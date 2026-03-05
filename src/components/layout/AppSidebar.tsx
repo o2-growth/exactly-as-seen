@@ -4,9 +4,9 @@ import { Home, BarChart3, Droplets, SlidersHorizontal, Users, Landmark, Trending
 const navItems = [
   { to: '/', icon: Home, label: 'Overview' },
   { to: '/assumptions', icon: SlidersHorizontal, label: 'Assumptions' },
+  { to: '/clients', icon: Users, label: 'Clients & Growth' },
   { to: '/pnl', icon: BarChart3, label: 'P&L' },
   { to: '/cashflow', icon: Droplets, label: 'Cash Flow' },
-  { to: '/clients', icon: Users, label: 'Clients & Growth' },
   { to: '/debt', icon: Landmark, label: 'Debt & Finance' },
   { to: '/valuation', icon: TrendingUp, label: 'Valuation & Cap Table' },
   { to: '/history', icon: Clock, label: 'Version History' },
