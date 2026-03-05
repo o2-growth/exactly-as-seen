@@ -1,131 +1,91 @@
 
 
-# O2 Inc Financial Dashboard — Upgrade Plan
+# Implementation Plan — Cash Flow, Assumptions, Clients & Growth Upgrades
 
-This is a large set of changes across three major areas. Here is the implementation plan broken into clear steps.
+## 1. Cash Flow Page — Full Restructure (`src/pages/CashFlow.tsx`)
 
----
+**Rewrite** to use the same expandable-row pattern as P&L:
 
-## 1. Expand the Data Layer (`src/lib/financialData.ts`)
+- **Data structure**: Build a cash flow tree from existing `pnlData.ts` values:
+  - Opening Balance (derived: previous period's closing balance, starting at 0 for 2025)
+  - Inflows group (expandable): CaaS Revenue, SaaS Revenue, Education, BaaS, Financial Income — values from `PNL_TREE` code `1.1`–`1.4`
+  - Outflows group (expandable): COGS (code `3`), SG&A (code `4`), Headcount (code `5`), Marketing (code `7`), Debt Repayments (code `11`), Capex (code `12`), Taxes (code `TAX`), Commissions (code `3.1`), Commercial (code `6`)
+  - Closing Balance = Opening + Inflows + Outflows (outflows are negative)
 
-The current data layer only stores 4 top-level aggregates (grossRevenue, netRevenue, grossProfit, ebitda). The P&L drill-down and Overview improvements require a much richer dataset extracted from the Excel.
+- **Expandable table**: Reuse the `ExpandableRow` recursive component approach from P&L. Annual view (2025–2030 columns). Summary rows (Opening, Total Inflows, Total Outflows, Closing) highlighted bold.
 
-**New data to add:**
-- **Detailed P&L line items** as a hierarchical structure with annual values (2025-2030) from Page 1 of the Excel:
-  - Revenue by sub-BU: CaaS (Enterprise, Assessoria, Corporate, Setup), SaaS (Oxy, Oxy+Genio), Education (Dono CFO), BaaS
-  - Sales Deductions (total by year)
-  - COGS (total by year)
-  - Sales Commissions, Marketing Expenses
-  - Contribution Margin
-  - Administrative Expenses (26 sub-items: 4.01-4.26, annual totals from Excel Page 3)
-  - Headcount Expenses (5.01-5.11, annual totals)
-  - Commercial Expenses (6.01-6.09, annual totals)
-  - Other Expenses, D&A
-  - Financial Result (8.01-8.10)
-  - Taxes (IRPJ, CSLL)
-  - Net Income
-  - Debt Payments (11.01-11.04)
-  - Capex (12.01-12.06)
-  - Final Cash Result
+- **Waterfall chart**: Below the table. One bar per year showing Opening → +Inflows → −Outflows → Closing. Use stacked bars with green (inflows), red (outflows), blue (net). Professional styling: larger axis fonts (13px), R$ formatted Y-axis via `tickFormatter`, subtle gridlines (`strokeDasharray="3 3"`, lighter stroke), institutional palette (`#0f766e` teal for inflows, `#dc2626` for outflows, `#1e40af` for net).
 
-- **Net Income and Net Margin** data for Overview KPI
-- **Operating Cash Flow** data for the Margin Evolution chart
-- **Monthly breakdown data** per year from Page 2 (for monthly P&L view)
+- **Remove**: All debt detail table (the creditor table at the bottom). Debt lives only in DebtFinance page.
 
-All values will be hardcoded from the Excel (R$ thousands) in a structured `PNL_DATA` object, organized as a tree of `{ label, code, annual: Record<Year, number>, children?: [...] }`.
+- **Remove**: Cash Runway KPI, Monthly Cumulative chart (replaced by the new structure).
 
-**New file: `src/lib/pnlData.ts`** — Contains the full P&L hierarchy extracted from the spreadsheet. This keeps `financialData.ts` manageable.
+## 2. Assumptions Page — Full Redesign (`src/pages/Assumptions.tsx`)
 
-**Updates to `financialData.ts`:**
-- Add `netIncome` and `netMargin` to `BASE_ANNUAL_DATA`
-- Add `operatingCashFlow` to `BASE_ANNUAL_DATA`
-- Extend `ProjectionData` interface with `netIncome`, `netMargin`, `operatingCashFlow`
-- Update `calculateProjections` to compute these new fields
+**Rewrite** from slider-based to spreadsheet-style editable grid:
 
----
+- **Edit mode toggle**: "Edit Assumptions" button (top right, Lock icon). When locked, all cells are read-only with a muted background. When unlocked, cells become editable inputs with a subtle border highlight.
 
-## 2. Overview Page Improvements (`src/pages/Overview.tsx`)
+- **Save flow**: When user clicks "Save", show a Dialog modal requiring a mandatory note ("Why are you changing this assumption?") + Confirm button. On confirm: call `saveVersion()` from VersionHistoryContext, then re-lock cells. "Cancel" discards all changes (reset to last saved state).
 
-- **5th KPI card**: Add "Net Margin %" using the new `netMargin` data from projections
-- **Assumptions Summary section**: A new card below KPIs showing:
-  - YoY Revenue Growth % as a small horizontal bar chart (computed from grossRevenue data)
-  - Key highlights: avg ticket per BU (from assumptions.tickets), churn rates, total headcount (summed from HEADCOUNT data)
-- **Client Growth chart**: Add a secondary right Y-axis with YoY growth % as a Line overlay
-- **Revenue Growth chart tooltip**: Increase font size to 13px, add color-coded dots via custom tooltip component
-- **Margin Evolution chart**: Add two new `<Line>` elements for Net Margin % and Cash Generation (operating cash flow as % of revenue)
+- **State management**: Use local `editState` (clone of assumptions) that only commits to context on save. `isDirty` flag tracks unsaved changes.
 
----
+- **Sections as card-based grids**:
 
-## 3. P&L Page — Full Drill-Down (`src/pages/PnL.tsx`)
+  1. **Client Growth** — Table with rows = sub-products (CaaS Assessoria, Enterprise, Corporate, Setup, SaaS Oxy, Oxy+Gênio, Education Dono CFO, BaaS), columns = 2025–2030. Values from assumptions context. Editable number inputs.
 
-Complete rewrite using the hierarchical data structure.
+  2. **Average Ticket (BRL/month)** — Simple 2-column grid: Product | Monthly Ticket (R$). 8 rows matching `assumptions.tickets`.
 
-**Implementation approach:**
-- Create a recursive `<ExpandableRow>` component that renders a row with a chevron toggle. When expanded, it renders its children rows indented.
-- Summary/total rows (Net Revenue, Gross Profit, EBITDA, etc.) rendered as bold, non-expandable rows with background highlight
-- Each row shows the label + values for all 6 years (annual view) or 12 months (monthly view)
-- Margin % rows shown as badges (green >70%, yellow otherwise)
+  3. **Churn Rate** — Small table: BU | Annual Churn %. Two rows (CaaS, SaaS).
 
-**View toggle**: Annual | Monthly | 5-Year Summary
-- Annual: full table with 2025-2030 columns
-- Monthly: 12-month columns for the selected year, values derived from monthly data
-- 5-Year: condensed view with totals
+  4. **Headcount & Salaries** — Table: Role | BU | Headcount per year (2025–2030) | Monthly Salary | Total Monthly Cost. Data from `HEADCOUNT` array. Add a `salary` field per role to the data (editable). Monthly cost = headcount × salary.
 
-**"Update Chart of Accounts" button**: Opens a Dialog/modal with a list of all line items. Each item has:
-- Editable label (text input)
-- Visibility toggle (eye icon)
-- Add new item button at bottom of each group
-- State stored in React context or local state (persisted via localStorage)
+  5. **Cost Assumptions** — SG&A items with annual growth rate %. Marketing budget by BU. Read from existing data, growth rate editable.
 
-**Chart of Accounts customization state**: Store in a new `useLocalStorage` hook or within the financial model context as `customLabels: Record<string, string>` and `hiddenItems: string[]`.
+- **Remove**: All slider components, live preview sidebar chart.
 
----
+- **Expand `Assumptions` interface** in `financialData.ts` to add:
+  - `headcountSalaries: Record<string, number>` — salary per role
+  - `sgaGrowthRate: number` — annual SG&A growth %
+  - Sub-product client breakdowns per year (currently only top-level CaaS/SaaS/Education)
 
-## 4. Version History System
+- **Update `DEFAULT_ASSUMPTIONS`** with new fields and default values.
 
-**New context/state: `src/contexts/VersionHistoryContext.tsx`**
-- Stores an array of version snapshots: `{ id, version: string, timestamp: Date, note: string, assumptions: Assumptions, scenario: Scenario }`
-- Version 1.0 = initial `DEFAULT_ASSUMPTIONS` with note "Base model (March 5, 2025)"
-- When assumptions change and user clicks "Save Version" (or auto-save on assumption page), prompt for a note, then push a new snapshot
-- Diff computation: compare current assumptions object vs previous version's assumptions, produce list of `{ field, oldValue, newValue }`
+## 3. Clients & Growth Page — Expand (`src/pages/ClientsGrowth.tsx`)
 
-**Sidebar addition (`AppSidebar.tsx`):**
-- New "History" nav item with a Clock icon linking to a `/history` page or a slide-out panel
+**Major edits**:
 
-**History Panel/Page (`src/pages/VersionHistory.tsx`):**
-- List of all versions with timestamp, version number, and note
-- Click a version to enter read-only preview mode (set context to that version's assumptions)
-- "Restore this version" button that replaces current assumptions
-- Side-by-side diff table showing changed fields
+- **Sub-product segmentation**: Replace 3-series bar chart (CaaS/SaaS/Education) with 7+ series: CaaS Enterprise, CaaS Assessoria, CaaS Corporate, SaaS Oxy, SaaS Oxy+Gênio, Education Dono CFO, BaaS. Data derived from new sub-product client assumptions.
 
-**Header badge (`AppHeader.tsx`):**
-- Display current version badge (e.g., "v1.2") next to the scenario switcher
+- **Planned vs. Actual toggle**: Add a toggle switch at the top. "Planned" = model values (default). "Actual" = editable input table (initially empty/placeholder) for future Meta Ads integration. Store actual data in local state. When "Actual" selected, show editable cells alongside charts.
 
-**Storage**: All versions stored in localStorage via a custom hook for persistence across sessions.
+- **Marketing KPIs section** (new card):
+  - CAC by channel/sector: table from `CAC_BY_SECTOR` data
+  - LTV:CAC ratio: LTV = Avg Ticket / Monthly Churn (computed)
+  - MRR = total clients × avg ticket for selected year; ARR = MRR × 12
+  - Lead volume + conversion rate: placeholder input fields
 
----
+- **Headcount table**: Expand `HEADCOUNT` data with more roles (Customer Service, Operations, etc.) and add salary column. Link to Assumptions page data via context.
+
+## 4. Data Layer Updates (`src/lib/financialData.ts`)
+
+- Extend `Assumptions` interface with: `subProductClients` (per sub-product per year), `headcountSalaries`, `sgaGrowthRate`
+- Extend `DEFAULT_ASSUMPTIONS` with sub-product client defaults derived from current totals
+- Add `HEADCOUNT_SALARIES` defaults
 
 ## File Changes Summary
 
 | File | Action |
 |------|--------|
-| `src/lib/pnlData.ts` | **New** — Full P&L hierarchy data from Excel |
-| `src/lib/financialData.ts` | **Edit** — Add netIncome, netMargin, operatingCashFlow |
-| `src/contexts/FinancialModelContext.tsx` | **Edit** — Add chart-of-accounts customization state |
-| `src/contexts/VersionHistoryContext.tsx` | **New** — Version snapshot management |
-| `src/pages/Overview.tsx` | **Edit** — 5th KPI, assumptions summary, chart improvements |
-| `src/pages/PnL.tsx` | **Rewrite** — Full expandable income statement |
-| `src/components/layout/AppSidebar.tsx` | **Edit** — Add History nav item |
-| `src/components/layout/AppHeader.tsx` | **Edit** — Add version badge |
-| `src/pages/VersionHistory.tsx` | **New** — Version history panel |
-| `src/App.tsx` | **Edit** — Add /history route, wrap with VersionHistoryProvider |
-
----
+| `src/lib/financialData.ts` | Edit — expand Assumptions with sub-product clients, salaries, SG&A growth |
+| `src/pages/CashFlow.tsx` | Rewrite — expandable cash flow table + waterfall chart |
+| `src/pages/Assumptions.tsx` | Rewrite — spreadsheet grid with edit/lock, save modal |
+| `src/pages/ClientsGrowth.tsx` | Rewrite — sub-product charts, planned/actual, marketing KPIs |
 
 ## Implementation Order
 
-1. Data layer expansion (pnlData.ts + financialData.ts updates)
-2. P&L page rewrite with expandable rows and Chart of Accounts modal
-3. Overview page improvements (KPI, charts, assumptions summary)
-4. Version History system (context, page, sidebar/header integration)
+1. Data layer (financialData.ts — new assumption fields)
+2. Cash Flow page rewrite
+3. Assumptions page rewrite
+4. Clients & Growth page expansion
 
