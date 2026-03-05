@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { FinancialModelProvider } from "@/contexts/FinancialModelContext";
+import { VersionHistoryProvider } from "@/contexts/VersionHistoryContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Overview from "./pages/Overview";
 import PnL from "./pages/PnL";
@@ -11,6 +12,7 @@ import CashFlow from "./pages/CashFlow";
 import Assumptions from "./pages/Assumptions";
 import ClientsGrowth from "./pages/ClientsGrowth";
 import DebtFinance from "./pages/DebtFinance";
+import VersionHistory from "./pages/VersionHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,19 +23,22 @@ const App = () => (
       <Toaster />
       <Sonner />
       <FinancialModelProvider>
-        <BrowserRouter>
-          <AppLayout>
-            <Routes>
-              <Route path="/" element={<Overview />} />
-              <Route path="/pnl" element={<PnL />} />
-              <Route path="/cashflow" element={<CashFlow />} />
-              <Route path="/assumptions" element={<Assumptions />} />
-              <Route path="/clients" element={<ClientsGrowth />} />
-              <Route path="/debt" element={<DebtFinance />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AppLayout>
-        </BrowserRouter>
+        <VersionHistoryProvider>
+          <BrowserRouter>
+            <AppLayout>
+              <Routes>
+                <Route path="/" element={<Overview />} />
+                <Route path="/pnl" element={<PnL />} />
+                <Route path="/cashflow" element={<CashFlow />} />
+                <Route path="/assumptions" element={<Assumptions />} />
+                <Route path="/clients" element={<ClientsGrowth />} />
+                <Route path="/debt" element={<DebtFinance />} />
+                <Route path="/history" element={<VersionHistory />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AppLayout>
+          </BrowserRouter>
+        </VersionHistoryProvider>
       </FinancialModelProvider>
     </TooltipProvider>
   </QueryClientProvider>
