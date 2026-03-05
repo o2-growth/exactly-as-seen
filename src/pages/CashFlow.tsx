@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
-import { PNL_TREE, PnlNode } from '@/lib/pnlData';
+import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency } from '@/lib/formatters';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import {
@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 
 // Helper to find a node by code in the PNL tree
-function findNode(code: string, nodes: PnlNode[] = PNL_TREE): PnlNode | undefined {
+function findNode(code: string, nodes: PnlNode[]): PnlNode | undefined {
   for (const n of nodes) {
     if (n.code === code) return n;
     if (n.children) {
@@ -21,8 +21,8 @@ function findNode(code: string, nodes: PnlNode[] = PNL_TREE): PnlNode | undefine
   return undefined;
 }
 
-function getAnnual(code: string, year: Year, multiplier: number): number {
-  const node = findNode(code);
+function getAnnual(code: string, year: Year, multiplier: number, tree: PnlNode[]): number {
+  const node = findNode(code, tree);
   if (!node) return 0;
   return Math.round(node.annual[year] * multiplier);
 }
@@ -35,27 +35,27 @@ interface CashFlowRow {
   children?: CashFlowRow[];
 }
 
-function buildCashFlowTree(multiplier: number): CashFlowRow[] {
+function buildCashFlowTree(multiplier: number, tree: PnlNode[]): CashFlowRow[] {
   const inflows: CashFlowRow[] = [
-    { code: 'I.1', label: 'CaaS Revenue', getValues: (y, m) => getAnnual('1.1', y, m) },
-    { code: 'I.2', label: 'SaaS Revenue', getValues: (y, m) => getAnnual('1.2', y, m) },
-    { code: 'I.3', label: 'Education', getValues: (y, m) => getAnnual('1.3', y, m) },
-    { code: 'I.4', label: 'BaaS', getValues: (y, m) => getAnnual('1.4', y, m) },
-    { code: 'I.5', label: 'Financial Income', getValues: (y, m) => Math.max(0, getAnnual('8', y, m)) },
+    { code: 'I.1', label: 'CaaS Revenue', getValues: (y, m) => getAnnual('1.1', y, m, tree) },
+    { code: 'I.2', label: 'SaaS Revenue', getValues: (y, m) => getAnnual('1.2', y, m, tree) },
+    { code: 'I.3', label: 'Education', getValues: (y, m) => getAnnual('1.3', y, m, tree) },
+    { code: 'I.4', label: 'BaaS', getValues: (y, m) => getAnnual('1.4', y, m, tree) },
+    { code: 'I.5', label: 'Financial Income', getValues: (y, m) => Math.max(0, getAnnual('8', y, m, tree)) },
   ];
 
   const outflows: CashFlowRow[] = [
-    { code: 'O.1', label: 'Sales Deductions', getValues: (y, m) => getAnnual('2', y, m) },
-    { code: 'O.2', label: 'COGS', getValues: (y, m) => getAnnual('3', y, m) },
-    { code: 'O.3', label: 'SG&A', getValues: (y, m) => getAnnual('4', y, m) },
-    { code: 'O.4', label: 'Headcount', getValues: (y, m) => getAnnual('5', y, m) },
-    { code: 'O.5', label: 'Commissions', getValues: (y, m) => getAnnual('3.1', y, m) },
-    { code: 'O.6', label: 'Marketing', getValues: (y, m) => getAnnual('7', y, m) },
-    { code: 'O.7', label: 'Commercial', getValues: (y, m) => getAnnual('6', y, m) },
-    { code: 'O.8', label: 'Taxes', getValues: (y, m) => getAnnual('TAX', y, m) },
-    { code: 'O.9', label: 'Debt Repayments', getValues: (y, m) => getAnnual('11', y, m) },
-    { code: 'O.10', label: 'Capex', getValues: (y, m) => getAnnual('12', y, m) },
-    { code: 'O.11', label: 'Financial Costs', getValues: (y, m) => Math.min(0, getAnnual('8', y, m)) },
+    { code: 'O.1', label: 'Sales Deductions', getValues: (y, m) => getAnnual('2', y, m, tree) },
+    { code: 'O.2', label: 'COGS', getValues: (y, m) => getAnnual('3', y, m, tree) },
+    { code: 'O.3', label: 'SG&A', getValues: (y, m) => getAnnual('4', y, m, tree) },
+    { code: 'O.4', label: 'Headcount', getValues: (y, m) => getAnnual('5', y, m, tree) },
+    { code: 'O.5', label: 'Commissions', getValues: (y, m) => getAnnual('3.1', y, m, tree) },
+    { code: 'O.6', label: 'Marketing', getValues: (y, m) => getAnnual('7', y, m, tree) },
+    { code: 'O.7', label: 'Commercial', getValues: (y, m) => getAnnual('6', y, m, tree) },
+    { code: 'O.8', label: 'Taxes', getValues: (y, m) => getAnnual('TAX', y, m, tree) },
+    { code: 'O.9', label: 'Debt Repayments', getValues: (y, m) => getAnnual('11', y, m, tree) },
+    { code: 'O.10', label: 'Capex', getValues: (y, m) => getAnnual('12', y, m, tree) },
+    { code: 'O.11', label: 'Financial Costs', getValues: (y, m) => Math.min(0, getAnnual('8', y, m, tree)) },
   ];
 
   return [
@@ -124,9 +124,9 @@ const formatAxis = (v: number) => {
 };
 
 export default function CashFlow() {
-  const { scenario } = useFinancialModel();
+  const { scenario, pnlTree } = useFinancialModel();
   const multiplier = scenario === 'BULL' ? 1.2 : scenario === 'BEAR' ? 0.8 : 1.0;
-  const tree = buildCashFlowTree(multiplier);
+  const tree = buildCashFlowTree(multiplier, pnlTree);
 
   // Compute opening/closing balances
   let openingBalance = 0;
