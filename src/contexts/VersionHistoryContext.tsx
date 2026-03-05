@@ -57,6 +57,13 @@ function deepDiffAssumptions(a: Assumptions, b: Assumptions): VersionDiff[] {
   compareRecord('SaaS Clients', a.saasClients, b.saasClients);
   compareRecord('Education Clients', a.educationClients, b.educationClients);
 
+  // Sub-product clients
+  if (a.subProductClients && b.subProductClients) {
+    for (const key of Object.keys(a.subProductClients) as (keyof typeof a.subProductClients)[]) {
+      compareRecord(`SubProduct ${key}`, a.subProductClients[key], b.subProductClients[key]);
+    }
+  }
+
   for (const key of Object.keys(a.tickets) as (keyof typeof a.tickets)[]) {
     if (a.tickets[key] !== b.tickets[key]) {
       diffs.push({ field: `Ticket ${key}`, oldValue: a.tickets[key], newValue: b.tickets[key] });
@@ -67,6 +74,17 @@ function deepDiffAssumptions(a: Assumptions, b: Assumptions): VersionDiff[] {
   if (a.churnSaas !== b.churnSaas) diffs.push({ field: 'Churn SaaS', oldValue: a.churnSaas, newValue: b.churnSaas });
   if (a.sgaPercent !== b.sgaPercent) diffs.push({ field: 'SG&A %', oldValue: a.sgaPercent, newValue: b.sgaPercent });
   if (a.headcountGrowth !== b.headcountGrowth) diffs.push({ field: 'Headcount Growth', oldValue: a.headcountGrowth, newValue: b.headcountGrowth });
+  if (a.sgaGrowthRate !== b.sgaGrowthRate) diffs.push({ field: 'SG&A Growth Rate', oldValue: a.sgaGrowthRate, newValue: b.sgaGrowthRate });
+
+  // Headcount salaries
+  if (a.headcountSalaries && b.headcountSalaries) {
+    const allKeys = new Set([...Object.keys(a.headcountSalaries), ...Object.keys(b.headcountSalaries)]);
+    for (const key of allKeys) {
+      if ((a.headcountSalaries[key] || 0) !== (b.headcountSalaries[key] || 0)) {
+        diffs.push({ field: `Salary ${key}`, oldValue: a.headcountSalaries[key] || 0, newValue: b.headcountSalaries[key] || 0 });
+      }
+    }
+  }
 
   return diffs;
 }

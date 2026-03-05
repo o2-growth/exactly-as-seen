@@ -1,10 +1,22 @@
 export const YEARS = [2025, 2026, 2027, 2028, 2029, 2030] as const;
 export type Year = typeof YEARS[number];
 
+export interface SubProductClients {
+  caasAssessoria: Record<Year, number>;
+  caasEnterprise: Record<Year, number>;
+  caasCorporate: Record<Year, number>;
+  caasSetup: Record<Year, number>;
+  saasOxy: Record<Year, number>;
+  saasOxyGenio: Record<Year, number>;
+  educationDonoCFO: Record<Year, number>;
+  baas: Record<Year, number>;
+}
+
 export interface Assumptions {
   caasClients: Record<Year, number>;
   saasClients: Record<Year, number>;
   educationClients: Record<Year, number>;
+  subProductClients: SubProductClients;
   tickets: {
     caasAssessoria: number;
     caasEnterprise: number;
@@ -19,12 +31,24 @@ export interface Assumptions {
   churnSaas: number;
   sgaPercent: number;
   headcountGrowth: number;
+  headcountSalaries: Record<string, number>;
+  sgaGrowthRate: number;
 }
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   caasClients: { 2025: 167, 2026: 272, 2027: 768, 2028: 2136, 2029: 4171, 2030: 6472 },
   saasClients: { 2025: 226, 2026: 631, 2027: 2293, 2028: 7992, 2029: 19471, 2030: 37918 },
   educationClients: { 2025: 49, 2026: 145, 2027: 605, 2028: 2373, 2029: 5292, 2030: 9504 },
+  subProductClients: {
+    caasAssessoria:  { 2025: 21, 2026: 78, 2027: 188, 2028: 525, 2029: 1127, 2030: 1886 },
+    caasEnterprise:  { 2025: 65, 2026: 130, 2027: 315, 2028: 879, 2029: 1887, 2030: 3157 },
+    caasCorporate:   { 2025: 6, 2026: 15, 2027: 37, 2028: 104, 2029: 223, 2030: 373 },
+    caasSetup:       { 2025: 75, 2026: 49, 2027: 228, 2028: 628, 2029: 934, 2030: 1056 },
+    saasOxy:         { 2025: 55, 2026: 289, 2027: 936, 2028: 3358, 2029: 8177, 2030: 15709 },
+    saasOxyGenio:    { 2025: 47, 2026: 186, 2027: 539, 2028: 1824, 2029: 4061, 2030: 7849 },
+    educationDonoCFO:{ 2025: 26, 2026: 101, 2027: 394, 2028: 1562, 2029: 3952, 2030: 7570 },
+    baas:            { 2025: 0, 2026: 0, 2027: 960, 2028: 6840, 2029: 25264, 2030: 65340 },
+  },
   tickets: {
     caasAssessoria: 2000,
     caasEnterprise: 9210,
@@ -39,6 +63,15 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   churnSaas: 5,
   sgaPercent: 15,
   headcountGrowth: 10,
+  headcountSalaries: {
+    'CFOs': 8500,
+    'PMO Directors': 12000,
+    'Sales Team': 6000,
+    'Tech Team': 9000,
+    'Customer Service': 4500,
+    'Operations': 5500,
+  },
+  sgaGrowthRate: 10,
 };
 
 // Base annual data (R$ thousands)
@@ -141,8 +174,21 @@ export const CAC_BY_SECTOR = [
 
 // Headcount data
 export const HEADCOUNT = [
-  { role: 'CFOs', 2025: 11, 2026: 97, 2027: 431, 2028: 950, 2029: 1800, 2030: 3200 },
-  { role: 'PMO Directors', 2025: 1, 2026: 8, 2027: 65, 2028: 180, 2029: 400, 2030: 750 },
-  { role: 'Sales Team', 2025: 5, 2026: 15, 2027: 45, 2028: 120, 2029: 280, 2030: 500 },
-  { role: 'Tech Team', 2025: 8, 2026: 20, 2027: 55, 2028: 140, 2029: 300, 2030: 520 },
+  { role: 'CFOs', bu: 'CaaS', 2025: 11, 2026: 97, 2027: 431, 2028: 950, 2029: 1800, 2030: 3200 },
+  { role: 'PMO Directors', bu: 'CaaS', 2025: 1, 2026: 8, 2027: 65, 2028: 180, 2029: 400, 2030: 750 },
+  { role: 'Sales Team', bu: 'Commercial', 2025: 5, 2026: 15, 2027: 45, 2028: 120, 2029: 280, 2030: 500 },
+  { role: 'Tech Team', bu: 'SaaS', 2025: 8, 2026: 20, 2027: 55, 2028: 140, 2029: 300, 2030: 520 },
+  { role: 'Customer Service', bu: 'Operations', 2025: 3, 2026: 10, 2027: 32, 2028: 90, 2029: 215, 2030: 460 },
+  { role: 'Operations', bu: 'Operations', 2025: 2, 2026: 5, 2027: 12, 2028: 30, 2029: 65, 2030: 120 },
 ];
+
+export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
+  caasAssessoria: 'CaaS Assessoria',
+  caasEnterprise: 'CaaS Enterprise',
+  caasCorporate: 'CaaS Corporate',
+  caasSetup: 'CaaS Setup',
+  saasOxy: 'SaaS Oxy',
+  saasOxyGenio: 'SaaS Oxy+Gênio',
+  educationDonoCFO: 'Education Dono CFO',
+  baas: 'BaaS',
+};
