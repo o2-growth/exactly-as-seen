@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
+import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { formatCurrency } from '@/lib/formatters';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, Save } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line,
@@ -33,7 +35,10 @@ function SliderInput({ label, value, min, max, step = 1, onChange, format = 'num
 }
 
 export default function Assumptions() {
-  const { assumptions, updateAssumption, resetAssumptions, projections } = useFinancialModel();
+  const { assumptions, updateAssumption, resetAssumptions, projections, scenario } = useFinancialModel();
+  const { saveVersion } = useVersionHistory();
+  const [saveNote, setSaveNote] = useState('');
+  const [showSave, setShowSave] = useState(false);
 
   const updateClientYear = (line: 'caasClients' | 'saasClients' | 'educationClients', year: Year, value: number) => {
     updateAssumption(line, { ...assumptions[line], [year]: value });
@@ -51,11 +56,48 @@ export default function Assumptions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold">Assumptions</h2>
-        <button onClick={resetAssumptions} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
-          <RotateCcw className="h-3.5 w-3.5" /> Reset to Base
-        </button>
+        <div className="flex items-center gap-2">
+          {showSave ? (
+            <div className="flex items-center gap-2">
+              <input
+                className="bg-secondary border border-border rounded-lg px-3 py-1.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary w-48"
+                placeholder="Nota da versão..."
+                value={saveNote}
+                onChange={e => setSaveNote(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && saveNote.trim()) {
+                    saveVersion(saveNote.trim(), assumptions, scenario);
+                    setSaveNote('');
+                    setShowSave(false);
+                  }
+                }}
+              />
+              <button
+                disabled={!saveNote.trim()}
+                onClick={() => {
+                  saveVersion(saveNote.trim(), assumptions, scenario);
+                  setSaveNote('');
+                  setShowSave(false);
+                }}
+                className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                Salvar
+              </button>
+              <button onClick={() => setShowSave(false)} className="text-xs text-muted-foreground hover:text-foreground">
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setShowSave(true)} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-primary/40 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+              <Save className="h-3.5 w-3.5" /> Save Version
+            </button>
+          )}
+          <button onClick={resetAssumptions} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset to Base
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">

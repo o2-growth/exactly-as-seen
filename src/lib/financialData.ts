@@ -43,10 +43,12 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
 
 // Base annual data (R$ thousands)
 export const BASE_ANNUAL_DATA = {
-  grossRevenue:  { 2025: 13777, 2026: 34250, 2027: 103707, 2028: 337072, 2029: 785967, 2030: 1460172 },
-  netRevenue:    { 2025: 12447, 2026: 30945, 2027: 87892,  2028: 285669, 2029: 666107, 2030: 1237496 },
-  grossProfit:   { 2025: 9679,  2026: 23643, 2027: 68276,  2028: 229690, 2029: 540218, 2030: 1010705 },
-  ebitda:        { 2025: 1360,  2026: 7136,  2027: 6605,   2028: 18606,  2029: 41855,  2030: 118380  },
+  grossRevenue:     { 2025: 13777, 2026: 34250, 2027: 103707, 2028: 337072, 2029: 785967, 2030: 1460172 },
+  netRevenue:       { 2025: 12447, 2026: 30945, 2027: 87892,  2028: 285669, 2029: 666107, 2030: 1237496 },
+  grossProfit:      { 2025: 9679,  2026: 23643, 2027: 68276,  2028: 229690, 2029: 540218, 2030: 1010705 },
+  ebitda:           { 2025: 1360,  2026: 7136,  2027: 6605,   2028: 18606,  2029: 41855,  2030: 118380  },
+  netIncome:        { 2025: -174,  2026: 3409,  2027: 4357,   2028: 12268,  2029: 27589,  2030: 78046   },
+  operatingCashFlow:{ 2025: -730,  2026: 2216,  2027: 2878,   2028: 9173,   2029: 21896,  2030: 68736   },
 };
 
 export const TOTAL_CLIENTS: Record<Year, number> = {
@@ -55,6 +57,10 @@ export const TOTAL_CLIENTS: Record<Year, number> = {
 
 export const GROSS_MARGINS: Record<Year, number> = {
   2025: 77.8, 2026: 76.4, 2027: 77.7, 2028: 80.4, 2029: 81.1, 2030: 81.7
+};
+
+export const NET_MARGINS: Record<Year, number> = {
+  2025: -1.4, 2026: 11.0, 2027: 5.0, 2028: 4.3, 2029: 4.1, 2030: 6.3
 };
 
 export type Scenario = 'BASE' | 'BULL' | 'BEAR';
@@ -70,8 +76,11 @@ export interface ProjectionData {
   netRevenue: Record<Year, number>;
   grossProfit: Record<Year, number>;
   ebitda: Record<Year, number>;
+  netIncome: Record<Year, number>;
+  operatingCashFlow: Record<Year, number>;
   totalClients: Record<Year, number>;
   grossMargins: Record<Year, number>;
+  netMargins: Record<Year, number>;
 }
 
 export function calculateProjections(
@@ -86,8 +95,11 @@ export function calculateProjections(
     netRevenue: {} as Record<Year, number>,
     grossProfit: {} as Record<Year, number>,
     ebitda: {} as Record<Year, number>,
+    netIncome: {} as Record<Year, number>,
+    operatingCashFlow: {} as Record<Year, number>,
     totalClients: {} as Record<Year, number>,
     grossMargins: {} as Record<Year, number>,
+    netMargins: {} as Record<Year, number>,
   };
 
   for (const year of YEARS) {
@@ -102,8 +114,11 @@ export function calculateProjections(
     projections.netRevenue[year] = Math.round(BASE_ANNUAL_DATA.netRevenue[year] * revenueScale);
     projections.grossProfit[year] = Math.round(BASE_ANNUAL_DATA.grossProfit[year] * revenueScale);
     projections.ebitda[year] = Math.round(BASE_ANNUAL_DATA.ebitda[year] * revenueScale);
+    projections.netIncome[year] = Math.round(BASE_ANNUAL_DATA.netIncome[year] * revenueScale);
+    projections.operatingCashFlow[year] = Math.round(BASE_ANNUAL_DATA.operatingCashFlow[year] * revenueScale);
     projections.totalClients[year] = assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year];
     projections.grossMargins[year] = GROSS_MARGINS[year];
+    projections.netMargins[year] = NET_MARGINS[year];
   }
 
   return projections;

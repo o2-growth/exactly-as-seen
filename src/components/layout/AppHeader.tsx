@@ -1,4 +1,5 @@
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
+import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Scenario } from '@/lib/financialData';
 import { FileDown } from 'lucide-react';
 
@@ -6,6 +7,7 @@ const scenarios: Scenario[] = ['BEAR', 'BASE', 'BULL'];
 
 export default function AppHeader() {
   const { scenario, setScenario, selectedYear, setSelectedYear } = useFinancialModel();
+  const { currentVersion } = useVersionHistory();
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 bg-card/90 backdrop-blur-md border-b border-border">
@@ -20,7 +22,10 @@ export default function AppHeader() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Scenario Switcher */}
+        {/* Version badge */}
+        <span className="hidden md:inline-flex items-center px-2 py-1 text-[10px] font-bold bg-primary/20 text-primary rounded-md border border-primary/30">
+          v{currentVersion}
+        </span>
         <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border">
           {scenarios.map((s) => (
             <button

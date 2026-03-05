@@ -1,115 +1,283 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS } from '@/lib/financialData';
+import { YEARS, Year } from '@/lib/financialData';
+import { PNL_TREE, PnlNode, MONTHLY_TOTALS_2025 } from '@/lib/pnlData';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
+import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from 'recharts';
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
 
-export default function PnL() {
-  const { projections, selectedYear } = useFinancialModel();
-  const [view, setView] = useState<'annual' | 'monthly'>('annual');
+type ViewMode = 'annual' | 'monthly' | 'summary';
 
-  const lineItems = [
-    { label: 'Gross Revenue', key: 'grossRevenue' as const },
-    { label: 'Net Revenue', key: 'netRevenue' as const },
-    { label: 'Gross Profit', key: 'grossProfit' as const },
-    { label: 'EBITDA', key: 'ebitda' as const },
-  ];
+function formatPnlValue(value: number, isMargin: boolean): string {
+  if (isMargin) return formatPercent(value);
+  if (value === 0) return '—';
+  return formatCurrency(value * 1000);
+}
 
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthlyData = months.map((m, i) => {
-    const annualRev = projections.grossRevenue[selectedYear];
-    // Simple distribution with growth curve
-    const weight = 0.6 + (i / 11) * 0.8;
-    const totalWeight = Array.from({ length: 12 }, (_, j) => 0.6 + (j / 11) * 0.8).reduce((a, b) => a + b, 0);
-    const monthlyRev = (annualRev * weight) / totalWeight;
-    return {
-      month: m,
-      CaaS: Math.round(monthlyRev * 0.45),
-      SaaS: Math.round(monthlyRev * 0.35),
-      Education: Math.round(monthlyRev * 0.15),
-      BaaS: Math.round(monthlyRev * 0.05),
-    };
+// Chart of Accounts customization
+function useChartOfAccounts() {
+  const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('o2_coa_labels') || '{}'); } catch { return {}; }
+  });
+  const [hiddenItems, setHiddenItems] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('o2_coa_hidden') || '[]')); } catch { return new Set(); }
   });
 
+  const setLabel = useCallback((code: string, label: string) => {
+    setCustomLabels(prev => {
+      const next = { ...prev, [code]: label };
+      localStorage.setItem('o2_coa_labels', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const toggleHidden = useCallback((code: string) => {
+    setHiddenItems(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      localStorage.setItem('o2_coa_hidden', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  return { customLabels, hiddenItems, setLabel, toggleHidden };
+}
+
+interface ExpandableRowProps {
+  node: PnlNode;
+  depth: number;
+  columns: (Year | string)[];
+  viewMode: ViewMode;
+  selectedYear: Year;
+  scenarioMultiplier: number;
+  customLabels: Record<string, string>;
+  hiddenItems: Set<string>;
+}
+
+function ExpandableRow({ node, depth, columns, viewMode, selectedYear, scenarioMultiplier, customLabels, hiddenItems }: ExpandableRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = node.children && node.children.length > 0;
+  const label = customLabels[node.code] || node.label;
+
+  if (hiddenItems.has(node.code)) return null;
+
+  const getValue = (col: Year | string): number => {
+    if (viewMode === 'monthly' && typeof col === 'string') {
+      const monthIdx = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(col);
+      // Use monthly data for 2025 totals, estimate for other years
+      const codeMap: Record<string, string> = {
+        '1': 'grossRevenue', '2': 'salesDeductions', 'NR': 'netRevenue',
+        '3': 'cogs', 'GP': 'grossProfit', '3.1': 'commissions',
+        '7': 'marketing', 'CM': 'contributionMargin', '4': 'adminExpenses',
+        '5': 'headcount', '6': 'commercial', '10': 'other', 'EBITDA': 'ebitda',
+      };
+      const key = codeMap[node.code];
+      if (key && MONTHLY_TOTALS_2025[key]) {
+        const yearScale = selectedYear === 2025 ? 1 : (node.annual[selectedYear] / (node.annual[2025] || 1));
+        return Math.round((MONTHLY_TOTALS_2025[key][monthIdx] || 0) * yearScale * scenarioMultiplier);
+      }
+      // Proportional estimate for sub-items
+      const annualVal = node.annual[selectedYear] * scenarioMultiplier;
+      return Math.round(annualVal / 12);
+    }
+    if (node.isMargin) return node.annual[col as Year];
+    return Math.round(node.annual[col as Year] * scenarioMultiplier);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">P&L — Income Statement</h2>
-        <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
-          {(['annual', 'monthly'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
-                view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {v}
-            </button>
-          ))}
+    <>
+      <tr
+        className={`border-b border-border/30 transition-colors ${
+          node.isSummary 
+            ? 'bg-primary/5 font-bold' 
+            : node.isMargin 
+              ? 'bg-transparent' 
+              : 'hover:bg-secondary/20'
+        }`}
+      >
+        <td
+          className="p-3 whitespace-nowrap cursor-pointer select-none"
+          style={{ paddingLeft: `${12 + depth * 20}px` }}
+          onClick={() => hasChildren && setExpanded(!expanded)}
+        >
+          <div className="flex items-center gap-1.5">
+            {hasChildren ? (
+              expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <span className="w-3.5" />
+            )}
+            <span className="text-[11px] text-muted-foreground font-mono mr-1.5">{node.code}</span>
+            <span className={`text-sm ${node.isSummary ? 'text-foreground' : node.isMargin ? 'text-muted-foreground italic' : 'text-foreground/90'}`}>
+              {label}
+            </span>
+          </div>
+        </td>
+        {columns.map((col) => {
+          const val = getValue(col);
+          return (
+            <td key={String(col)} className="text-right p-3 tabular-nums text-sm">
+              {node.isMargin ? (
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                  val > 70 ? 'bg-success/20 text-positive' : val > 0 ? 'bg-warning/20 text-warning' : 'bg-destructive/20 text-negative'
+                }`}>
+                  {formatPercent(val)}
+                </span>
+              ) : (
+                <span className={val < 0 ? 'text-negative' : ''}>
+                  {formatPnlValue(val, false)}
+                </span>
+              )}
+            </td>
+          );
+        })}
+      </tr>
+      {expanded && node.children?.map(child => (
+        <ExpandableRow
+          key={child.code}
+          node={child}
+          depth={depth + 1}
+          columns={columns}
+          viewMode={viewMode}
+          selectedYear={selectedYear}
+          scenarioMultiplier={scenarioMultiplier}
+          customLabels={customLabels}
+          hiddenItems={hiddenItems}
+        />
+      ))}
+    </>
+  );
+}
+
+function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden }: {
+  customLabels: Record<string, string>;
+  hiddenItems: Set<string>;
+  setLabel: (code: string, label: string) => void;
+  toggleHidden: (code: string) => void;
+}) {
+  const renderItems = (nodes: PnlNode[], depth = 0): React.ReactNode => {
+    return nodes.map(node => (
+      <div key={node.code}>
+        <div className="flex items-center gap-2 py-1.5" style={{ paddingLeft: `${depth * 16}px` }}>
+          <button onClick={() => toggleHidden(node.code)} className="text-muted-foreground hover:text-foreground">
+            {hiddenItems.has(node.code) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
+          <span className="text-[10px] text-muted-foreground font-mono w-10">{node.code}</span>
+          <input
+            className="flex-1 bg-secondary/50 border border-border rounded px-2 py-1 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+            value={customLabels[node.code] || node.label}
+            onChange={(e) => setLabel(node.code, e.target.value)}
+          />
+        </div>
+        {node.children && renderItems(node.children, depth + 1)}
+      </div>
+    ));
+  };
+
+  return (
+    <DialogContent className="max-w-xl max-h-[70vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-lg">Plano de Contas</DialogTitle>
+      </DialogHeader>
+      <div className="space-y-0.5 mt-2">
+        {renderItems(PNL_TREE)}
+      </div>
+      <div className="pt-3 border-t border-border mt-3">
+        <button className="flex items-center gap-1.5 text-xs text-primary hover:underline">
+          <Plus className="h-3 w-3" /> Adicionar linha
+        </button>
+      </div>
+    </DialogContent>
+  );
+}
+
+export default function PnL() {
+  const { scenario, selectedYear } = useFinancialModel();
+  const [viewMode, setViewMode] = useState<ViewMode>('annual');
+  const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
+
+  const scenarioMultiplier = scenario === 'BULL' ? 1.2 : scenario === 'BEAR' ? 0.8 : 1.0;
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const columns: (Year | string)[] = viewMode === 'monthly'
+    ? months
+    : viewMode === 'summary'
+      ? [2025, 2030] as Year[]
+      : [...YEARS];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-2xl font-bold">P&L — Demonstração de Resultado</h2>
+        <div className="flex items-center gap-3">
+          {/* View toggle */}
+          <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
+            {(['annual', 'monthly', 'summary'] as const).map(v => (
+              <button
+                key={v}
+                onClick={() => setViewMode(v)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
+                  viewMode === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {v === 'summary' ? '5-Year' : v}
+              </button>
+            ))}
+          </div>
+
+          {/* CoA Modal */}
+          <Dialog>
+            <DialogTrigger asChild>
+              <button className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
+                <Settings2 className="h-3.5 w-3.5" />
+                Plano de Contas
+              </button>
+            </DialogTrigger>
+            <CoaModal customLabels={customLabels} hiddenItems={hiddenItems} setLabel={setLabel} toggleHidden={toggleHidden} />
+          </Dialog>
         </div>
       </div>
 
-      {view === 'annual' ? (
-        <div className="gradient-card overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left p-4 text-muted-foreground font-medium">Line Item</th>
-                {YEARS.map(y => (
-                  <th key={y} className="text-right p-4 text-muted-foreground font-medium">{y}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {lineItems.map(({ label, key }) => (
-                <tr key={key} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                  <td className="p-4 font-medium">{label}</td>
-                  {YEARS.map(y => (
-                    <td key={y} className="text-right p-4 tabular-nums">
-                      {formatCurrency(projections[key][y] * 1000)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              <tr className="border-b border-border/50">
-                <td className="p-4 font-medium">Gross Margin</td>
-                {YEARS.map(y => (
-                  <td key={y} className="text-right p-4">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-                      projections.grossMargins[y] > 70 ? 'bg-success/20 text-positive' : 'bg-warning/20 text-warning'
-                    }`}>
-                      {formatPercent(projections.grossMargins[y])}
-                    </span>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="gradient-card p-5">
-          <h3 className="text-sm font-semibold mb-4">Monthly Revenue Breakdown — {selectedYear} (R$ thousands)</h3>
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22%)" />
-              <XAxis dataKey="month" stroke="hsl(215 20% 55%)" fontSize={11} />
-              <YAxis stroke="hsl(215 20% 55%)" fontSize={11} />
-              <Tooltip
-                contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 12 }}
-                labelStyle={{ color: 'hsl(210 40% 98%)' }}
-              />
-              <Bar dataKey="CaaS" stackId="a" fill="#3b82f6" />
-              <Bar dataKey="SaaS" stackId="a" fill="#8b5cf6" />
-              <Bar dataKey="Education" stackId="a" fill="#f59e0b" />
-              <Bar dataKey="BaaS" stackId="a" fill="#14b8a6" radius={[4, 4, 0, 0]} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {viewMode === 'monthly' && (
+        <p className="text-xs text-muted-foreground">Detalhamento mensal — {selectedYear}</p>
       )}
+
+      <div className="gradient-card overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left p-3 text-muted-foreground font-medium min-w-[260px] sticky left-0 bg-card">
+                Descrição
+              </th>
+              {columns.map(col => (
+                <th key={String(col)} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                  {String(col)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {PNL_TREE.map(node => (
+              <ExpandableRow
+                key={node.code}
+                node={node}
+                depth={0}
+                columns={columns}
+                viewMode={viewMode}
+                selectedYear={selectedYear}
+                scenarioMultiplier={scenarioMultiplier}
+                customLabels={customLabels}
+                hiddenItems={hiddenItems}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground text-center pt-2">
+        Valores em R$ mil (000's) · {scenario} scenario · Projeções estimadas
+      </p>
     </div>
   );
 }
