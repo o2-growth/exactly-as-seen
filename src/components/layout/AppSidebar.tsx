@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Droplets, SlidersHorizontal, Users, Landmark, Clock } from 'lucide-react';
+import { Home, BarChart3, Droplets, SlidersHorizontal, Users, Landmark, TrendingUp, Clock } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Overview' },
@@ -8,6 +8,7 @@ const navItems = [
   { to: '/assumptions', icon: SlidersHorizontal, label: 'Assumptions' },
   { to: '/clients', icon: Users, label: 'Clients & Growth' },
   { to: '/debt', icon: Landmark, label: 'Debt & Finance' },
+  { to: '/valuation', icon: TrendingUp, label: 'Valuation & Cap Table' },
   { to: '/history', icon: Clock, label: 'Version History' },
 ];
 

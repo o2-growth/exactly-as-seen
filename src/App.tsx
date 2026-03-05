@@ -12,6 +12,7 @@ import CashFlow from "./pages/CashFlow";
 import Assumptions from "./pages/Assumptions";
 import ClientsGrowth from "./pages/ClientsGrowth";
 import DebtFinance from "./pages/DebtFinance";
+import Valuation from "./pages/Valuation";
 import VersionHistory from "./pages/VersionHistory";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
                 <Route path="/assumptions" element={<Assumptions />} />
                 <Route path="/clients" element={<ClientsGrowth />} />
                 <Route path="/debt" element={<DebtFinance />} />
+                <Route path="/valuation" element={<Valuation />} />
                 <Route path="/history" element={<VersionHistory />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
