@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   AreaChart, Area, LineChart, Line, Legend, ComposedChart,
 } from 'recharts';
+import RuleOf40Card, { RuleOf40Chart } from '@/components/overview/RuleOf40';
 
 const CustomRevenueTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload) return null;
@@ -86,7 +87,7 @@ export default function Overview() {
       <h2 className="text-2xl font-bold">Overview — {selectedYear}</h2>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         {kpis.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="kpi-card">
             <div className="flex items-center gap-2 mb-3">
@@ -96,6 +97,7 @@ export default function Overview() {
             <p className="text-2xl font-bold tracking-tight animate-count">{value}</p>
           </div>
         ))}
+        <RuleOf40Card />
       </div>
 
       {/* Assumptions Summary */}
@@ -186,7 +188,6 @@ export default function Overview() {
           </ResponsiveContainer>
         </div>
 
-        {/* Margin Evolution with Net Margin and Cash Gen */}
         <div className="gradient-card p-5 lg:col-span-2">
           <h3 className="text-sm font-semibold mb-4">Margin Evolution</h3>
           <ResponsiveContainer width="100%" height={260}>
@@ -206,6 +207,11 @@ export default function Overview() {
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </LineChart>
           </ResponsiveContainer>
+        </div>
+
+        {/* Rule of 40 Chart */}
+        <div className="lg:col-span-2">
+          <RuleOf40Chart />
         </div>
       </div>
 
