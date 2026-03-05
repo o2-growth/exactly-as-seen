@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
-import { PNL_TREE, PnlNode, MONTHLY_TOTALS_2025 } from '@/lib/pnlData';
+import { PnlNode, MONTHLY_TOTALS_2025 } from '@/lib/pnlData';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus } from 'lucide-react';
 import {
@@ -150,11 +150,12 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, scenarioM
   );
 }
 
-function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden }: {
+function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden, pnlTree }: {
   customLabels: Record<string, string>;
   hiddenItems: Set<string>;
   setLabel: (code: string, label: string) => void;
   toggleHidden: (code: string) => void;
+  pnlTree: PnlNode[];
 }) {
   const renderItems = (nodes: PnlNode[], depth = 0): React.ReactNode => {
     return nodes.map(node => (
@@ -181,7 +182,7 @@ function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden }: {
         <DialogTitle className="text-lg">Plano de Contas</DialogTitle>
       </DialogHeader>
       <div className="space-y-0.5 mt-2">
-        {renderItems(PNL_TREE)}
+        {renderItems(pnlTree)}
       </div>
       <div className="pt-3 border-t border-border mt-3">
         <button className="flex items-center gap-1.5 text-xs text-primary hover:underline">
@@ -193,7 +194,7 @@ function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden }: {
 }
 
 export default function PnL() {
-  const { scenario, selectedYear } = useFinancialModel();
+  const { scenario, selectedYear, pnlTree } = useFinancialModel();
   const [viewMode, setViewMode] = useState<ViewMode>('annual');
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
 
@@ -234,7 +235,7 @@ export default function PnL() {
                 Plano de Contas
               </button>
             </DialogTrigger>
-            <CoaModal customLabels={customLabels} hiddenItems={hiddenItems} setLabel={setLabel} toggleHidden={toggleHidden} />
+            <CoaModal customLabels={customLabels} hiddenItems={hiddenItems} setLabel={setLabel} toggleHidden={toggleHidden} pnlTree={pnlTree} />
           </Dialog>
         </div>
       </div>
@@ -258,7 +259,7 @@ export default function PnL() {
             </tr>
           </thead>
           <tbody>
-            {PNL_TREE.map(node => (
+            {pnlTree.map(node => (
               <ExpandableRow
                 key={node.code}
                 node={node}
