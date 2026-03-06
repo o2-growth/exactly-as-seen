@@ -11,13 +11,13 @@ import {
   ResponsiveContainer, Legend,
 } from 'recharts';
 
-type ShareholderType = 'Founder' | 'Investor' | 'ESOP';
+type ShareholderType = 'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team';
 
 interface Shareholder {
   id: string;
   name: string;
   type: ShareholderType;
-  shares: number;
+  ownershipPct: number; // drives shares
   entryValuation: number;
   entryDate: string;
 }
@@ -29,21 +29,52 @@ const DONUT_COLORS = [
 ];
 
 const STORAGE_KEY = 'o2-cap-table';
+const TOTAL_SHARES_KEY = 'o2-total-shares';
 
 function loadCapTable(): Shareholder[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // backward compat: convert old shares-based model to pct-based
+      if (parsed.length > 0 && parsed[0].shares !== undefined && parsed[0].ownershipPct === undefined) {
+        const total = parsed.reduce((s: number, sh: any) => s + (sh.shares || 0), 0);
+        return parsed.map((sh: any) => ({
+          id: sh.id,
+          name: sh.name,
+          type: sh.type,
+          ownershipPct: total > 0 ? Math.round(((sh.shares / total) * 100) * 10) / 10 : 0,
+          entryValuation: sh.entryValuation || 0,
+          entryDate: sh.entryDate || '',
+        }));
+      }
+      return parsed;
+    }
   } catch {}
   return [
-    { id: '1', name: 'Founder A', type: 'Founder', shares: 700000, entryValuation: 0, entryDate: '2024-01' },
-    { id: '2', name: 'Founder B', type: 'Founder', shares: 300000, entryValuation: 0, entryDate: '2024-01' },
+    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryValuation: 8, entryDate: '2017-08' },
+    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryValuation: 0, entryDate: '2024-01' },
+    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryValuation: 0, entryDate: '' },
   ];
+}
+
+function loadTotalShares(): number {
+  try {
+    const raw = localStorage.getItem(TOTAL_SHARES_KEY);
+    if (raw) return Number(raw) || 1_000_000;
+  } catch {}
+  return 1_000_000;
+}
+
+function formatSharesInput(value: number): string {
+  if (!value) return '';
+  return value.toLocaleString('pt-BR');
 }
 
 export default function Valuation() {
   const { projections, assumptions, scenario } = useFinancialModel();
   const [shareholders, setShareholders] = useState<Shareholder[]>(loadCapTable);
+  const [totalSharesPool, setTotalSharesPool] = useState(loadTotalShares);
   const [ebitdaMultiple, setEbitdaMultiple] = useState(10);
   const [arrMultiple, setArrMultiple] = useState(5);
   const [raiseAmount, setRaiseAmount] = useState(0);
@@ -53,10 +84,15 @@ export default function Valuation() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(shareholders));
   }, [shareholders]);
 
-  const totalShares = shareholders.reduce((s, sh) => s + sh.shares, 0);
+  useEffect(() => {
+    localStorage.setItem(TOTAL_SHARES_KEY, String(totalSharesPool));
+  }, [totalSharesPool]);
+
+  const getShares = (pct: number) => Math.round(totalSharesPool * pct / 100);
+  const totalShares = totalSharesPool;
 
   const addShareholder = () => {
-    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', shares: 0, entryValuation: 0, entryDate: '' }]);
+    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryValuation: 0, entryDate: '' }]);
   };
   const removeShareholder = (id: string) => setShareholders(prev => prev.filter(s => s.id !== id));
   const updateShareholder = (id: string, field: keyof Shareholder, value: string | number) => {
@@ -64,10 +100,10 @@ export default function Valuation() {
   };
 
   // Donut data
-  const donutData = shareholders.filter(s => s.shares > 0).map(s => ({
+  const donutData = shareholders.filter(s => s.ownershipPct > 0).map(s => ({
     name: s.name || 'Unnamed',
-    value: s.shares,
-    pct: totalShares > 0 ? ((s.shares / totalShares) * 100).toFixed(1) : '0',
+    value: getShares(s.ownershipPct),
+    pct: s.ownershipPct.toFixed(1),
   }));
 
   // EBITDA valuation
@@ -125,9 +161,22 @@ export default function Valuation() {
       <div className="gradient-card p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-foreground">Cap Table</h3>
-          <Button variant="outline" size="sm" onClick={addShareholder} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Add Shareholder
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Total Shares:</span>
+              <Input
+                value={formatSharesInput(totalSharesPool)}
+                onChange={e => {
+                  const num = Number(e.target.value.replace(/\D/g, ''));
+                  setTotalSharesPool(num || 0);
+                }}
+                className="h-8 w-36 text-xs text-right"
+              />
+            </div>
+            <Button variant="outline" size="sm" onClick={addShareholder} className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" /> Add Shareholder
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 overflow-x-auto">
@@ -136,8 +185,8 @@ export default function Valuation() {
                 <tr className="border-b border-border">
                   <th className="text-left p-2 text-muted-foreground font-medium">Shareholder</th>
                   <th className="text-left p-2 text-muted-foreground font-medium">Type</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Shares</th>
                   <th className="text-right p-2 text-muted-foreground font-medium">% Ownership</th>
+                  <th className="text-right p-2 text-muted-foreground font-medium">Shares</th>
                   <th className="text-right p-2 text-muted-foreground font-medium">Entry Val.</th>
                   <th className="text-right p-2 text-muted-foreground font-medium">Entry Date</th>
                   <th className="p-2 w-8"></th>
@@ -146,26 +195,38 @@ export default function Valuation() {
               <tbody>
                 {shareholders.map(s => (
                   <tr key={s.id} className="border-b border-border/50">
-                    <td className="p-1.5"><Input value={s.name} onChange={e => updateShareholder(s.id, 'name', e.target.value)} className="h-8 text-xs" /></td>
-                    <td className="p-1.5">
-                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground">
+                    <td className="p-2"><Input value={s.name} onChange={e => updateShareholder(s.id, 'name', e.target.value)} className="h-8 text-xs" /></td>
+                    <td className="p-2">
+                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground w-full">
                         <option value="Founder">Founder</option>
                         <option value="Investor">Investor</option>
-                        <option value="ESOP">ESOP</option>
+                        <option value="SOP C-Level">SOP C-Level</option>
+                        <option value="SOP Team">SOP Team</option>
                       </select>
                     </td>
-                    <td className="p-1.5"><Input type="number" value={s.shares || ''} onChange={e => updateShareholder(s.id, 'shares', +e.target.value)} className="h-8 text-xs text-right" /></td>
-                    <td className="p-1.5 text-right tabular-nums text-foreground">{totalShares > 0 ? ((s.shares / totalShares) * 100).toFixed(1) : 0}%</td>
-                    <td className="p-1.5"><Input type="number" value={s.entryValuation || ''} onChange={e => updateShareholder(s.id, 'entryValuation', +e.target.value)} className="h-8 text-xs text-right" /></td>
-                    <td className="p-1.5"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-right" placeholder="YYYY-MM" /></td>
-                    <td className="p-1.5"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShareholder(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
+                    <td className="p-2">
+                      <Input
+                        value={s.ownershipPct || ''}
+                        onChange={e => {
+                          const val = e.target.value.replace(/[^0-9.]/g, '');
+                          const num = parseFloat(val);
+                          updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 10) / 10);
+                        }}
+                        className="h-8 text-xs text-right w-20"
+                        placeholder="0.0"
+                      />
+                    </td>
+                    <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(getShares(s.ownershipPct))}</td>
+                    <td className="p-2"><Input type="number" value={s.entryValuation || ''} onChange={e => updateShareholder(s.id, 'entryValuation', +e.target.value)} className="h-8 text-xs text-right" /></td>
+                    <td className="p-2"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-right" placeholder="YYYY-MM" /></td>
+                    <td className="p-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShareholder(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
                   </tr>
                 ))}
-                <tr className="font-semibold">
+                <tr className="font-semibold bg-secondary/30">
                   <td className="p-2 text-foreground">Total</td>
                   <td></td>
-                  <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(totalShares)}</td>
-                  <td className="p-2 text-right text-foreground">100%</td>
+                  <td className="p-2 text-right tabular-nums text-foreground">{shareholders.reduce((s, sh) => s + sh.ownershipPct, 0).toFixed(1)}%</td>
+                  <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(shareholders.reduce((s, sh) => s + getShares(sh.ownershipPct), 0))}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tbody>
@@ -347,12 +408,13 @@ export default function Valuation() {
                 </thead>
                 <tbody>
                   {shareholders.map(s => {
+                    const shares = getShares(s.ownershipPct);
                     const newTotal = totalShares + postMoneyShares;
-                    const pct = newTotal > 0 ? ((s.shares / newTotal) * 100).toFixed(1) : '0';
+                    const pct = newTotal > 0 ? ((shares / newTotal) * 100).toFixed(1) : '0';
                     return (
                       <tr key={s.id} className="border-b border-border/50">
                         <td className="p-2 text-foreground">{s.name || 'Unnamed'}</td>
-                        <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(s.shares)}</td>
+                        <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(shares)}</td>
                         <td className="p-2 text-right tabular-nums text-foreground">{pct}%</td>
                       </tr>
                     );
