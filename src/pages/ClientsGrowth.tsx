@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS, CAC_BY_SECTOR, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, Year } from '@/lib/financialData';
+import { YEARS, SUB_PRODUCT_LABELS, SubProductClients, Year } from '@/lib/financialData';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
+import { cacBySector, headcountRatios, namedEmployees2025, salaryRanges, cacPerClient } from '@/data/modelData';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -19,8 +20,45 @@ const SUB_PRODUCT_COLORS: Record<SubProductKey, string> = {
   baas: 'hsl(340 82% 52%)',
 };
 
+// Compute projected headcount from engine ratios
+function computeHeadcount(totalClients: number) {
+  const baseCFOs = namedEmployees2025.filter(e => e.role === 'CFO').length;
+  const baseFPA = namedEmployees2025.filter(e => e.role === 'FP&A').length;
+  const baseCSM = namedEmployees2025.filter(e => e.role === 'Customer Svc').length;
+  const baseIT = namedEmployees2025.filter(e => e.role === 'IT').length;
+  const baseMgmt = namedEmployees2025.filter(e => ['CEO', 'COO', 'CTO', 'CMO'].includes(e.role)).length;
+  const baseAdmin = namedEmployees2025.filter(e => ['People', 'Finance', 'Admin'].includes(e.role)).length;
+  const baseMkt = namedEmployees2025.filter(e => e.role === 'Marketing').length;
+
+  return {
+    cfos: Math.max(baseCFOs, Math.ceil(totalClients / headcountRatios.clientsPerCFO)),
+    fpa: Math.max(baseFPA, Math.ceil(totalClients / headcountRatios.clientsPerFPA)),
+    csm: Math.max(baseCSM, Math.ceil(totalClients / headcountRatios.clientsPerCSM)),
+    pf: Math.ceil(totalClients / headcountRatios.clientsPerPF),
+    projectAnalyst: Math.ceil(totalClients / headcountRatios.clientsPerProjectAnal),
+    dataAnalyst: Math.ceil(totalClients / headcountRatios.clientsPerDataAnal),
+    it: baseIT,
+    management: baseMgmt,
+    admin: baseAdmin,
+    marketing: baseMkt,
+  };
+}
+
+const HEADCOUNT_ROLES = [
+  { key: 'cfos', label: 'CFOs', bu: 'CaaS', salary: salaryRanges['CFO'] },
+  { key: 'fpa', label: 'FP&A Analysts', bu: 'CaaS', salary: salaryRanges['FP&A Analyst'] },
+  { key: 'csm', label: 'Customer Service', bu: 'Operations', salary: salaryRanges['Customer Service'] },
+  { key: 'pf', label: 'Project Finance Directors', bu: 'CaaS', salary: salaryRanges['Project Finance Director'] },
+  { key: 'projectAnalyst', label: 'Project Analysts', bu: 'CaaS', salary: salaryRanges['Project Analyst'] },
+  { key: 'dataAnalyst', label: 'Data Analysts', bu: 'SaaS', salary: salaryRanges['Data Processes Analyst'] },
+  { key: 'it', label: 'Tech Team', bu: 'SaaS', salary: salaryRanges['Senior Fullstack'] },
+  { key: 'management', label: 'Management', bu: 'Management', salary: 22000 },
+  { key: 'admin', label: 'Administrative', bu: 'Admin', salary: 8500 },
+  { key: 'marketing', label: 'Marketing', bu: 'Marketing', salary: salaryRanges['UX Designer'] },
+];
+
 export default function ClientsGrowth() {
-  const { projections, assumptions, selectedYear } = useFinancialModel();
+  const { projections, assumptions, selectedYear, model } = useFinancialModel();
   const [viewMode, setViewMode] = useState<'planned' | 'actual'>('planned');
 
   const subProductKeys = Object.keys(SUB_PRODUCT_LABELS) as SubProductKey[];
@@ -51,20 +89,39 @@ export default function ClientsGrowth() {
     }));
   };
 
-  const cacData = CAC_BY_SECTOR.sort((a, b) => b.cac - a.cac);
+  // CAC data from real model (7 sectors)
+  const cacData = [...cacBySector].sort((a, b) => b.cac - a.cac);
 
-  // LTV calculation
+  // LTV calculation using real CAC per BU
   const avgTicket = Object.values(assumptions.tickets).reduce((s, v) => s + v, 0) / Object.values(assumptions.tickets).length;
   const avgChurn = (assumptions.churnCaas + assumptions.churnSaas) / 2 / 100;
   const monthlyChurn = avgChurn / 12;
   const ltv = monthlyChurn > 0 ? avgTicket / monthlyChurn : avgTicket * 1200;
-  const avgCac = CAC_BY_SECTOR.reduce((s, c) => s + c.cac, 0) / CAC_BY_SECTOR.length;
+  const avgCac = (cacPerClient.caas + cacPerClient.saas + cacPerClient.education + cacPerClient.baas) / 4;
   const ltvCacRatio = avgCac > 0 ? ltv / avgCac : 0;
 
   // MRR / ARR
   const totalClientsYear = projections.totalClients[selectedYear];
   const mrr = totalClientsYear * avgTicket;
   const arr = mrr * 12;
+
+  // Headcount projections from engine ratios
+  const headcountByYear = YEARS.map(y => ({
+    year: y,
+    ...computeHeadcount(projections.totalClients[y]),
+  }));
+
+  // BU breakdown from engine
+  const buData = YEARS.map(y => {
+    const yr = model.years[y];
+    return {
+      year: y.toString(),
+      'CaaS': yr.caasRevenue,
+      'SaaS': yr.saasRevenue,
+      'Education': yr.educationRevenue,
+      'BaaS': yr.baasRevenue,
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -129,6 +186,28 @@ export default function ClientsGrowth() {
         </ResponsiveContainer>
       </div>
 
+      {/* BU Revenue Breakdown */}
+      <div className="gradient-card p-5">
+        <h3 className="text-sm font-semibold mb-4">Revenue by BU (R$ thousands)</h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={buData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
+            <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
+            <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={(v: number) => `${(v/1000).toFixed(0)}M`} />
+            <Tooltip
+              contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 12 }}
+              labelStyle={{ color: 'hsl(210 40% 98%)', fontWeight: 700 }}
+              formatter={(v: number) => [formatCurrency(v * 1000), '']}
+            />
+            <Bar dataKey="CaaS" stackId="rev" fill="hsl(217 91% 60%)" />
+            <Bar dataKey="SaaS" stackId="rev" fill="hsl(258 90% 66%)" />
+            <Bar dataKey="Education" stackId="rev" fill="hsl(38 92% 50%)" />
+            <Bar dataKey="BaaS" stackId="rev" fill="hsl(340 82% 52%)" />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
       {/* Actual input table (shown when "Actual" selected) */}
       {viewMode === 'actual' && (
         <div className="gradient-card overflow-x-auto">
@@ -169,9 +248,9 @@ export default function ClientsGrowth() {
 
       {/* Marketing KPIs */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* CAC by Sector */}
+        {/* CAC by Sector (real data from modelData) */}
         <div className="gradient-card p-5">
-          <h3 className="text-sm font-semibold mb-4">CAC by Sector (BRL)</h3>
+          <h3 className="text-sm font-semibold mb-4">CAC by BU / Sector (BRL)</h3>
           <div className="space-y-3">
             {cacData.map(c => (
               <div key={c.sector}>
@@ -180,24 +259,24 @@ export default function ClientsGrowth() {
                   <span className="font-semibold">{formatCurrency(c.cac)}</span>
                 </div>
                 <div className="w-full bg-secondary rounded-full h-2">
-                  <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${(c.cac / 4000) * 100}%` }} />
+                  <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (c.cac / 12000) * 100)}%` }} />
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Lead & Conversion Placeholders */}
+        {/* LTV & Unit Economics */}
         <div className="gradient-card p-5">
-          <h3 className="text-sm font-semibold mb-4">Lead Volume & Conversion</h3>
+          <h3 className="text-sm font-semibold mb-4">Unit Economics</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Monthly Leads</p>
-              <input type="number" className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary" placeholder="0" />
+              <p className="text-xs text-muted-foreground">Avg Ticket</p>
+              <p className="text-lg font-bold">{formatCurrency(avgTicket)}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Conversion Rate %</p>
-              <input type="number" className="w-full bg-secondary border border-border rounded px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary" placeholder="0" />
+              <p className="text-xs text-muted-foreground">Avg Churn (annual)</p>
+              <p className="text-lg font-bold">{(avgChurn * 100).toFixed(1)}%</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">LTV</p>
@@ -211,9 +290,10 @@ export default function ClientsGrowth() {
         </div>
       </div>
 
-      {/* Headcount */}
+      {/* Headcount (engine-driven from ratios) */}
       <div className="gradient-card overflow-x-auto">
-        <h3 className="text-sm font-semibold p-5 pb-0">Headcount Growth</h3>
+        <h3 className="text-sm font-semibold p-5 pb-0">Headcount Projection (ratio-driven)</h3>
+        <p className="text-[10px] text-muted-foreground px-5 pb-3">Based on {headcountRatios.clientsPerCFO} clients/CFO, {headcountRatios.clientsPerFPA} clients/FP&A, {headcountRatios.clientsPerCSM} clients/CSM</p>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
@@ -226,16 +306,28 @@ export default function ClientsGrowth() {
             </tr>
           </thead>
           <tbody>
-            {HEADCOUNT.map(h => (
-              <tr key={h.role} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
-                <td className="p-4 font-medium">{h.role}</td>
-                <td className="p-4 text-muted-foreground">{h.bu}</td>
-                {YEARS.map(y => (
-                  <td key={y} className="text-right p-4 tabular-nums">{(h as any)[y].toLocaleString('pt-BR')}</td>
+            {HEADCOUNT_ROLES.map(role => (
+              <tr key={role.key} className="border-b border-border/50 hover:bg-secondary/30 transition-colors">
+                <td className="p-4 font-medium">{role.label}</td>
+                <td className="p-4 text-muted-foreground">{role.bu}</td>
+                {headcountByYear.map(h => (
+                  <td key={h.year} className="text-right p-4 tabular-nums">
+                    {((h as any)[role.key] || 0).toLocaleString('pt-BR')}
+                  </td>
                 ))}
-                <td className="text-right p-4 tabular-nums">{formatCurrency(assumptions.headcountSalaries[h.role] || 0)}</td>
+                <td className="text-right p-4 tabular-nums">{formatCurrency(role.salary)}</td>
               </tr>
             ))}
+            {/* Total row */}
+            <tr className="border-b border-border bg-primary/5 font-bold">
+              <td className="p-4">Total</td>
+              <td className="p-4"></td>
+              {headcountByYear.map(h => {
+                const total = HEADCOUNT_ROLES.reduce((s, r) => s + ((h as any)[r.key] || 0), 0);
+                return <td key={h.year} className="text-right p-4 tabular-nums">{total.toLocaleString('pt-BR')}</td>;
+              })}
+              <td className="p-4"></td>
+            </tr>
           </tbody>
         </table>
       </div>

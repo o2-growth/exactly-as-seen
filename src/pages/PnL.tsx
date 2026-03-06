@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
-import { PnlNode, MONTHLY_TOTALS_2025 } from '@/lib/pnlData';
+import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus } from 'lucide-react';
 import {
@@ -51,39 +51,28 @@ interface ExpandableRowProps {
   columns: (Year | string)[];
   viewMode: ViewMode;
   selectedYear: Year;
-  scenarioMultiplier: number;
   customLabels: Record<string, string>;
   hiddenItems: Set<string>;
 }
 
-function ExpandableRow({ node, depth, columns, viewMode, selectedYear, scenarioMultiplier, customLabels, hiddenItems }: ExpandableRowProps) {
+function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLabels, hiddenItems }: ExpandableRowProps) {
   const [expanded, setExpanded] = useState(false);
   const hasChildren = node.children && node.children.length > 0;
   const label = customLabels[node.code] || node.label;
 
   if (hiddenItems.has(node.code)) return null;
 
+  // Engine already applies scenario — no double-multiplication needed
   const getValue = (col: Year | string): number => {
     if (viewMode === 'monthly' && typeof col === 'string') {
       const monthIdx = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(col);
-      // Use monthly data for 2025 totals, estimate for other years
-      const codeMap: Record<string, string> = {
-        '1': 'grossRevenue', '2': 'salesDeductions', 'NR': 'netRevenue',
-        '3': 'cogs', 'GP': 'grossProfit', '3.1': 'commissions',
-        '7': 'marketing', 'CM': 'contributionMargin', '4': 'adminExpenses',
-        '5': 'headcount', '6': 'commercial', '10': 'other', 'EBITDA': 'ebitda',
-      };
-      const key = codeMap[node.code];
-      if (key && MONTHLY_TOTALS_2025[key]) {
-        const yearScale = selectedYear === 2025 ? 1 : (node.annual[selectedYear] / (node.annual[2025] || 1));
-        return Math.round((MONTHLY_TOTALS_2025[key][monthIdx] || 0) * yearScale * scenarioMultiplier);
+      if (node.monthly?.[selectedYear]) {
+        return node.monthly[selectedYear][monthIdx] || 0;
       }
-      // Proportional estimate for sub-items
-      const annualVal = node.annual[selectedYear] * scenarioMultiplier;
-      return Math.round(annualVal / 12);
+      if (node.isMargin) return node.annual[selectedYear];
+      return Math.round(node.annual[selectedYear] / 12);
     }
-    if (node.isMargin) return node.annual[col as Year];
-    return Math.round(node.annual[col as Year] * scenarioMultiplier);
+    return node.annual[col as Year];
   };
 
   return (
@@ -141,7 +130,6 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, scenarioM
           columns={columns}
           viewMode={viewMode}
           selectedYear={selectedYear}
-          scenarioMultiplier={scenarioMultiplier}
           customLabels={customLabels}
           hiddenItems={hiddenItems}
         />
@@ -197,8 +185,6 @@ export default function PnL() {
   const { scenario, selectedYear, pnlTree } = useFinancialModel();
   const [viewMode, setViewMode] = useState<ViewMode>('annual');
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
-
-  const scenarioMultiplier = scenario === 'BULL' ? 1.2 : scenario === 'BEAR' ? 0.8 : 1.0;
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const columns: (Year | string)[] = viewMode === 'monthly'
@@ -267,7 +253,6 @@ export default function PnL() {
                 columns={columns}
                 viewMode={viewMode}
                 selectedYear={selectedYear}
-                scenarioMultiplier={scenarioMultiplier}
                 customLabels={customLabels}
                 hiddenItems={hiddenItems}
               />
