@@ -157,30 +157,7 @@ export function calculateProjections(
   return projections;
 }
 
-// Debt data
-export const DEBTS = [
-  { creditor: 'CEF – PRONAMP', amount: 119459, monthlyPayment: 3853, finalDate: 'Jul/2027', rate: 1.2 },
-  { creditor: 'CEF – FAMPE', amount: 31705, monthlyPayment: 5284, finalDate: 'Jun/2025', rate: 1.2 },
-  { creditor: 'Santander', amount: 160214, monthlyPayment: 3270, finalDate: 'Jan/2029', rate: 1.2 },
-];
 
-// CAC data by sector
-export const CAC_BY_SECTOR = [
-  { sector: 'Agtech', cac: 3804 },
-  { sector: 'Adtech', cac: 3456 },
-  { sector: 'Aviation & Defense', cac: 3150 },
-  { sector: 'Automotive', cac: 2568 },
-];
-
-// Headcount data
-export const HEADCOUNT = [
-  { role: 'CFOs', bu: 'CaaS', 2025: 11, 2026: 97, 2027: 431, 2028: 950, 2029: 1800, 2030: 3200 },
-  { role: 'PMO Directors', bu: 'CaaS', 2025: 1, 2026: 8, 2027: 65, 2028: 180, 2029: 400, 2030: 750 },
-  { role: 'Sales Team', bu: 'Commercial', 2025: 5, 2026: 15, 2027: 45, 2028: 120, 2029: 280, 2030: 500 },
-  { role: 'Tech Team', bu: 'SaaS', 2025: 8, 2026: 20, 2027: 55, 2028: 140, 2029: 300, 2030: 520 },
-  { role: 'Customer Service', bu: 'Operations', 2025: 3, 2026: 10, 2027: 32, 2028: 90, 2029: 215, 2030: 460 },
-  { role: 'Operations', bu: 'Operations', 2025: 2, 2026: 5, 2027: 12, 2028: 30, 2029: 65, 2030: 120 },
-];
 
 export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
   caasAssessoria: 'CaaS Assessoria',
