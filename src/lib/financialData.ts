@@ -169,3 +169,34 @@ export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
   educationDonoCFO: 'Education Dono CFO',
   baas: 'BaaS',
 };
+
+// ─── HEADCOUNT (derived from namedEmployees2025) ───
+import { namedEmployees2025 } from '@/data/modelData';
+
+interface HeadcountRow {
+  role: string;
+  bu: string;
+  [key: number]: number;
+}
+
+function buildHeadcount(): HeadcountRow[] {
+  const grouped = new Map<string, { role: string; bu: string; count: number }>();
+  for (const emp of namedEmployees2025) {
+    const key = `${emp.role}|${emp.bu}`;
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      grouped.set(key, { role: emp.role, bu: emp.bu, count: 1 });
+    }
+  }
+  return Array.from(grouped.values()).map(({ role, bu, count }) => {
+    const row: HeadcountRow = { role, bu };
+    for (const y of YEARS) {
+      row[y] = y === 2025 ? count : count; // future years start at same base; engine scales dynamically
+    }
+    return row;
+  });
+}
+
+export const HEADCOUNT = buildHeadcount();
