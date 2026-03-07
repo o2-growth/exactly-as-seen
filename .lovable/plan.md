@@ -1,34 +1,41 @@
 
 
-# Plan: Fix Cap Table Columns and % Input
-
-## Problems
-1. Column names get cut off due to fixed widths — need flexible/wider columns
-2. Column headers should be centered
-3. % Ownership input doesn't accept comma as decimal separator (pt-BR locale) and has formatting issues when typing
+# Plan: Cap Table Improvements
 
 ## Changes to `src/pages/Valuation.tsx`
 
-### 1. Remove fixed column widths, allow flexible sizing
-Remove all `w-28`, `w-24` constraints from `<th>` and `<td>` elements. Use `min-w-[...]` only where needed to prevent collapse, and let the table auto-size columns based on content. Add `whitespace-nowrap` to headers so they don't wrap.
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-### 2. Center column header text
-Change all `<th>` from `text-left`/`text-right` to `text-center`.
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
 
-### 3. Fix % input to accept comma as decimal separator
-Replace the `onChange` handler to:
-- Accept both `.` and `,` as decimal separators
-- Replace `,` with `.` before parsing
-- Allow the user to type freely (store raw text in local state while editing, commit parsed value on blur)
-- On blur, format to 2 decimal places
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
 
-This requires a small refactor: use a local `editingPct` state (keyed by shareholder id) to hold the raw text while the user types, and only update the model on blur.
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
 
-### 4. Same fix for Shares input
-Allow free typing, commit on blur.
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
+
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
+```
 
 ## Files Changed
 | File | Change |
 |------|--------|
-| `src/pages/Valuation.tsx` | Flexible columns, centered headers, locale-aware % input with comma support |
+| `src/pages/Valuation.tsx` | All changes above |
 
