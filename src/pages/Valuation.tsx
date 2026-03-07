@@ -43,7 +43,6 @@ function loadCapTable(): Shareholder[] {
           name: sh.name,
           type: sh.type,
           ownershipPct: total > 0 ? Math.round(((sh.shares / total) * 100) * 10) / 10 : 0,
-          entryValuation: sh.entryValuation || 0,
           entryDate: sh.entryDate || '',
         }));
       }
