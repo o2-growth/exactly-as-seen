@@ -234,12 +234,12 @@ export default function Valuation() {
             <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="bg-secondary border-b-2 border-primary/40">
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Shareholder</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">% Ownership</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Shares</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Entry Val.</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Entry Date</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[140px]">Shareholder</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[120px]">Type</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[110px]">% Ownership</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Shares</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[140px]">Entry Valuation (R$ M)</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Entry Date</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -248,7 +248,7 @@ export default function Valuation() {
                   <tr key={s.id} className="border-b border-border/50">
                     <td className="p-2"><Input value={s.name} onChange={e => updateShareholder(s.id, 'name', e.target.value)} className="h-8 text-xs" /></td>
                     <td className="p-2">
-                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground w-full">
+                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground w-full min-w-[100px]">
                         <option value="Founder">Founder</option>
                         <option value="Investor">Investor</option>
                         <option value="SOP C-Level">SOP C-Level</option>
