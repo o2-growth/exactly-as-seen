@@ -91,7 +91,14 @@ export default function Valuation() {
   const getShares = (pct: number) => Math.round(totalSharesPool * pct / 100);
   const totalShares = totalSharesPool;
 
+  const totalOwnership = shareholders.reduce((s, sh) => s + sh.ownershipPct, 0);
+  const totalAllocatedShares = shareholders.reduce((s, sh) => s + getShares(sh.ownershipPct), 0);
+  const ownershipExceeds = totalOwnership > 100;
+  const sharesExceeds = totalAllocatedShares > totalSharesPool;
+  const atLimit = ownershipExceeds || sharesExceeds;
+
   const addShareholder = () => {
+    if (atLimit) return;
     setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryValuation: 0, entryDate: '' }]);
   };
   const removeShareholder = (id: string) => setShareholders(prev => prev.filter(s => s.id !== id));
