@@ -205,16 +205,19 @@ export default function Valuation() {
                       </select>
                     </td>
                     <td className="p-2">
-                      <Input
-                        value={s.ownershipPct || ''}
-                        onChange={e => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          const num = parseFloat(val);
-                          updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 10) / 10);
-                        }}
-                        className="h-8 text-xs text-right w-20"
-                        placeholder="0.0"
-                      />
+                      <div className="relative inline-flex items-center">
+                        <Input
+                          value={s.ownershipPct ? s.ownershipPct.toFixed(1) : ''}
+                          onChange={e => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            const num = parseFloat(val);
+                            updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 10) / 10);
+                          }}
+                          className="h-8 text-xs text-right w-20 pr-6"
+                          placeholder="0.0"
+                        />
+                        <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
+                      </div>
                     </td>
                     <td className="p-2">
                       <Input
