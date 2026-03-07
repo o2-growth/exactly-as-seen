@@ -50,9 +50,9 @@ function loadCapTable(): Shareholder[] {
     }
   } catch {}
   return [
-    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryValuation: 8, entryDate: '2017-08' },
-    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryValuation: 0, entryDate: '2024-01' },
-    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryValuation: 0, entryDate: '' },
+    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryDate: '2017-08' },
+    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryDate: '2024-01' },
+    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryDate: '' },
   ];
 }
 
