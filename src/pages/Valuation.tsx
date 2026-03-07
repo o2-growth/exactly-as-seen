@@ -18,7 +18,6 @@ interface Shareholder {
   name: string;
   type: ShareholderType;
   ownershipPct: number; // drives shares
-  entryValuation: number;
   entryDate: string;
 }
 
