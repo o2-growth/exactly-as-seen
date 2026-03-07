@@ -1,27 +1,41 @@
 
 
-# Plan: Make Shares Column Editable (Bi-directional)
-
-## Current Behavior
-- **% Ownership** is an editable input, shares are computed as `totalSharesPool * pct / 100`
-- **Shares** column is read-only display
-
-## New Behavior
-- **Shares** column becomes an editable input (formatted with pt-BR dots)
-- When user edits shares, **% Ownership auto-calculates** as `shares / totalSharesPool * 100` (1 decimal)
-- When user edits % Ownership (existing), shares still auto-calculate (no change)
-- The total row always shows the sum; shares should max out at `totalSharesPool`
+# Plan: Cap Table Improvements
 
 ## Changes to `src/pages/Valuation.tsx`
 
-1. **Replace the read-only shares cell** (line 219) with an `<Input>` that:
-   - Displays formatted shares (dots via `formatNumber`)
-   - On change, strips non-digits, clamps to `totalSharesPool`, and updates `ownershipPct = (shares / totalSharesPool) * 100`
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-2. **No model changes needed** — still store `ownershipPct` as source of truth; the shares input just reverse-computes the pct on edit.
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
+
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
+
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
+```
 
 ## Files Changed
 | File | Change |
 |------|--------|
-| `src/pages/Valuation.tsx` | Make shares cell an editable input with reverse pct calculation |
+| `src/pages/Valuation.tsx` | All changes above |
 

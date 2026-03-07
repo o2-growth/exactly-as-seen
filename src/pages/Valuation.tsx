@@ -216,7 +216,24 @@ export default function Valuation() {
                         placeholder="0.0"
                       />
                     </td>
-                    <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(getShares(s.ownershipPct))}</td>
+                    <td className="p-2">
+                      <Input
+                        value={formatNumber(getShares(s.ownershipPct))}
+                        onChange={e => {
+                          const raw = e.target.value.replace(/\D/g, '');
+                          const num = parseInt(raw, 10);
+                          if (isNaN(num)) {
+                            updateShareholder(s.id, 'ownershipPct', 0);
+                          } else {
+                            const clamped = Math.min(num, totalSharesPool);
+                            const pct = Math.round((clamped / totalSharesPool) * 1000) / 10;
+                            updateShareholder(s.id, 'ownershipPct', pct);
+                          }
+                        }}
+                        className="h-8 text-xs text-right w-24 tabular-nums"
+                        placeholder="0"
+                      />
+                    </td>
                     <td className="p-2"><Input type="number" value={s.entryValuation || ''} onChange={e => updateShareholder(s.id, 'entryValuation', +e.target.value)} className="h-8 text-xs text-right" /></td>
                     <td className="p-2"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-right" placeholder="YYYY-MM" /></td>
                     <td className="p-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShareholder(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
