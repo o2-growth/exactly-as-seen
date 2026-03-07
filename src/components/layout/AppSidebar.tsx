@@ -18,7 +18,7 @@ export default function AppSidebar() {
   return (
     <aside className="hidden md:flex flex-col w-60 min-h-screen bg-sidebar border-r border-sidebar-border p-4">
       <div className="mb-8 px-2">
-        <h1 className="text-xl font-bold text-foreground tracking-tight">
+        <h1 className="text-xl font-bold text-foreground tracking-tight font-display">
           O2 <span className="text-primary">Inc</span>
         </h1>
         <p className="text-xs text-muted-foreground mt-1">Financial Model 2025–2030</p>
