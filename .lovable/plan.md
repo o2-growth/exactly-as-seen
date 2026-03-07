@@ -1,41 +1,42 @@
 
 
-# Plan: Cap Table Improvements
+# Plan: Apply O2 Inc Brand Identity
 
-## Changes to `src/pages/Valuation.tsx`
+## Brand Book Summary
+From the parsed PDF:
+- **Primary color**: Vivid Green `#6BF169` (HSL ~119 85% 68%)
+- **Secondary color**: Intense Gray `#494949` (HSL 0 0% 29%)
+- **Fonts**: Tusker Grotesk (display) + Codec Pro (body) — both commercial/unavailable on Google Fonts, will use **Space Grotesk** (closest free geometric sans) for headings and keep **Inter** for body
 
-### 1. Shareholder Types
-Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
+## Changes
 
-### 2. Shares formatting with dots (pt-BR)
-Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
+### 1. Color System (`src/index.css`)
+Remap all CSS custom properties:
+- `--primary`: blue → O2 green (#6BF169, ~119 85% 68%)
+- `--accent`: keep green-aligned (same as primary for brand consistency)
+- `--sidebar-primary`: → O2 green
+- `--ring`: → O2 green
+- Chart palette: update CaaS to green, keep others as complementary
+- `--success` stays green (naturally aligned now)
+- Background, card, border tones stay dark navy (works well with vivid green)
 
-### 3. Input-driven % Ownership (% drives shares)
-Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+### 2. Font Addition (`src/index.css`)
+Add Google Font import for **Space Grotesk** (closest to Tusker Grotesk). Apply to sidebar brand name and section headings.
 
-### 4. Total Shares widget
-Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+### 3. Tailwind Config (`tailwind.config.ts`)
+Add `'Space Grotesk'` to font families as `display` variant.
 
-### 5. One decimal place on % Ownership
-Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+### 4. Sidebar Branding (`src/components/layout/AppSidebar.tsx`)
+Update "O2 Inc" text to use Space Grotesk font and O2 green color for consistency with brand book logo styling.
 
-### 6. First row formatting
-Match the screenshot reference: consistent row styling with proper padding and alignment.
-
-## Data Model Change
-- Add `totalSharesPool` state (persisted to localStorage)
-- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
-- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
-
-## Default Data
-```
-Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
-Tiago Pisoni — Founder — 30.0% — 2024-01
-Rafael Fleck — Investor — 0.0%
-```
+### 5. Gradient Cards (`src/index.css`)
+Update `.gradient-card` and `.kpi-card` hover border to use green instead of blue primary.
 
 ## Files Changed
 | File | Change |
 |------|--------|
-| `src/pages/Valuation.tsx` | All changes above |
+| `src/index.css` | Update all `--primary`, `--accent`, `--ring`, `--sidebar-primary` to green; add Space Grotesk import |
+| `tailwind.config.ts` | Add `display` font family with Space Grotesk |
+| `src/components/layout/AppSidebar.tsx` | Apply display font to brand name |
+| `src/components/layout/AppHeader.tsx` | Minor: scenario button active states use new green primary naturally |
 
