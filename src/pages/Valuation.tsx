@@ -80,6 +80,10 @@ export default function Valuation() {
   const [raiseAmount, setRaiseAmount] = useState(0);
   const [raiseValuation, setRaiseValuation] = useState(0);
 
+  // Local editing states for free-typing (keyed by shareholder id)
+  const [editingPct, setEditingPct] = useState<Record<string, string>>({});
+  const [editingShares, setEditingShares] = useState<Record<string, string>>({});
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(shareholders));
   }, [shareholders]);
@@ -104,6 +108,46 @@ export default function Valuation() {
   const removeShareholder = (id: string) => setShareholders(prev => prev.filter(s => s.id !== id));
   const updateShareholder = (id: string, field: keyof Shareholder, value: string | number) => {
     setShareholders(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+  };
+
+  // Handlers for % ownership input
+  const handlePctFocus = (id: string, currentPct: number) => {
+    setEditingPct(prev => ({ ...prev, [id]: currentPct ? currentPct.toFixed(2) : '' }));
+  };
+  const handlePctChange = (id: string, rawValue: string) => {
+    // Allow digits, dot, comma
+    const filtered = rawValue.replace(/[^0-9.,]/g, '');
+    setEditingPct(prev => ({ ...prev, [id]: filtered }));
+  };
+  const handlePctBlur = (id: string) => {
+    const raw = (editingPct[id] || '').replace(',', '.');
+    const num = parseFloat(raw);
+    const final = isNaN(num) ? 0 : Math.round(num * 100) / 100;
+    updateShareholder(id, 'ownershipPct', final);
+    setEditingPct(prev => { const n = { ...prev }; delete n[id]; return n; });
+  };
+
+  // Handlers for shares input
+  const handleSharesFocus = (id: string, currentPct: number) => {
+    const shares = getShares(currentPct);
+    setEditingShares(prev => ({ ...prev, [id]: shares ? formatNumber(shares) : '' }));
+  };
+  const handleSharesChange = (id: string, rawValue: string) => {
+    // Allow digits and dots (pt-BR thousand separator)
+    const filtered = rawValue.replace(/[^0-9.]/g, '');
+    setEditingShares(prev => ({ ...prev, [id]: filtered }));
+  };
+  const handleSharesBlur = (id: string) => {
+    const raw = (editingShares[id] || '').replace(/\./g, '');
+    const num = parseInt(raw, 10);
+    if (isNaN(num)) {
+      updateShareholder(id, 'ownershipPct', 0);
+    } else {
+      const clamped = Math.min(num, totalSharesPool);
+      const pct = Math.round((clamped / totalSharesPool) * 10000) / 100;
+      updateShareholder(id, 'ownershipPct', pct);
+    }
+    setEditingShares(prev => { const n = { ...prev }; delete n[id]; return n; });
   };
 
   // Donut data
