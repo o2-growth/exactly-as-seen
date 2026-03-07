@@ -110,7 +110,7 @@ export default function Valuation() {
   const donutData = shareholders.filter(s => s.ownershipPct > 0).map(s => ({
     name: s.name || 'Unnamed',
     value: getShares(s.ownershipPct),
-    pct: s.ownershipPct.toFixed(1),
+    pct: s.ownershipPct.toFixed(2),
   }));
 
   // EBITDA valuation
