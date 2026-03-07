@@ -248,7 +248,7 @@ export default function Valuation() {
                   <tr key={s.id} className="border-b border-border/50">
                     <td className="p-2"><Input value={s.name} onChange={e => updateShareholder(s.id, 'name', e.target.value)} className="h-8 text-xs" /></td>
                     <td className="p-2">
-                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground w-full">
+                      <select value={s.type} onChange={e => updateShareholder(s.id, 'type', e.target.value)} className="h-8 text-xs rounded-md border border-input bg-background px-2 text-foreground w-full min-w-[100px]">
                         <option value="Founder">Founder</option>
                         <option value="Investor">Investor</option>
                         <option value="SOP C-Level">SOP C-Level</option>
