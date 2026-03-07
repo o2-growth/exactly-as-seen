@@ -236,8 +236,7 @@ export default function Valuation() {
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[120px]">Type</th>
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[110px]">% Ownership</th>
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Shares</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[140px]">Entry Valuation (R$ M)</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Entry Date</th>
+                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Entry Date</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
