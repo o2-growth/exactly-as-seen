@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year, SCENARIO_MULTIPLIERS } from '@/lib/financialData';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
