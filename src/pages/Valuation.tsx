@@ -231,15 +231,15 @@ export default function Valuation() {
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="bg-secondary border-b-2 border-primary/40">
-                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider">Shareholder</th>
-                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Type</th>
-                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">% Ownership</th>
-                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Shares</th>
-                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-24">Entry Val.</th>
-                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Entry Date</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Shareholder</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Type</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">% Ownership</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Shares</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Entry Val.</th>
+                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap">Entry Date</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -258,13 +258,11 @@ export default function Valuation() {
                     <td className="p-2">
                       <div className="relative inline-flex items-center w-full justify-end">
                         <Input
-                          value={s.ownershipPct ? s.ownershipPct.toFixed(2) : ''}
-                          onChange={e => {
-                            const val = e.target.value.replace(/[^0-9.]/g, '');
-                            const num = parseFloat(val);
-                            updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 100) / 100);
-                          }}
-                          className="h-8 text-xs text-right w-24 pr-6"
+                          value={editingPct[s.id] !== undefined ? editingPct[s.id] : (s.ownershipPct ? s.ownershipPct.toFixed(2) : '')}
+                          onFocus={() => handlePctFocus(s.id, s.ownershipPct)}
+                          onChange={e => handlePctChange(s.id, e.target.value)}
+                          onBlur={() => handlePctBlur(s.id)}
+                          className="h-8 text-xs text-right pr-6"
                           placeholder="0.00"
                         />
                         <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
@@ -272,19 +270,11 @@ export default function Valuation() {
                     </td>
                     <td className="p-2">
                       <Input
-                        value={formatNumber(getShares(s.ownershipPct))}
-                        onChange={e => {
-                          const raw = e.target.value.replace(/\D/g, '');
-                          const num = parseInt(raw, 10);
-                          if (isNaN(num)) {
-                            updateShareholder(s.id, 'ownershipPct', 0);
-                          } else {
-                            const clamped = Math.min(num, totalSharesPool);
-                            const pct = Math.round((clamped / totalSharesPool) * 10000) / 100;
-                            updateShareholder(s.id, 'ownershipPct', pct);
-                          }
-                        }}
-                        className="h-8 text-xs text-right w-28 tabular-nums"
+                        value={editingShares[s.id] !== undefined ? editingShares[s.id] : formatNumber(getShares(s.ownershipPct))}
+                        onFocus={() => handleSharesFocus(s.id, s.ownershipPct)}
+                        onChange={e => handleSharesChange(s.id, e.target.value)}
+                        onBlur={() => handleSharesBlur(s.id)}
+                        className="h-8 text-xs text-right tabular-nums"
                         placeholder="0"
                       />
                     </td>
@@ -295,9 +285,9 @@ export default function Valuation() {
                 ))}
                 <tr className={`font-semibold ${ownershipExceeds || sharesExceeds ? 'bg-destructive/20' : 'bg-secondary/30'}`}>
                   <td className="p-2 text-foreground">Total</td>
-                  <td className="p-2 w-28"></td>
-                  <td className={`p-2 text-right tabular-nums w-28 ${ownershipExceeds ? 'text-destructive' : 'text-foreground'}`}>{totalOwnership.toFixed(2)}%</td>
-                  <td className={`p-2 text-right tabular-nums w-28 ${sharesExceeds ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(totalAllocatedShares)}</td>
+                  <td className="p-2"></td>
+                  <td className={`p-2 text-right tabular-nums ${ownershipExceeds ? 'text-destructive' : 'text-foreground'}`}>{totalOwnership.toFixed(2)}%</td>
+                  <td className={`p-2 text-right tabular-nums ${sharesExceeds ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(totalAllocatedShares)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tbody>
