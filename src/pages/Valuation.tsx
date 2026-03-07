@@ -180,7 +180,7 @@ export default function Valuation() {
                 className="h-8 w-36 text-xs text-right"
               />
             </div>
-            <Button variant="outline" size="sm" onClick={addShareholder} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={addShareholder} className="gap-1.5" disabled={atLimit}>
               <Plus className="h-3.5 w-3.5" /> Add Shareholder
             </Button>
           </div>
