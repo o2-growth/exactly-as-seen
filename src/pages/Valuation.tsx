@@ -101,7 +101,7 @@ export default function Valuation() {
 
   const addShareholder = () => {
     if (atLimit) return;
-    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryValuation: 0, entryDate: '' }]);
+    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryDate: '' }]);
   };
   const removeShareholder = (id: string) => setShareholders(prev => prev.filter(s => s.id !== id));
   const updateShareholder = (id: string, field: keyof Shareholder, value: string | number) => {
