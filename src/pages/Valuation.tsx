@@ -189,13 +189,13 @@ export default function Valuation() {
           <div className="lg:col-span-2 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-2 text-muted-foreground font-medium">Shareholder</th>
-                  <th className="text-left p-2 text-muted-foreground font-medium">Type</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">% Ownership</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Shares</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Entry Val.</th>
-                  <th className="text-right p-2 text-muted-foreground font-medium">Entry Date</th>
+                <tr className="bg-secondary border-b-2 border-primary/40">
+                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider">Shareholder</th>
+                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Type</th>
+                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">% Ownership</th>
+                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Shares</th>
+                  <th className="text-right p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-24">Entry Val.</th>
+                  <th className="text-left p-2 text-foreground font-semibold text-xs uppercase tracking-wider w-28">Entry Date</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -212,16 +212,16 @@ export default function Valuation() {
                       </select>
                     </td>
                     <td className="p-2">
-                      <div className="relative inline-flex items-center">
+                      <div className="relative inline-flex items-center w-full justify-end">
                         <Input
-                          value={s.ownershipPct ? s.ownershipPct.toFixed(1) : ''}
+                          value={s.ownershipPct ? s.ownershipPct.toFixed(2) : ''}
                           onChange={e => {
                             const val = e.target.value.replace(/[^0-9.]/g, '');
                             const num = parseFloat(val);
-                            updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 10) / 10);
+                            updateShareholder(s.id, 'ownershipPct', isNaN(num) ? 0 : Math.round(num * 100) / 100);
                           }}
-                          className="h-8 text-xs text-right w-20 pr-6"
-                          placeholder="0.0"
+                          className="h-8 text-xs text-right w-24 pr-6"
+                          placeholder="0.00"
                         />
                         <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
                       </div>
@@ -236,28 +236,42 @@ export default function Valuation() {
                             updateShareholder(s.id, 'ownershipPct', 0);
                           } else {
                             const clamped = Math.min(num, totalSharesPool);
-                            const pct = Math.round((clamped / totalSharesPool) * 1000) / 10;
+                            const pct = Math.round((clamped / totalSharesPool) * 10000) / 100;
                             updateShareholder(s.id, 'ownershipPct', pct);
                           }
                         }}
-                        className="h-8 text-xs text-right w-24 tabular-nums"
+                        className="h-8 text-xs text-right w-28 tabular-nums"
                         placeholder="0"
                       />
                     </td>
                     <td className="p-2"><Input type="number" value={s.entryValuation || ''} onChange={e => updateShareholder(s.id, 'entryValuation', +e.target.value)} className="h-8 text-xs text-right" /></td>
-                    <td className="p-2"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-right" placeholder="YYYY-MM" /></td>
+                    <td className="p-2"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-left" placeholder="YYYY-MM" /></td>
                     <td className="p-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShareholder(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
                   </tr>
                 ))}
-                <tr className="font-semibold bg-secondary/30">
+                <tr className={`font-semibold ${ownershipExceeds || sharesExceeds ? 'bg-destructive/20' : 'bg-secondary/30'}`}>
                   <td className="p-2 text-foreground">Total</td>
-                  <td></td>
-                  <td className="p-2 text-right tabular-nums text-foreground">{shareholders.reduce((s, sh) => s + sh.ownershipPct, 0).toFixed(1)}%</td>
-                  <td className="p-2 text-right tabular-nums text-foreground">{formatNumber(shareholders.reduce((s, sh) => s + getShares(sh.ownershipPct), 0))}</td>
+                  <td className="p-2 w-28"></td>
+                  <td className={`p-2 text-right tabular-nums w-28 ${ownershipExceeds ? 'text-destructive' : 'text-foreground'}`}>{totalOwnership.toFixed(2)}%</td>
+                  <td className={`p-2 text-right tabular-nums w-28 ${sharesExceeds ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(totalAllocatedShares)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tbody>
             </table>
+
+            {ownershipExceeds && (
+              <div className="mt-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                <p className="font-semibold">Total ownership is {totalOwnership.toFixed(2)}% — exceeds by {(totalOwnership - 100).toFixed(2)}%</p>
+                <p className="text-xs mt-1 text-destructive/80">You need to redistribute or remove ownership from an existing shareholder.</p>
+              </div>
+            )}
+
+            {sharesExceeds && (
+              <div className="mt-2 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                <p className="font-semibold">Total allocated: {formatNumber(totalAllocatedShares)} shares — exceeds by {formatNumber(totalAllocatedShares - totalSharesPool)}</p>
+                <p className="text-xs mt-1 text-destructive/80">You need to redistribute or remove shares from an existing shareholder.</p>
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-center">
             <ResponsiveContainer width="100%" height={220}>
