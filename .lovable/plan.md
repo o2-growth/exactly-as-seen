@@ -1,41 +1,24 @@
 
 
-# Plan: Cap Table Improvements
+# Plan: Remove Entry Valuation Column & Fix Layout Overlap
+
+## Problems
+1. "Entry Valuation (R$ M)" column is not needed — remove it
+2. Cap table content is hidden behind/overlapping with the donut chart
 
 ## Changes to `src/pages/Valuation.tsx`
 
-### 1. Shareholder Types
-Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
+### 1. Remove Entry Valuation column
+- Remove the `<th>` for "Entry Valuation (R$ M)" from the header row
+- Remove the `<td>` with the entry valuation input from each shareholder row
+- Remove `entryValuation` from `addShareholder` default and the `Shareholder` interface
+- Update the total row `colSpan` from 3 to 2
 
-### 2. Shares formatting with dots (pt-BR)
-Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
-
-### 3. Input-driven % Ownership (% drives shares)
-Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
-
-### 4. Total Shares widget
-Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
-
-### 5. One decimal place on % Ownership
-Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
-
-### 6. First row formatting
-Match the screenshot reference: consistent row styling with proper padding and alignment.
-
-## Data Model Change
-- Add `totalSharesPool` state (persisted to localStorage)
-- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
-- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
-
-## Default Data
-```
-Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
-Tiago Pisoni — Founder — 30.0% — 2024-01
-Rafael Fleck — Investor — 0.0%
-```
+### 2. Fix layout overlap
+The cap table uses `grid-cols-1 lg:grid-cols-3` with `lg:col-span-2` for the table and the donut chart taking the remaining column. The table content likely overflows behind the chart. Fix by ensuring the table wrapper doesn't overflow into the chart area — add `overflow-hidden` to the table container and ensure proper `min-w-0` on the grid children so they respect grid boundaries.
 
 ## Files Changed
 | File | Change |
 |------|--------|
-| `src/pages/Valuation.tsx` | All changes above |
+| `src/pages/Valuation.tsx` | Remove Entry Valuation column, fix grid overflow |
 
