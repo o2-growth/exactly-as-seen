@@ -284,7 +284,7 @@ export default function Valuation() {
                   <td className="p-2"></td>
                   <td className={`p-2 text-right tabular-nums ${ownershipExceeds ? 'text-destructive' : 'text-foreground'}`}>{totalOwnership.toFixed(2)}%</td>
                   <td className={`p-2 text-right tabular-nums ${sharesExceeds ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(totalAllocatedShares)}</td>
-                  <td colSpan={3}></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tbody>
             </table>
