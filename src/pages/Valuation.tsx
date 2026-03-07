@@ -18,7 +18,6 @@ interface Shareholder {
   name: string;
   type: ShareholderType;
   ownershipPct: number; // drives shares
-  entryValuation: number;
   entryDate: string;
 }
 
@@ -44,7 +43,6 @@ function loadCapTable(): Shareholder[] {
           name: sh.name,
           type: sh.type,
           ownershipPct: total > 0 ? Math.round(((sh.shares / total) * 100) * 10) / 10 : 0,
-          entryValuation: sh.entryValuation || 0,
           entryDate: sh.entryDate || '',
         }));
       }
@@ -52,9 +50,9 @@ function loadCapTable(): Shareholder[] {
     }
   } catch {}
   return [
-    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryValuation: 8, entryDate: '2017-08' },
-    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryValuation: 0, entryDate: '2024-01' },
-    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryValuation: 0, entryDate: '' },
+    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryDate: '2017-08' },
+    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryDate: '2024-01' },
+    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryDate: '' },
   ];
 }
 
@@ -103,7 +101,7 @@ export default function Valuation() {
 
   const addShareholder = () => {
     if (atLimit) return;
-    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryValuation: 0, entryDate: '' }]);
+    setShareholders(prev => [...prev, { id: `sh-${Date.now()}`, name: '', type: 'Investor', ownershipPct: 0, entryDate: '' }]);
   };
   const removeShareholder = (id: string) => setShareholders(prev => prev.filter(s => s.id !== id));
   const updateShareholder = (id: string, field: keyof Shareholder, value: string | number) => {
@@ -230,7 +228,7 @@ export default function Valuation() {
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 overflow-x-auto">
+          <div className="lg:col-span-2 overflow-x-auto min-w-0">
             <table className="w-full text-sm table-auto">
               <thead>
                 <tr className="bg-secondary border-b-2 border-primary/40">
@@ -238,8 +236,7 @@ export default function Valuation() {
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[120px]">Type</th>
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[110px]">% Ownership</th>
                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Shares</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[140px]">Entry Valuation (R$ M)</th>
-                  <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Entry Date</th>
+                   <th className="text-center p-2 text-foreground font-semibold text-xs uppercase tracking-wider whitespace-nowrap min-w-[100px]">Entry Date</th>
                   <th className="p-2 w-8"></th>
                 </tr>
               </thead>
@@ -278,7 +275,6 @@ export default function Valuation() {
                         placeholder="0"
                       />
                     </td>
-                    <td className="p-2"><Input type="number" value={s.entryValuation || ''} onChange={e => updateShareholder(s.id, 'entryValuation', +e.target.value)} className="h-8 text-xs text-right" /></td>
                     <td className="p-2"><Input value={s.entryDate} onChange={e => updateShareholder(s.id, 'entryDate', e.target.value)} className="h-8 text-xs text-left" placeholder="YYYY-MM" /></td>
                     <td className="p-2"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeShareholder(s.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button></td>
                   </tr>
@@ -288,7 +284,7 @@ export default function Valuation() {
                   <td className="p-2"></td>
                   <td className={`p-2 text-right tabular-nums ${ownershipExceeds ? 'text-destructive' : 'text-foreground'}`}>{totalOwnership.toFixed(2)}%</td>
                   <td className={`p-2 text-right tabular-nums ${sharesExceeds ? 'text-destructive' : 'text-foreground'}`}>{formatNumber(totalAllocatedShares)}</td>
-                  <td colSpan={3}></td>
+                  <td colSpan={2}></td>
                 </tr>
               </tbody>
             </table>
