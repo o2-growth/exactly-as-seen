@@ -1015,7 +1015,10 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     { code: 'EBITDA%', label: '% EBITDA', isMargin: true, annual: a(y => y.ebitdaMarginPct) },
 
     // ── Below EBITDA ──
-    { code: '8R', label: 'Receitas Financeiras', annual: z, monthly: zMo() },
+    { code: '8R', label: 'Receitas Financeiras', annual: z, monthly: zMo(), children: [
+      { code: '8.01', label: 'Rendimentos de Aplicações', annual: z, monthly: zMo() },
+      { code: '8.09', label: 'Juros Recebidos', annual: z, monthly: zMo() },
+    ]},
     {
       code: '8D', label: 'Despesas Financeira', annual: finAn, monthly: finMo,
       children: buildDetailChildren(BASE_FINANCIAL, y => y.financialResult, d => d.financialResult, years),
