@@ -792,7 +792,9 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const caasAn = a(y => y.caasRevenue), caasMo = mo(d => d.caasRevenue);
   const saasAn = a(y => y.saasRevenue), saasMo = mo(d => d.saasRevenue);
   const eduAn = a(y => y.educationRevenue), eduMo = mo(d => d.educationRevenue);
-  // BaaS revenue not shown in Oxy structure (future BU handled via Expansão)
+  // BaaS revenue flows into Expansão
+  const baasAn = a(y => y.baasRevenue), baasMo = mo(d => d.baasRevenue);
+  const baAn = a(y => y.revenueDetail.baasAssinatura);
   // Sub-revenue
   const assAn = a(y => y.revenueDetail.caasAssessoria);
   const entAn = a(y => y.revenueDetail.caasEnterprise);
@@ -802,7 +804,6 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const ogAn = a(y => y.revenueDetail.saasOxyGenio);
   const ssAn = a(y => y.revenueDetail.saasSetup);
   const dcAn = a(y => y.revenueDetail.educationDonoCfo);
-  // baasAssinatura detail not shown in Oxy structure
   // Main categories
   const dedAn = a(y => y.deductions), dedMo = mo(d => d.deductions);
   const nrAn = a(y => y.netRevenue), nrMo = mo(d => d.netRevenue);
@@ -826,11 +827,30 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const cSWAn = a(y => y.capexDetail.software), cREAn = a(y => y.capexDetail.realestate);
   const cogsCaasAn = a(y => y.cogsDetail.caas), cogsCSAn = a(y => y.cogsDetail.customerService);
   const cogsSaasAn = a(y => y.cogsDetail.saas), cogsEduAn = a(y => y.cogsDetail.education);
-  const _cogsBaasAn = a(y => y.cogsDetail.baas); // BaaS COGS — reserved for future BaaS BU
-  void _cogsBaasAn;
+  const cogsBaasAn = a(y => y.cogsDetail.baas); // BaaS COGS flows into Custos Expansão
 
   // Combine commissions + marketing into a single "Despesas de Marketing" total for DESPESAS FIXAS
   // (commissions are now under Despesas Comerciais in the Oxy structure)
+
+  // Helper: build zero COGS children for a BU (structural placeholders)
+  function buildCostChildren(buName: string, hasVariavel: boolean = false): PnlNode[] {
+    const items: string[] = [
+      `Custo com Deslocamento ${buName}`,
+      `Custo com Alimentação ${buName}`,
+      `Equipe ${buName}`,
+      `Custo com Viagens e Estadias ${buName}`,
+      `Softwares e Ferramentas - ${buName}`,
+      `Benefícios - ${buName}`,
+    ];
+    if (hasVariavel) items.push(`Custo Variável ${buName}`);
+    items.push(`Remuneração de Estagiários - ${buName}`);
+    return items.map((label, i) => ({
+      code: '',
+      label,
+      annual: z,
+      monthly: zMo(),
+    }));
+  }
 
   return [
     // ── RECEITA BRUTA ──
@@ -838,11 +858,11 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
       code: '1', label: 'RECEITA BRUTA', annual: grAn, monthly: grMo, isSummary: true,
       children: [
         { code: '1.1', label: 'CaaS', annual: caasAn, monthly: caasMo, children: [
-          { code: '1.1.1', label: 'Assessoria', annual: assAn, monthly: allocMo(caasMo, assAn, caasAn) },
+          { code: '1.1.1', label: 'Serviços Especializados', annual: assAn, monthly: allocMo(caasMo, assAn, caasAn) },
           { code: '1.1.2', label: 'Enterprise', annual: entAn, monthly: allocMo(caasMo, entAn, caasAn) },
           { code: '1.1.3', label: 'Corporate', annual: corpAn, monthly: allocMo(caasMo, corpAn, caasAn) },
-          { code: '1.1.4', label: 'Setup', annual: csAn, monthly: allocMo(caasMo, csAn, caasAn) },
-          { code: '1.1.5', label: 'Parceiros', annual: z, monthly: zMo() },
+          { code: '1.1.4', label: 'Parceiros', annual: z, monthly: zMo() },
+          { code: '1.1.5', label: 'BPO Financeiro', annual: z, monthly: zMo() },
         ]},
         { code: '1.2', label: 'SaaS', annual: saasAn, monthly: saasMo, children: [
           { code: '1.2.1', label: 'Oxy', annual: oxyAn, monthly: allocMo(saasMo, oxyAn, saasAn) },
@@ -852,23 +872,26 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.2.5', label: 'Oxy + Gênio + Especialista', annual: z, monthly: zMo() },
         ]},
         { code: '1.3', label: 'Education', annual: eduAn, monthly: eduMo, children: [
-          { code: '1.3.3', label: 'Dono CFO', annual: dcAn, monthly: eduMo },
-          { code: '1.3.1', label: 'Diagnóstico 360', annual: z, monthly: zMo() },
-          { code: '1.3.2', label: 'Eng. de Negócios', annual: z, monthly: zMo() },
-          { code: '1.3.4', label: 'Fin na Raiz', annual: z, monthly: zMo() },
+          { code: '1.3.1', label: 'Dono CFO', annual: dcAn, monthly: eduMo },
+          { code: '1.3.2', label: 'Engenheiro de Negócios', annual: z, monthly: zMo() },
+          { code: '1.3.3', label: 'Financeiro Raiz', annual: z, monthly: zMo() },
+          { code: '1.3.4', label: 'Finance Sales Program', annual: z, monthly: zMo() },
         ]},
-        { code: '1.5', label: 'Expansão', annual: z, monthly: zMo() },
+        { code: '1.5', label: 'Expansão', annual: baasAn, monthly: baasMo, children: [
+          { code: '1.5.1', label: 'Assinatura', annual: baAn, monthly: allocMo(baasMo, baAn, baasAn) },
+          { code: '1.5.2', label: 'Custódia', annual: z, monthly: zMo() },
+        ]},
         { code: '1.6', label: 'Tax', annual: z, monthly: zMo() },
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500, desc: 0.0100 };
-          const ratesReal = { pis: 0.0165, cofins: 0.0760, iss: 0.0500, desc: 0.0100 };
-          const subDeds = [
-            { code: '2.01', label: 'PIS', key: 'pis' as const },
-            { code: '2.02', label: 'COFINS', key: 'cofins' as const },
-            { code: '2.03', label: 'ISS', key: 'iss' as const },
-            { code: '2.04', label: 'Descontos', key: 'desc' as const },
+          const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500 };
+          const ratesReal = { pis: 0.0165, cofins: 0.0760, iss: 0.0500 };
+          // Proportional sub-items (have computed values)
+          const proportionalItems: { code: string; label: string; key: 'pis' | 'cofins' | 'iss' }[] = [
+            { code: '2.03', label: 'ISS', key: 'iss' },
+            { code: '2.04', label: 'PIS', key: 'pis' },
+            { code: '2.05', label: 'COFINS', key: 'cofins' },
           ];
-          return subDeds.map(sd => {
+          const proportionalNodes = proportionalItems.map(sd => {
             const ann = {} as Record<Year, number>;
             for (const y of YEARS) {
               const rates = (y as number) <= 2026 ? ratesPresumido : ratesReal;
@@ -878,6 +901,29 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
             }
             return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
           });
+          // Zero sub-items (structural placeholders)
+          const zeroItems: PnlNode[] = [
+            { code: '2.01', label: 'CSLL (retido na fonte)', annual: z, monthly: zMo() },
+            { code: '2.02', label: 'PIS (retido na fonte)', annual: z, monthly: zMo() },
+            { code: '2.06', label: 'ICMS', annual: z, monthly: zMo() },
+            { code: '2.07', label: 'IRRF (retido na fonte)', annual: z, monthly: zMo() },
+            { code: '2.08', label: 'COFINS (retido na fonte)', annual: z, monthly: zMo() },
+            { code: '2.09', label: 'Devoluções – Reembolso ao Cliente', annual: z, monthly: zMo() },
+            { code: '2.10', label: 'Devoluções – Cancelamento/Desistência de Venda', annual: z, monthly: zMo() },
+          ];
+          // Order: CSLL retido, ISS, PIS retido, PIS, COFINS, ICMS, IRRF retido, COFINS retido, Devoluções...
+          return [
+            zeroItems[0],           // CSLL (retido na fonte)
+            proportionalNodes[0],   // ISS
+            zeroItems[1],           // PIS (retido na fonte)
+            proportionalNodes[1],   // PIS
+            proportionalNodes[2],   // COFINS
+            zeroItems[2],           // ICMS
+            zeroItems[3],           // IRRF (retido na fonte)
+            zeroItems[4],           // COFINS (retido na fonte)
+            zeroItems[5],           // Devoluções – Reembolso ao Cliente
+            zeroItems[6],           // Devoluções – Cancelamento/Desistência de Venda
+          ];
         })() },
       ],
     },
@@ -889,31 +935,27 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     { code: 'CV_HDR', label: 'CUSTOS VARIÁVEIS', isHeader: true, annual: z, monthly: zMo() },
     {
       code: '3.1', label: 'Custos CaaS', annual: cogsCaasAn, monthly: allocMo(cogsMo, cogsCaasAn, cogsAn),
+      children: buildCostChildren('CaaS'),
     },
     {
       code: '3.2', label: 'Custos SaaS', annual: cogsSaasAn, monthly: allocMo(cogsMo, cogsSaasAn, cogsAn),
+      children: buildCostChildren('SaaS'),
     },
     {
       code: '3.3', label: 'Custos Education', annual: cogsEduAn, monthly: allocMo(cogsMo, cogsEduAn, cogsAn),
-      children: [
-        { code: '3.3.1', label: 'Custo com Viagens e Estadias Education', annual: z, monthly: zMo() },
-        { code: '3.3.2', label: 'Equipe Education', annual: z, monthly: zMo() },
-        { code: '3.3.3', label: 'Custo com Deslocamento Education', annual: z, monthly: zMo() },
-        { code: '3.3.4', label: 'Custo com Alimentação Education', annual: z, monthly: zMo() },
-        { code: '3.3.5', label: 'Softwares e Ferramentas - Education', annual: z, monthly: zMo() },
-        { code: '3.3.6', label: 'Benefícios - Education', annual: z, monthly: zMo() },
-        { code: '3.3.7', label: 'Custo Variável Education', annual: z, monthly: zMo() },
-        { code: '3.3.8', label: 'Remuneração de Estagiários - Education', annual: z, monthly: zMo() },
-      ],
+      children: buildCostChildren('Education', true),
     },
     {
       code: '3.4', label: 'Custos Customer Success', annual: cogsCSAn, monthly: allocMo(cogsMo, cogsCSAn, cogsAn),
+      children: buildCostChildren('Customer Success'),
     },
     {
-      code: '3.5', label: 'Custos Expansão', annual: z, monthly: zMo(),
+      code: '3.5', label: 'Custos Expansão', annual: cogsBaasAn, monthly: allocMo(cogsMo, cogsBaasAn, cogsAn),
+      children: buildCostChildren('Expansão'),
     },
     {
       code: '3.6', label: 'Custos Tax', annual: z, monthly: zMo(),
+      children: buildCostChildren('Tax'),
     },
 
     // ── LUCRO BRUTO ──
