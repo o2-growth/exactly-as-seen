@@ -7,11 +7,11 @@
 import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
-  clientsBase2025, avgTicket, churnAnnual, salesDeductions, cogsMonthly2025,
-  commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
+  clientsBase2025, avgTicket, churnAnnual, salesDeductions, salesDeductionsByYear,
+  cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
   commercialExpenses2025, taxRates, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
-  salaryRanges, expectedOutputs, saasSetupClients,
+  salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
 } from '@/data/modelData';
 
 // ─── TYPES ───
@@ -193,7 +193,7 @@ function calcTotalClients(month: number, year: number, assumptions: Assumptions)
 
 // ─── COGS ───
 
-function calcMonthlyCOGS(month: number, year: number, revenueScale: number) {
+function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baasClients: number) {
   if (year === 2025) {
     return {
       caas: cogsMonthly2025.caas[month] / 1000,
@@ -210,21 +210,25 @@ function calcMonthlyCOGS(month: number, year: number, revenueScale: number) {
     customerService: (cogsMonthly2025.customerService.reduce((s, v) => s + v, 0) / 12) / 1000,
     saas: (cogsMonthly2025.saas.reduce((s, v) => s + v, 0) / 12) / 1000,
     education: 0,
-    baas: 0,
   };
+  // BaaS COGS: ~R$25 per BaaS client/month (processing, compliance, banking fees)
+  // Starts from 2027 when BaaS launches
+  const baasCogs = year >= 2027 ? -(baasClients * 25) / 1000 : 0;
+
   return {
     caas: base.caas * yearMult,
     customerService: base.customerService * yearMult,
     saas: base.saas * yearMult,
     education: base.education * yearMult,
-    baas: base.baas * yearMult,
+    baas: baasCogs,
   };
 }
 
 // ─── SG&A ───
 
-function calcMonthlySGA(month: number, year: number, netRevenue: number): number {
+function calcMonthlySGA(month: number, year: number, grossRevenue: number, totalHeadcount: number): number {
   const yearMult = Math.pow(1.10, year - 2025);
+  // Items that scale with 10% YoY (truly fixed costs)
   const fixedItems = [
     sgaMonthly2025['4.02_energia'],
     sgaMonthly2025['4.03_internet'],
@@ -232,47 +236,99 @@ function calcMonthlySGA(month: number, year: number, netRevenue: number): number
     sgaMonthly2025['4.05_condominio'],
     sgaMonthly2025['4.07_materiais'],
     sgaMonthly2025['4.08_higiene'],
-    sgaMonthly2025['4.10_maquinas'],
     sgaMonthly2025['4.11_contabil'],
     sgaMonthly2025['4.13_juridica'],
     sgaMonthly2025['4.22_alimentacao'],
-    sgaMonthly2025['4.25_softwares'],
   ];
   const sgaFixed = fixedItems.reduce((s, v) => s + v, 0) * yearMult / 1000;
-  // Bad debt = -2% of net revenue
-  const badDebt = -0.02 * Math.abs(netRevenue);
+
+  // Items that scale proportionally to headcount (not flat 10% YoY)
+  const baseHC = 22; // 2025 base headcount
+  const hcRatio = Math.max(1, totalHeadcount / baseHC);
+  const hcScaledItems = [
+    sgaMonthly2025['4.10_maquinas'],  // Notebooks/machines
+    sgaMonthly2025['4.25_softwares'], // Google email, software licenses
+  ];
+  const sgaHcScaled = hcScaledItems.reduce((s, v) => s + v, 0) * hcRatio / 1000;
+
+  // Eventos also scale with headcount
+  const eventos = (sgaMonthly2025['4.18_eventos'] || -832.52) * hcRatio / 1000;
+
+  // Bad debt = -2% of GROSS revenue (not net — Excel uses gross)
+  const badDebt = -0.02 * Math.abs(grossRevenue);
+
   // Insurance only first 3 months of 2025
   const insurance = (year === 2025 && month < 3) ? sgaMonthly2025['4.15_seguros'] / 1000 : 0;
-  return sgaFixed + badDebt + insurance;
+
+  return sgaFixed + sgaHcScaled + eventos + badDebt + insurance;
 }
 
 // ─── HEADCOUNT ───
 
-function calcMonthlyHeadcount(month: number, year: number, totalClients: number): { salaries: number; benefits: number } {
+function calcMonthlyHeadcount(
+  month: number, year: number,
+  caasClients: number, caasSaasClients: number, totalClients: number
+): { salaries: number; benefits: number } {
   const yearMult = Math.pow(1.10, year - 2025);
 
   // Base payroll (named employees, code 5.01)
-  let salaries = basePayroll2025 / 1000 * yearMult;
+  // Include temp employees only in their active months (2025 only)
+  let basePay = basePayroll2025;
+  if (year === 2025) {
+    // Acivaldo (R$3,067) and Lorenzi (R$7,500) only in January
+    if (month === 0) basePay += 3067 + 7500;
+  }
+  let salaries = basePay / 1000 * yearMult;
 
   // Additional hires based on client ratios
-  const additionalCFOs = Math.max(0, Math.ceil(totalClients / headcountRatios.clientsPerCFO) - 9); // 9 existing
-  const additionalFPA = Math.max(0, Math.ceil(totalClients / headcountRatios.clientsPerFPA) - 3);
-  const additionalCSM = Math.max(0, Math.ceil(totalClients / headcountRatios.clientsPerCSM) - 1);
-  const additionalPF = Math.max(0, Math.ceil(totalClients / headcountRatios.clientsPerPF) - 0);
+  // Excel uses CaaS-only clients for PF/CFO/FP&A, CaaS+SaaS for Project/Data/CSM
+  const additionalCFOs = Math.max(0, Math.ceil(caasClients / headcountRatios.clientsPerCFO) - 9); // 9 existing
+  const additionalFPA = Math.max(0, Math.ceil(caasClients / headcountRatios.clientsPerFPA) - 3);
+  const additionalPF = Math.max(0, Math.ceil(caasClients / headcountRatios.clientsPerPF) - 0);
+  const additionalProjectAnal = Math.max(0, Math.ceil(caasSaasClients / headcountRatios.clientsPerProjectAnal) - 0);
+  const additionalDataAnal = Math.max(0, Math.ceil(caasSaasClients / headcountRatios.clientsPerDataAnal) - 0);
+  const additionalCSM = Math.max(0, Math.ceil(caasSaasClients / headcountRatios.clientsPerCSM) - 1);
 
+  // CaaS/Operations hires
   salaries += (additionalCFOs * salaryRanges['CFO'] +
     additionalFPA * salaryRanges['FP&A Analyst'] +
     additionalCSM * salaryRanges['Customer Service'] +
-    additionalPF * salaryRanges['Project Finance Director']) / 1000;
+    additionalPF * salaryRanges['Project Finance Director'] +
+    additionalProjectAnal * salaryRanges['Project Analyst'] +
+    additionalDataAnal * salaryRanges['Data Processes Analyst']) / 1000;
+
+  // Tech hires (scale with SaaS client growth)
+  const saasScale = Math.max(0, Math.floor(caasSaasClients / 500)); // 1 batch per 500 clients
+  const techHires = {
+    seniorFullstack: Math.min(saasScale, 5),
+    plenoFullstack: Math.min(saasScale * 2, 10),
+    aiEngineer: Math.min(Math.floor(saasScale / 2), 3),
+    devops: Math.min(Math.ceil(saasScale / 3), 3),
+    uxDesigner: Math.min(Math.ceil(saasScale / 2), 4),
+    pmo: Math.min(Math.ceil(saasScale / 4), 2),
+  };
+  salaries += (
+    techHires.seniorFullstack * salaryRanges['Senior Fullstack'] +
+    techHires.plenoFullstack * salaryRanges['Pleno Fullstack'] +
+    techHires.aiEngineer * salaryRanges['AI Engineer'] +
+    techHires.devops * salaryRanges['DevOps'] +
+    techHires.uxDesigner * salaryRanges['UX Designer'] +
+    techHires.pmo * salaryRanges['PMO']
+  ) / 1000;
+
+  // Total headcount for benefits calculation
+  const baseHC = namedEmployees2025.filter(e => !('endMonth' in e)).length; // 22 permanent
+  const totalHC = baseHC + additionalCFOs + additionalFPA + additionalCSM + additionalPF +
+    additionalProjectAnal + additionalDataAnal +
+    techHires.seniorFullstack + techHires.plenoFullstack + techHires.aiEngineer +
+    techHires.devops + techHires.uxDesigner + techHires.pmo;
 
   // Benefits
   let benefits: number;
   if (year === 2025) {
     benefits = benefitsMonthly2025[month] / 1000;
   } else {
-    // Scale benefits with total headcount
-    const totalHC = 22 + additionalCFOs + additionalFPA + additionalCSM + additionalPF;
-    benefits = totalHC * 901.10 / 1000 * yearMult; // R$901.10 per person (food allowance basis)
+    benefits = totalHC * 901.10 / 1000 * yearMult;
   }
 
   return { salaries: -salaries, benefits: -benefits };
@@ -317,8 +373,10 @@ function calcMonthlyDebtPayment(month: number, year: number): { loans: number; s
 // ─── CAPEX ───
 
 function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number): { software: number; realestate: number } {
-  // Software capex = ~50% of SaaS COGS (tech investment)
-  const software = saasCogsMonthly; // already negative in R$k
+  // Software capex = % of SaaS COGS (tech investment)
+  // 50% in 2025-2026, 30% in 2027+ (as per Excel model)
+  const capexPct = year <= 2026 ? 0.50 : 0.30;
+  const software = saasCogsMonthly * capexPct;
 
   // Real estate: Melnick installment
   const absoluteMonth = (year - 2025) * 12 + month;
@@ -384,14 +442,16 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const eduRev = rev.education / 1000;
     const baasRev = rev.baas / 1000;
 
-    // Deductions
-    const ded = -grossRev * salesDeductions.totalRate;
+    // Deductions (rate changes at 2027: Lucro Presumido → Lucro Real)
+    const dedRate = salesDeductionsByYear[year] ?? salesDeductions.totalRate;
+    const ded = -grossRev * dedRate;
 
     // Net revenue
     const netRev = grossRev + ded;
 
-    // COGS
-    const cogs = calcMonthlyCOGS(m, year, revenueScale);
+    // COGS (pass BaaS clients for BaaS COGS calculation)
+    const baasClientsM = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
+    const cogs = calcMonthlyCOGS(m, year, revenueScale, baasClientsM);
     const totalCogs = cogs.caas + cogs.customerService + cogs.saas + cogs.education + cogs.baas;
 
     // Gross profit
@@ -418,12 +478,30 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // Contribution margin
     const cm = gp + totalComm + totalMkt;
 
-    // SG&A
-    const sga = calcMonthlySGA(m, year, netRev);
+    // Calculate client counts by BU for headcount ratios
+    const caasClientsM = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
+    const saasClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
+      + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
+    const caasSaasClientsM = caasClientsM + saasClientsM;
 
-    // Headcount
-    const hc = calcMonthlyHeadcount(m, year, totalClientsM);
+    // Headcount (uses CaaS-only for CFO/FP&A/PF, CaaS+SaaS for others)
+    const hc = calcMonthlyHeadcount(m, year, caasClientsM, caasSaasClientsM, totalClientsM);
     const totalHC = hc.salaries + hc.benefits;
+
+    // Estimate total headcount for SG&A scaling
+    const baseHC = 22;
+    const addCFOs = Math.max(0, Math.ceil(caasClientsM / headcountRatios.clientsPerCFO) - 9);
+    const addFPA = Math.max(0, Math.ceil(caasClientsM / headcountRatios.clientsPerFPA) - 3);
+    const addCSM = Math.max(0, Math.ceil(caasSaasClientsM / headcountRatios.clientsPerCSM) - 1);
+    const saasScale = Math.max(0, Math.floor(caasSaasClientsM / 500));
+    const estTotalHC = baseHC + addCFOs + addFPA + addCSM +
+      Math.min(saasScale, 5) + Math.min(saasScale * 2, 10) +
+      Math.min(Math.floor(saasScale / 2), 3) + Math.min(Math.ceil(saasScale / 3), 3);
+
+    // SG&A (uses gross revenue for PDD, headcount for scaling)
+    const sga = calcMonthlySGA(m, year, grossRev, estTotalHC);
 
     // Commercial
     const commercial = calcMonthlyCommercial(year);
@@ -435,7 +513,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const ebitda = cm + sga + totalHC + commercial + other;
 
     // Financial result
-    const boleto = -(totalClientsM * revenueTaxes.boletoPerClient) / 1000;
+    // Boleto tariff: R$0.10 per BaaS client only (not R$14.34 per all clients)
+    const boleto = -(baasClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
     const overdraft = (year === 2025 && m < 3) ? -25 / 3 : 0; // approximate
     const loanInterest = (year === 2025 && m < 3) ? -2 / 3 : 0;
     const financialResult = boleto + overdraft + loanInterest;

@@ -9,12 +9,12 @@ export const clientsBase2025 = {
     assessoria: [0, 0, 0, 6.37, 9, 13, 18, 24, 31, 39, 48, 58],
     enterprise: [30.43, 33.47, 36.52, 45.31, 49.84, 54.83, 60.31, 66.34, 72.98, 80.27, 88.30, 97.13],
     corporate:  [3.60, 3.96, 4.32, 5.36, 5.90, 6.49, 7.13, 7.85, 8.63, 9.50, 10.44, 11.49],
-    setup:      [0, 3, 3, 16, 8, 10, 11, 10, 11, 13, 13, 14],
+    setup:      [0, 3, 3, 16, 8, 10, 11, 13, 14, 16, 18, 20],
     parceiros:  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   },
   saas: {
     oxy:       [0, 0, 0, 47.21, 53.81, 60.41, 67.01, 73.60, 80.20, 86.80, 93.39, 99.99],
-    oxyGenio:  [0, 0, 0, 16.21, 23.90, 31.60, 39.29, 47.98, 56.68, 65.38, 74.07, 82.77],
+    oxyGenio:  [0, 0, 0, 16.21, 28.63, 41.05, 53.47, 65.89, 78.31, 90.73, 103.15, 125.79],
     setup:     [0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
     parceiros: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   },
@@ -64,12 +64,24 @@ export const churnAnnual = {
 };
 
 // ─── SALES DEDUCTIONS (% of Gross Revenue) ───
+// Lucro Presumido (2025-2026): PIS 0.65%, COFINS 3.0%
+// Lucro Real (2027+): PIS 1.65%, COFINS 7.6%
+// ISS 5.0% and Discounts 1.0% are constant
 export const salesDeductions = {
   pis:       0.0065,
   cofins:    0.0300,
   iss:       0.0500,
   discounts: 0.0100,
   totalRate: 0.0965,
+};
+
+export const salesDeductionsByYear: Record<number, number> = {
+  2025: 0.0965,  // PIS 0.65% + COFINS 3.0% + ISS 5.0% + Desc 1.0%
+  2026: 0.0965,
+  2027: 0.1525,  // PIS 1.65% + COFINS 7.6% + ISS 5.0% + Desc 1.0%
+  2028: 0.1525,
+  2029: 0.1525,
+  2030: 0.1525,
 };
 
 // ─── COGS monthly values Jan–Dec 2025 (BRL, negative) ───
@@ -165,6 +177,12 @@ export const namedEmployees2025 = [
   { name: 'Frank Martins',      role: 'Finance',      bu: 'Administrative', salary: 6000,   costCode: '5.01' },
   { name: 'Eduardo Pedrolo',    role: 'Admin',        bu: 'Administrative', salary: 12000,  costCode: '5.01' },
   { name: 'Mauricio Daneluz',   role: 'Admin',        bu: 'Administrative', salary: 7500,   costCode: '5.01' },
+  // Missing employees from Excel
+  { name: 'Head Comercial',     role: 'Commercial',   bu: 'Commercial',     salary: 12500,  costCode: '6.08' },
+  { name: 'SDR 01',             role: 'SDR',          bu: 'Commercial',     salary: 4000,   costCode: '6.08' },
+  { name: 'SDR 02',             role: 'SDR',          bu: 'Commercial',     salary: 4000,   costCode: '6.08' },
+  { name: 'Acivaldo',           role: 'Temp',         bu: 'Administrative', salary: 3067,   costCode: '5.01', endMonth: 0 }, // Jan only
+  { name: 'Lorenzi',            role: 'Temp',         bu: 'Administrative', salary: 7500,   costCode: '5.01', endMonth: 0 }, // Jan only
 ];
 
 // ─── SALARY RANGES FOR FUTURE HIRES ───
@@ -211,7 +229,8 @@ export const taxRates = {
 
 // ─── FINANCIAL/REVENUE TAXES ───
 export const revenueTaxes = {
-  boletoPerClient: 14.34,
+  boletoPerClient: 14.34,    // Legacy: was applied to all clients
+  baasBoletoPerClient: 0.10, // Correct: R$0.10 per BaaS client only
 };
 
 // ─── DEBT SCHEDULE ───
@@ -266,7 +285,7 @@ export const debtSchedule = [
     account:    '11.03',
     category:   'investor' as const,
     outstanding:    53494.10,
-    monthlyPayment: 2057.47,
+    monthlyPayment: 4057.47,
     finalDate:      '2027-02',
     interestRate:   0.00,
     remainingInstallments: 26,
@@ -315,7 +334,7 @@ export const baasCustodia = {
 // ─── SaaS SETUP CLIENTS (for years > 2025) ───
 export const saasSetupClients: Record<number, number[]> = {
   2025: [0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
-  2026: [22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22],
+  2026: [25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25],
   2027: [97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97],
   2028: [361, 361, 361, 361, 361, 361, 361, 361, 361, 361, 361, 361],
   2029: [787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787],
@@ -330,7 +349,8 @@ export const scenarioMultipliers = {
 };
 
 // ─── BENEFITS MONTHLY (2025) ───
-export const benefitsMonthly2025 = [5980, 5400, 7500, 7500, 7500, 7500, 7500, 7500, 7500, 7500, 7500, 7500];
+// Benefits grow with headcount through 2025 (Excel: R$10,500 → R$22,200)
+export const benefitsMonthly2025 = [10500, 10500, 11200, 12800, 13900, 15100, 16400, 17600, 18900, 20100, 21300, 22200];
 
 // ─── BASE PAYROLL 2025 ───
 export const basePayroll2025 = namedEmployees2025
