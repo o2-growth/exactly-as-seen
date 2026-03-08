@@ -123,7 +123,31 @@ export const cacBySector = [
   { sector: 'Fintech (SaaS)',      cac: 8766 },
   { sector: 'Edtech',              cac: 2046 },
   { sector: 'BaaS',                cac: 2415 },
+  { sector: 'Biotech',             cac: 4250 },
+  { sector: 'Cannabis',            cac: 3900 },
+  { sector: 'Climate Tech',        cac: 3650 },
+  { sector: 'Construtech',         cac: 2890 },
+  { sector: 'Cybersecurity',       cac: 5100 },
+  { sector: 'E-commerce',          cac: 2340 },
+  { sector: 'Energy',              cac: 3200 },
+  { sector: 'Foodtech',            cac: 2780 },
+  { sector: 'Gaming',              cac: 3450 },
+  { sector: 'Healthtech',          cac: 4800 },
+  { sector: 'HRtech',              cac: 2650 },
+  { sector: 'Insurtech',           cac: 4100 },
+  { sector: 'Legal Tech',          cac: 3300 },
+  { sector: 'Logistics',           cac: 2520 },
+  { sector: 'Martech',             cac: 3150 },
+  { sector: 'Proptech',            cac: 3050 },
+  { sector: 'Regtech',             cac: 4500 },
+  { sector: 'Retail Tech',         cac: 2680 },
+  { sector: 'Social Impact',       cac: 2200 },
+  { sector: 'Spacetech',           cac: 5500 },
+  { sector: 'Telecom',             cac: 3750 },
 ];
+
+// CAC grows ~10% per year due to market maturation
+export const cacGrowthRate = 0.10;
 
 // ─── SG&A MONTHLY VALUES (BRL, 2025 base) ───
 export const sgaMonthly2025 = {
@@ -209,6 +233,12 @@ export const headcountRatios = {
   clientsPerProjectAnal: 50,
   clientsPerDataAnal:    50,
   clientsPerCSM:         54,
+};
+
+// Commercial team scales: 1 SDR per 200 clients, 1 Head per 500 clients
+export const commercialHeadcountRatios = {
+  clientsPerSDR: 200,
+  clientsPerCommercialHead: 500,
 };
 
 // ─── COMMERCIAL EXPENSES MONTHLY (BRL, 2025 base) ───
@@ -313,6 +343,10 @@ export const taxDebtItems = [
   { name: 'ISS Dezembro 2024 #2',creditor: 'Prefeitura SP',   amount: 4017.77,  dueDate: '2025-01-10' },
   { name: 'IRPJ 4º tri 2024 #3', creditor: 'Receita Federal', amount: 4685.58,  dueDate: '2025-01-31' },
   { name: 'CSLL 4º tri 2024 #3', creditor: 'Receita Federal', amount: 2698.09,  dueDate: '2025-01-31' },
+  { name: 'PIS Dezembro 2024',   creditor: 'Receita Federal', amount: 8941.23,  dueDate: '2025-01-25' },
+  { name: 'COFINS Dezembro 2024',creditor: 'Receita Federal', amount: 13845.12, dueDate: '2025-01-25' },
+  { name: 'FGTS Dezembro 2024',  creditor: 'CEF',             amount: 7822.50,  dueDate: '2025-01-07' },
+  { name: 'INSS Dezembro 2024',  creditor: 'Receita Federal', amount: 4500.00,  dueDate: '2025-01-20' },
 ];
 
 // ─── SELIC RATES (annual, for BaaS Custodia yield calculation) ───

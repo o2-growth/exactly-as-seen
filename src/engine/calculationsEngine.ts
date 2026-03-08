@@ -745,7 +745,7 @@ const BASE_FINANCIAL = [
   { c: '8.05', l: 'Tarifa de Boletos', v: V(-7,-1,-4,-18,-56,-129) },
   { c: '8.06', l: 'Tarifa de PIX', v: V(0,0,0,0,0,0) },
   { c: '8.07', l: 'Tarifa de Adquirência', v: V(0,0,0,0,0,0) },
-  { c: '8.08', l: 'Juros Antecipação de Recebíveis', v: V(0,0,0,0,0,0) },
+  { c: '8.08', l: 'Juros Antecipação de Recebíveis', v: V(-46,0,0,0,0,0) },
   { c: '8.09', l: 'Receita Financeira (Aplicações)', v: V(0,0,0,0,0,0) },
   { c: '8.10', l: 'Multa e Juros por Atraso', v: V(0,0,0,0,0,0) },
 ];
@@ -842,21 +842,47 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.1.2', label: 'Enterprise', annual: entAn, monthly: allocMo(caasMo, entAn, caasAn) },
           { code: '1.1.3', label: 'Corporate', annual: corpAn, monthly: allocMo(caasMo, corpAn, caasAn) },
           { code: '1.1.4', label: 'Setup', annual: csAn, monthly: allocMo(caasMo, csAn, caasAn) },
+          { code: '1.1.5', label: 'Parceiros', annual: z, monthly: zMo() },
         ]},
         { code: '1.2', label: 'SaaS', annual: saasAn, monthly: saasMo, children: [
           { code: '1.2.1', label: 'Oxy', annual: oxyAn, monthly: allocMo(saasMo, oxyAn, saasAn) },
           { code: '1.2.2', label: 'Oxy + Gênio', annual: ogAn, monthly: allocMo(saasMo, ogAn, saasAn) },
+          { code: '1.2.3', label: 'Parceiros', annual: z, monthly: zMo() },
           { code: '1.2.4', label: 'Setup', annual: ssAn, monthly: allocMo(saasMo, ssAn, saasAn) },
         ]},
         { code: '1.3', label: 'Education', annual: eduAn, monthly: eduMo, children: [
+          { code: '1.3.1', label: 'Diagnóstico 360', annual: z, monthly: zMo() },
+          { code: '1.3.2', label: 'Eng. de Negócios', annual: z, monthly: zMo() },
           { code: '1.3.3', label: 'Dono CFO', annual: dcAn, monthly: eduMo },
+          { code: '1.3.4', label: 'Fin na Raiz', annual: z, monthly: zMo() },
         ]},
         { code: '1.4', label: 'BaaS', annual: baasAn, monthly: baasMo, children: [
           { code: '1.4.1', label: 'Assinatura', annual: baAn, monthly: baasMo },
+          { code: '1.4.2', label: 'Custódia', annual: z, monthly: zMo() },
         ]},
       ],
     },
-    { code: '2', label: 'Dedução de Vendas', annual: dedAn, monthly: dedMo },
+    { code: '2', label: 'Dedução de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
+      // Sub-deduction rates by regime
+      const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500, desc: 0.0100 };
+      const ratesReal = { pis: 0.0165, cofins: 0.0760, iss: 0.0500, desc: 0.0100 };
+      const subDeds = [
+        { code: '2.01', label: 'PIS', key: 'pis' as const },
+        { code: '2.02', label: 'COFINS', key: 'cofins' as const },
+        { code: '2.03', label: 'ISS', key: 'iss' as const },
+        { code: '2.04', label: 'Descontos/Devoluções', key: 'desc' as const },
+      ];
+      return subDeds.map(sd => {
+        const ann = {} as Record<Year, number>;
+        for (const y of YEARS) {
+          const rates = (y as number) <= 2026 ? ratesPresumido : ratesReal;
+          const totalRate = salesDeductionsByYear[y as number];
+          const proportion = totalRate !== 0 ? rates[sd.key] / totalRate : 0;
+          ann[y] = Math.round(dedAn[y] * proportion);
+        }
+        return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
+      });
+    })() },
     { code: 'NR', label: '(=) Receita Líquida', isSummary: true, annual: nrAn, monthly: nrMo },
     {
       code: '3', label: 'Custo dos Serviços Prestados (COGS)', annual: cogsAn, monthly: cogsMo,
@@ -908,6 +934,7 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     },
     { code: '10', label: 'Outras Despesas', annual: otherAn, monthly: otherMo },
     { code: '9', label: 'Depreciação & Amortização', annual: z, monthly: zMo() },
+    { code: 'RO', label: '(=) Resultado Operacional', isSummary: true, annual: ebitdaAn, monthly: ebitdaMo },
     { code: 'EBITDA', label: '(=) EBITDA', isSummary: true, annual: ebitdaAn, monthly: ebitdaMo },
     { code: 'EBITDA%', label: '% EBITDA', isMargin: true, annual: a(y => y.ebitdaMarginPct) },
     {
