@@ -11,7 +11,7 @@ import {
   commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
   commercialExpenses2025, taxRates, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
-  salaryRanges, expectedOutputs,
+  salaryRanges, expectedOutputs, saasSetupClients,
 } from '@/data/modelData';
 
 // ─── TYPES ───
@@ -149,8 +149,9 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * t.saasOxy;
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * t.saasOxyGenio;
-  // SaaS setup: use same pattern as CaaS setup but with SaaS setup clients
-  const saasSetup   = (year === 2025 ? (clientsBase2025.saas.setup[month] || 0) : 0) * avgTicket.saas.setup;
+  // SaaS setup: use monthly setup clients from model data
+  const saasSetupArr = saasSetupClients[year] || saasSetupClients[2025];
+  const saasSetup   = (saasSetupArr[month] || 0) * avgTicket.saas.setup;
   const saasTotal = saasOxy + saasOxyGenio + saasSetup;
 
   const eduDonoCfo = getMonthlyClientCount('education', 'donoCfo', month, year, assumptions) * t.educationDonoCFO;

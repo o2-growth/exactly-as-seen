@@ -271,6 +271,17 @@ export const debtSchedule = [
     interestRate:   0.00,
     remainingInstallments: 26,
   },
+  {
+    name:       'Negociação Caramello+EPG',
+    creditor:   'Guardian',
+    account:    '11.03',
+    category:   'investor' as const,
+    outstanding:    119130.00,
+    monthlyPayment: 5000.00,
+    finalDate:      '2026-04',
+    interestRate:   0.00,
+    remainingInstallments: 13,
+  },
 ];
 
 // ─── TAX DEBT (outstanding Jan 2025) ───
@@ -284,6 +295,32 @@ export const taxDebtItems = [
   { name: 'IRPJ 4º tri 2024 #3', creditor: 'Receita Federal', amount: 4685.58,  dueDate: '2025-01-31' },
   { name: 'CSLL 4º tri 2024 #3', creditor: 'Receita Federal', amount: 2698.09,  dueDate: '2025-01-31' },
 ];
+
+// ─── SELIC RATES (annual, for BaaS Custodia yield calculation) ───
+export const selicRates: Record<number, number> = {
+  2025: 0.15,
+  2026: 0.125,
+  2027: 0.105,
+  2028: 0.10,
+  2029: 0.1297,
+  2030: 0.1297,
+};
+
+// ─── BaaS CUSTODIA PARAMETERS ───
+export const baasCustodia = {
+  avgPmeCash: 20039,       // Average PME cash balance (R$)
+  custodyFeeRate: 0.002,   // 0.2% of AUM
+};
+
+// ─── SaaS SETUP CLIENTS (for years > 2025) ───
+export const saasSetupClients: Record<number, number[]> = {
+  2025: [0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 7, 7],
+  2026: [22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22],
+  2027: [97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97],
+  2028: [361, 361, 361, 361, 361, 361, 361, 361, 361, 361, 361, 361],
+  2029: [787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787, 787],
+  2030: [1345, 1345, 1345, 1345, 1345, 1345, 1345, 1345, 1345, 1345, 1345, 1345],
+};
 
 // ─── SCENARIO MULTIPLIERS ───
 export const scenarioMultipliers = {
