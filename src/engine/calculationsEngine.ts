@@ -717,15 +717,16 @@ const BASE_SGA = [
   { c: '4.17', l: 'Custas Judiciais ou Processuais', v: V(0,0,0,0,0,0) },
   { c: '4.18', l: 'Eventos Internos', v: V(-23,-51,-121,-339,-737,-1488) },
   { c: '4.19', l: 'Retenções IRRF de Serviços de Terceiros', v: V(0,0,0,0,0,0) },
-  { c: '4.20', l: 'Retenções PIS/COFINS/CSLL de Serviços', v: V(0,0,0,0,0,0) },
+  { c: '4.20', l: 'Retenções PIS/COFINS/CSLL de Serviços de Terceiros', v: V(0,0,0,0,0,0) },
+  { c: '4.21', l: 'Assessoria de Informática', v: V(0,0,0,0,0,0) },
   { c: '4.22', l: 'Alimentação - Administrativo', v: V(-255,-281,-309,-340,-374,-411) },
   { c: '4.23', l: 'Deslocamento - Administrativo', v: V(0,0,0,0,0,0) },
-  { c: '4.21', l: 'Assessoria de Informática', v: V(0,0,0,0,0,0) },
   { c: '4.24', l: 'Viagens e Estadias - Administrativo', v: V(0,0,0,0,0,0) },
   { c: '4.25', l: 'Softwares e Ferramentas - Administrativo', v: V(-172,-262,-548,-1418,-3108,-5874) },
   { c: '4.26', l: 'Provisão para Devedores Duvidosos', v: V(-276,-685,-2074,-6742,-15719,-29215) },
   { c: '4.27', l: 'Despesas a Identificar', v: V(0,0,0,0,0,0) },
-  { c: '4.28', l: 'DIFAL', v: V(0,0,0,0,0,0) },
+  { c: '4.28', l: 'DIFAL - Diferencial de Alíquotas do ICMS', v: V(0,0,0,0,0,0) },
+  { c: '4.29', l: 'Retenções ISS de Serviços de Terceiros', v: V(0,0,0,0,0,0) },
 ];
 
 const BASE_COMMERCIAL = [
