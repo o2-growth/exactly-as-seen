@@ -62,6 +62,19 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLab
 
   if (hiddenItems.has(node.code)) return null;
 
+  if (node.isHeader) {
+    return (
+      <tr className="border-b border-border/50">
+        <td
+          colSpan={columns.length + 1}
+          className="p-3 pt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+        >
+          {label}
+        </td>
+      </tr>
+    );
+  }
+
   // Engine already applies scenario — no double-multiplication needed
   const getValue = (col: Year | string): number => {
     if (viewMode === 'monthly' && typeof col === 'string') {

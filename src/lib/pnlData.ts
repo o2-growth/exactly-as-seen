@@ -7,6 +7,7 @@ export interface PnlNode {
   monthly?: Record<Year, number[]>; // 12 monthly values per year, R$ thousands
   isSummary?: boolean;
   isMargin?: boolean;
+  isHeader?: boolean;
   children?: PnlNode[];
 }
 
