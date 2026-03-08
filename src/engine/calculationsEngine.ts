@@ -1047,10 +1047,11 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     {
       code: '11', label: 'Amortização da Dívida Global', annual: debtAn, monthly: debtMo,
       children: [
-        { code: '11.01', label: 'Empréstimos e Financiamentos', annual: dLoansAn, monthly: allocMo(debtMo, dLoansAn, debtAn) },
-        { code: '11.02', label: 'Tributos Parcelados', annual: z, monthly: zMo() },
-        { code: '11.03', label: 'Dívida com Fornecedores', annual: dSuppAn, monthly: allocMo(debtMo, dSuppAn, debtAn) },
-        { code: '11.04', label: 'Compra de Cotas', annual: z, monthly: zMo() },
+        { code: '11.01', label: 'Compra de Cotas', annual: z, monthly: zMo() },
+        { code: '11.02', label: 'Pagamento de Tributos Parcelados', annual: z, monthly: zMo() },
+        { code: '11.03', label: 'Amortização de Empréstimos e Financiamentos', annual: dLoansAn, monthly: allocMo(debtMo, dLoansAn, debtAn) },
+        { code: '11.04', label: 'Pagamento de Dívida com Fornecedores', annual: dSuppAn, monthly: allocMo(debtMo, dSuppAn, debtAn) },
+        { code: '11.05', label: 'Grupo Octo', annual: z, monthly: zMo() },
       ],
     },
     {
