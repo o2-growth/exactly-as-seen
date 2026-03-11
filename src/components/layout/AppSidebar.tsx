@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, Database } from 'lucide-react';
+import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock } from 'lucide-react';
 import o2Logo from '@/assets/O2_Inc_Logo.png';
 
 const navItems = [
