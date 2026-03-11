@@ -13,7 +13,7 @@ import Assumptions from "./pages/Assumptions";
 import DebtFinance from "./pages/DebtFinance";
 import Valuation from "./pages/Valuation";
 import VersionHistory from "./pages/VersionHistory";
-import Actuals from "./pages/Actuals";
+
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,7 +35,7 @@ const App = () => (
                 <Route path="/clients" element={<Navigate to="/assumptions" replace />} />
                 <Route path="/debt" element={<DebtFinance />} />
                 <Route path="/valuation" element={<Valuation />} />
-                <Route path="/actuals" element={<Actuals />} />
+                
                 <Route path="/history" element={<VersionHistory />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
