@@ -29,6 +29,8 @@ export interface Assumptions {
   };
   churnCaas: number;
   churnSaas: number;
+  churnBaas: number;
+  pmrConfig: PmrConfig;
   sgaPercent: number;
   headcountGrowth: number;
   headcountSalaries: Record<string, number>;
@@ -61,6 +63,8 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   },
   churnCaas: 5,
   churnSaas: 5,
+  churnBaas: 0,
+  pmrConfig: { caas: 30, saas: 15, education: 30, baas: 0 },
   sgaPercent: 15,
   headcountGrowth: 10,
   headcountSalaries: {
@@ -97,6 +101,25 @@ export const NET_MARGINS: Record<Year, number> = {
 };
 
 export type Scenario = 'BASE' | 'BULL' | 'BEAR';
+
+export type PeriodPreset = 'all' | '3y' | '5y' | 'historical' | 'projected';
+export type DataSource = 'model' | 'actual' | 'blended';
+
+export const HISTORICAL_CUTOFF_YEAR = 2025;
+
+export interface PmrConfig {
+  caas: number;   // days receivable outstanding — CaaS
+  saas: number;   // days receivable outstanding — SaaS
+  education: number;
+  baas: number;
+}
+
+export const DEFAULT_PMR: PmrConfig = {
+  caas: 30,
+  saas: 15,
+  education: 30,
+  baas: 0,
+};
 
 export const SCENARIO_MULTIPLIERS: Record<Scenario, number> = {
   BASE: 1.0,

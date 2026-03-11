@@ -3,7 +3,7 @@ import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency } from '@/lib/formatters';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, ReferenceLine,
@@ -35,13 +35,14 @@ interface CashFlowRow {
   children?: CashFlowRow[];
 }
 
-function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
+function buildCashFlowTree(tree: PnlNode[], receivablesChange: Record<Year, number>): CashFlowRow[] {
   const inflows: CashFlowRow[] = [
     { code: 'I.1', label: 'CaaS Revenue', getValues: (y) => getAnnual('1.1', y, tree) },
     { code: 'I.2', label: 'SaaS Revenue', getValues: (y) => getAnnual('1.2', y, tree) },
     { code: 'I.3', label: 'Education', getValues: (y) => getAnnual('1.3', y, tree) },
     { code: 'I.4', label: 'BaaS', getValues: (y) => getAnnual('1.4', y, tree) },
     { code: 'I.5', label: 'Financial Income', getValues: (y) => Math.max(0, getAnnual('8', y, tree)) },
+    { code: 'I.6', label: 'Variacao de Contas a Receber', getValues: (y) => receivablesChange[y] ?? 0 },
   ];
 
   const outflows: CashFlowRow[] = [
@@ -124,8 +125,18 @@ const formatAxis = (v: number) => {
 };
 
 export default function CashFlow() {
-  const { scenario, pnlTree } = useFinancialModel();
-  const tree = buildCashFlowTree(pnlTree);
+  const { scenario, pnlTree, model, assumptions, setAssumptions } = useFinancialModel();
+  const [pmrOpen, setPmrOpen] = useState(false);
+  const [editingPmr, setEditingPmr] = useState(false);
+  const [pmrDraft, setPmrDraft] = useState(assumptions.pmrConfig);
+
+  // Build receivablesChange lookup from engine
+  const receivablesChange: Record<Year, number> = {} as Record<Year, number>;
+  for (const y of YEARS) {
+    receivablesChange[y] = model.years[y].receivablesChange;
+  }
+
+  const tree = buildCashFlowTree(pnlTree, receivablesChange);
 
   // Compute opening/closing balances
   let openingBalance = 0;
@@ -146,9 +157,98 @@ export default function CashFlow() {
     'Net Cash': d.closing,
   }));
 
+  const savePmr = () => {
+    setAssumptions({ ...assumptions, pmrConfig: pmrDraft });
+    setEditingPmr(false);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Cash Flow</h2>
+
+      {/* PMR Panel */}
+      <div className="gradient-card">
+        <button
+          className="w-full flex items-center justify-between p-5 text-left"
+          onClick={() => setPmrOpen(o => !o)}
+        >
+          <div>
+            <h3 className="text-sm font-semibold">Prazo Medio de Recebimento (PMR)</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              CaaS {assumptions.pmrConfig.caas}d · SaaS {assumptions.pmrConfig.saas}d · Education {assumptions.pmrConfig.education}d · BaaS {assumptions.pmrConfig.baas}d
+            </p>
+          </div>
+          {pmrOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        </button>
+
+        {pmrOpen && (
+          <div className="px-5 pb-5 border-t border-border pt-4 space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(['caas', 'saas', 'education', 'baas'] as const).map(bu => (
+                <div key={bu} className="space-y-1">
+                  <p className="text-xs text-muted-foreground capitalize">{bu} (dias)</p>
+                  {editingPmr ? (
+                    <input
+                      type="number"
+                      min="0"
+                      max="180"
+                      className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={pmrDraft[bu]}
+                      onChange={e => setPmrDraft(p => ({ ...p, [bu]: Number(e.target.value) || 0 }))}
+                    />
+                  ) : (
+                    <p className="text-sm font-semibold">{assumptions.pmrConfig[bu]} dias</p>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              {editingPmr ? (
+                <>
+                  <button onClick={savePmr} className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                    Salvar PMR
+                  </button>
+                  <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(false); }} className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(true); }} className="px-3 py-1.5 text-xs font-semibold border border-primary/40 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                  Editar PMR
+                </button>
+              )}
+            </div>
+
+            {/* Receivables change preview */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-1.5 text-muted-foreground font-medium">Variacao de Recebíveis</th>
+                    {YEARS.map(y => (
+                      <th key={y} className="text-right py-1.5 text-muted-foreground font-medium min-w-[90px]">{y}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-1.5 font-medium">Delta Contas a Receber</td>
+                    {YEARS.map(y => {
+                      const val = receivablesChange[y] ?? 0;
+                      return (
+                        <td key={y} className={`text-right py-1.5 tabular-nums ${val < 0 ? 'text-negative' : 'text-positive'}`}>
+                          {val === 0 ? '—' : formatCurrency(val * 1000)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Expandable Table */}
       <div className="gradient-card overflow-x-auto">
@@ -215,7 +315,7 @@ export default function CashFlow() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ mil (000's) · {scenario} scenario · Projeções estimadas
+        Valores em R$ mil (000's) · {scenario} scenario · Projecoes estimadas
       </p>
     </div>
   );

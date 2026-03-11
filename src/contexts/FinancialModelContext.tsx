@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import {
   Assumptions, DEFAULT_ASSUMPTIONS, Scenario, Year, YEARS,
-  ProjectionData,
+  ProjectionData, PeriodPreset, DataSource,
 } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
@@ -10,6 +10,8 @@ interface FinancialModelContextType {
   assumptions: Assumptions;
   scenario: Scenario;
   selectedYear: Year;
+  selectedPeriod: PeriodPreset;
+  dataSource: DataSource;
   projections: ProjectionData;
   model: FullModelOutput;
   pnlTree: PnlNode[];
@@ -17,6 +19,8 @@ interface FinancialModelContextType {
   updateAssumption: <K extends keyof Assumptions>(key: K, value: Assumptions[K]) => void;
   setScenario: (s: Scenario) => void;
   setSelectedYear: (y: Year) => void;
+  setSelectedPeriod: (p: PeriodPreset) => void;
+  setDataSource: (d: DataSource) => void;
   resetAssumptions: () => void;
 }
 
@@ -26,6 +30,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const [assumptions, setAssumptions] = useState<Assumptions>(DEFAULT_ASSUMPTIONS);
   const [scenario, setScenario] = useState<Scenario>('BASE');
   const [selectedYear, setSelectedYear] = useState<Year>(2025);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>('all');
+  const [dataSource, setDataSource] = useState<DataSource>('model');
 
   // Compute full model from engine
   const model = useMemo(
@@ -73,8 +79,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
   return (
     <FinancialModelContext.Provider value={{
-      assumptions, scenario, selectedYear, projections, model, pnlTree,
-      setAssumptions, updateAssumption, setScenario, setSelectedYear, resetAssumptions,
+      assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
+      setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, resetAssumptions,
     }}>
       {children}
     </FinancialModelContext.Provider>

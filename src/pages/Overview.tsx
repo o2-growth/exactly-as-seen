@@ -58,14 +58,17 @@ export default function Overview() {
 
   // Client chart with actual BU data from assumptions + YoY growth
   const clientChartData = YEARS.map((y, i) => {
-    const total = assumptions.caasClients[y] + assumptions.saasClients[y] + assumptions.educationClients[y];
-    const prevTotal = i > 0 ? assumptions.caasClients[YEARS[i-1]] + assumptions.saasClients[YEARS[i-1]] + assumptions.educationClients[YEARS[i-1]] : 0;
+    const baasClients = assumptions.subProductClients.baas[y];
+    const total = assumptions.caasClients[y] + assumptions.saasClients[y] + assumptions.educationClients[y] + baasClients;
+    const prevBaas = i > 0 ? assumptions.subProductClients.baas[YEARS[i-1]] : 0;
+    const prevTotal = i > 0 ? assumptions.caasClients[YEARS[i-1]] + assumptions.saasClients[YEARS[i-1]] + assumptions.educationClients[YEARS[i-1]] + prevBaas : 0;
     const growthPct = i > 0 && prevTotal > 0 ? Number((((total - prevTotal) / prevTotal) * 100).toFixed(0)) : 0;
     return {
       year: y.toString(),
       CaaS: assumptions.caasClients[y],
       SaaS: assumptions.saasClients[y],
       Education: assumptions.educationClients[y],
+      BaaS: baasClients,
       'Growth %': growthPct,
     };
   });
@@ -182,7 +185,8 @@ export default function Overview() {
               <Area yAxisId="left" type="monotone" dataKey="SaaS" stackId="1" fill="hsl(258 90% 66%)" stroke="hsl(258 90% 66%)" fillOpacity={0.6} />
               <Area yAxisId="left" type="monotone" dataKey="Education" stackId="1" fill="hsl(38 92% 50%)" stroke="hsl(38 92% 50%)" fillOpacity={0.6} />
               <Area yAxisId="left" type="monotone" dataKey="CaaS" stackId="1" fill="hsl(217 91% 60%)" stroke="hsl(217 91% 60%)" fillOpacity={0.6} />
-              <Line yAxisId="right" type="monotone" dataKey="Growth %" stroke="hsl(38 92% 50%)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'hsl(38 92% 50%)', r: 3 }} />
+              <Area yAxisId="left" type="monotone" dataKey="BaaS" stackId="1" fill="hsl(340 82% 52%)" stroke="hsl(340 82% 52%)" fillOpacity={0.6} />
+              <Line yAxisId="right" type="monotone" dataKey="Growth %" stroke="hsl(280 60% 65%)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'hsl(280 60% 65%)', r: 3 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </ComposedChart>
           </ResponsiveContainer>
@@ -202,8 +206,8 @@ export default function Overview() {
               />
               <Line type="monotone" dataKey="Gross Margin" stroke="hsl(160 84% 39%)" strokeWidth={2} dot={{ fill: 'hsl(160 84% 39%)', r: 4 }} />
               <Line type="monotone" dataKey="EBITDA %" stroke="hsl(217 91% 60%)" strokeWidth={2} dot={{ fill: 'hsl(217 91% 60%)', r: 4 }} />
-              <Line type="monotone" dataKey="Net Margin" stroke="hsl(258 90% 66%)" strokeWidth={2} dot={{ fill: 'hsl(258 90% 66%)', r: 4 }} />
-              <Line type="monotone" dataKey="Cash Gen %" stroke="hsl(38 92% 50%)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'hsl(38 92% 50%)', r: 4 }} />
+              <Line type="monotone" dataKey="Net Margin" stroke="hsl(0 72% 51%)" strokeWidth={2} dot={{ fill: 'hsl(0 72% 51%)', r: 4 }} />
+              <Line type="monotone" dataKey="Cash Gen %" stroke="hsl(45 93% 58%)" strokeWidth={2} strokeDasharray="5 5" dot={{ fill: 'hsl(45 93% 58%)', r: 4 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </LineChart>
           </ResponsiveContainer>

@@ -12,6 +12,7 @@ import {
   commercialExpenses2025, taxRates, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
   salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
+  financialItems2025, outrosExpenses2025,
 } from '@/data/modelData';
 
 // ─── TYPES ───
@@ -79,6 +80,7 @@ export interface AnnualOutput {
   capex: number;
   capexDetail: { software: number; realestate: number };
   finalResult: number;
+  receivablesChange: number;
   totalClients: number;
   monthlyData: MonthlyPnL[];
   // Sub-revenue detail
@@ -212,8 +214,8 @@ function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baas
     education: 0,
   };
   // BaaS COGS: ~R$25 per BaaS client/month (processing, compliance, banking fees)
-  // Starts from 2027 when BaaS launches
-  const baasCogs = year >= 2027 ? -(baasClients * 25) / 1000 : 0;
+  // Starts from 2025
+  const baasCogs = year >= 2025 ? -(baasClients * 25) / 1000 : 0;
 
   return {
     caas: base.caas * yearMult,
@@ -226,41 +228,68 @@ function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baas
 
 // ─── SG&A ───
 
+// Helper: get value from SGA item (array or scalar) for a given month
+function getSgaValue(key: string, month: number): number {
+  const v = sgaMonthly2025[key];
+  if (Array.isArray(v)) return v[month];
+  return v as number;
+}
+
 function calcMonthlySGA(month: number, year: number, grossRevenue: number, totalHeadcount: number): number {
   const yearMult = Math.pow(1.10, year - 2025);
+
   // Items that scale with 10% YoY (truly fixed costs)
-  const fixedItems = [
-    sgaMonthly2025['4.02_energia'],
-    sgaMonthly2025['4.03_internet'],
-    sgaMonthly2025['4.04_aluguel'],
-    sgaMonthly2025['4.05_condominio'],
-    sgaMonthly2025['4.07_materiais'],
-    sgaMonthly2025['4.08_higiene'],
-    sgaMonthly2025['4.11_contabil'],
-    sgaMonthly2025['4.13_juridica'],
-    sgaMonthly2025['4.22_alimentacao'],
+  // For 2025, use monthly values; for later years, use Feb-Nov base × yearMult
+  const fixedKeys = [
+    '4.02_energia', '4.03_internet', '4.04_aluguel', '4.05_condominio',
+    '4.07_materiais', '4.08_higiene', '4.11_contabil', '4.13_juridica',
+    '4.22_alimentacao',
   ];
-  const sgaFixed = fixedItems.reduce((s, v) => s + v, 0) * yearMult / 1000;
+  let sgaFixed: number;
+  if (year === 2025) {
+    sgaFixed = fixedKeys.reduce((s, k) => s + getSgaValue(k, month), 0) / 1000;
+  } else {
+    // Use a stable base (Feb value for arrays, scalar for others)
+    sgaFixed = fixedKeys.reduce((s, k) => {
+      const v = sgaMonthly2025[k];
+      const base = Array.isArray(v) ? v[1] : v as number; // Feb as base
+      return s + base;
+    }, 0) * yearMult / 1000;
+  }
+
+  // Assessoria RH (4.14)
+  let assessoriaRH: number;
+  if (year === 2025) {
+    assessoriaRH = getSgaValue('4.14_assessoriaRH', month) / 1000;
+  } else {
+    assessoriaRH = -300 * yearMult / 1000;
+  }
+
+  // Insurance (4.15) — monthly array handles Jan-Mar 2025, 0 after
+  let insurance: number;
+  if (year === 2025) {
+    insurance = getSgaValue('4.15_seguros', month) / 1000;
+  } else {
+    insurance = 0;
+  }
 
   // Items that scale proportionally to headcount (not flat 10% YoY)
   const baseHC = 22; // 2025 base headcount
   const hcRatio = Math.max(1, totalHeadcount / baseHC);
   const hcScaledItems = [
-    sgaMonthly2025['4.10_maquinas'],  // Notebooks/machines
-    sgaMonthly2025['4.25_softwares'], // Google email, software licenses
+    sgaMonthly2025['4.10_maquinas'] as number,  // Notebooks/machines
+    sgaMonthly2025['4.25_softwares'] as number, // Google email, software licenses
   ];
   const sgaHcScaled = hcScaledItems.reduce((s, v) => s + v, 0) * hcRatio / 1000;
 
   // Eventos also scale with headcount
-  const eventos = (sgaMonthly2025['4.18_eventos'] || -832.52) * hcRatio / 1000;
+  const eventosBase = sgaMonthly2025['4.18_eventos'] as number || -832.52;
+  const eventos = eventosBase * hcRatio / 1000;
 
   // Bad debt = -2% of GROSS revenue (not net — Excel uses gross)
   const badDebt = -0.02 * Math.abs(grossRevenue);
 
-  // Insurance only first 3 months of 2025
-  const insurance = (year === 2025 && month < 3) ? sgaMonthly2025['4.15_seguros'] / 1000 : 0;
-
-  return sgaFixed + sgaHcScaled + eventos + badDebt + insurance;
+  return sgaFixed + assessoriaRH + insurance + sgaHcScaled + eventos + badDebt;
 }
 
 // ─── HEADCOUNT ───
@@ -336,15 +365,31 @@ function calcMonthlyHeadcount(
 
 // ─── COMMERCIAL EXPENSES ───
 
-function calcMonthlyCommercial(year: number): number {
+// Helper: get value from commercial item (array or scalar) for a given month
+function getCommercialValue(key: string, month: number): number {
+  const v = commercialExpenses2025[key];
+  if (Array.isArray(v)) return v[month];
+  return v as number;
+}
+
+function calcMonthlyCommercial(month: number, year: number): number {
   const yearMult = Math.pow(1.10, year - 2025);
-  const items = [
-    commercialExpenses2025['6.03_softwares'],
-    commercialExpenses2025['6.05_deslocamento'],
-    commercialExpenses2025['6.06_hospedagem'],
-  ];
-  const variable = items.reduce((s, v) => s + v, 0) * yearMult / 1000;
-  const fixed = commercialExpenses2025['6.08_assessoria'] / 1000; // doesn't grow
+  const variableKeys = ['6.03_softwares', '6.04_alimentacao', '6.05_deslocamento', '6.06_hospedagem'];
+
+  let variable: number;
+  if (year === 2025) {
+    variable = variableKeys.reduce((s, k) => s + getCommercialValue(k, month), 0) / 1000;
+  } else {
+    // Use Apr+ base values for projection (stable period)
+    variable = variableKeys.reduce((s, k) => {
+      const v = commercialExpenses2025[k];
+      const base = Array.isArray(v) ? v[3] : v as number; // Apr as stable base
+      return s + base;
+    }, 0) * yearMult / 1000;
+  }
+
+  const assessoria = commercialExpenses2025['6.08_assessoria'] as number;
+  const fixed = assessoria / 1000; // doesn't grow
   return variable + fixed;
 }
 
@@ -504,20 +549,36 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const sga = calcMonthlySGA(m, year, grossRev, estTotalHC);
 
     // Commercial
-    const commercial = calcMonthlyCommercial(year);
+    const commercial = calcMonthlyCommercial(m, year);
 
-    // Other expenses (only 2025)
-    const other = year === 2025 ? -13 / 12 : 0;
+    // Other expenses (code 10 — temporary services, only 2025)
+    let other: number;
+    if (year === 2025) {
+      other = outrosExpenses2025[m] / 1000;
+    } else {
+      other = 0;
+    }
 
     // EBITDA
     const ebitda = cm + sga + totalHC + commercial + other;
 
-    // Financial result
-    // Boleto tariff: R$0.10 per BaaS client only (not R$14.34 per all clients)
-    const boleto = -(baasClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
-    const overdraft = (year === 2025 && m < 3) ? -25 / 3 : 0; // approximate
-    const loanInterest = (year === 2025 && m < 3) ? -2 / 3 : 0;
-    const financialResult = boleto + overdraft + loanInterest;
+    // Financial result — use real monthly values for 2025, formula-based after
+    let financialResult: number;
+    if (year === 2025) {
+      const jurosChEsp = financialItems2025['8.01_jurosChEspecial'][m] / 1000;
+      const iof = financialItems2025['8.03_iof'][m] / 1000;
+      const jurosEmp = financialItems2025['8.04_jurosEmprestimos'][m] / 1000;
+      // Boleto tariff: real Jan-Mar, then f(clients) Apr+
+      const boletoReal = financialItems2025['8.05_tarifaBoletos'][m];
+      const boleto = m < 3 ? boletoReal / 1000 : -(totalClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
+      const antecipacao = financialItems2025['8.08_antecipacao'][m] / 1000;
+      const recFinanceira = financialItems2025['8.09_receitaFinanceira'][m] / 1000;
+      financialResult = jurosChEsp + iof + jurosEmp + boleto + antecipacao + recFinanceira;
+    } else {
+      // BaaS boleto only for later years
+      const boleto = -(baasClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
+      financialResult = boleto;
+    }
 
     // EBT
     const ebt = ebitda + financialResult;
@@ -593,6 +654,20 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
   const r = (v: number) => Math.round(v);
 
+  // ─── PMR / Receivables Change ───
+  // Ending receivables = annual gross revenue * weighted PMR / 365
+  const pmr = assumptions.pmrConfig ?? { caas: 30, saas: 15, education: 30, baas: 0 };
+  const totalRevForPmr = annualCaas + annualSaas + annualEdu + annualBaas;
+  const weightedPmr = totalRevForPmr > 0
+    ? (annualCaas * pmr.caas + annualSaas * pmr.saas + annualEdu * pmr.education + annualBaas * pmr.baas) / totalRevForPmr
+    : 0;
+  const endingReceivables = (annualGrossRevenue / 1000) * (weightedPmr / 365); // in R$ thousands
+  // For prior year we approximate using same formula with prior year revenue
+  const prevYear = (year - 1) as Year;
+  const prevYearRev = YEARS.includes(prevYear) ? expectedOutputs.grossRevenue[prevYear] ?? 0 : 0;
+  const beginningReceivables = (prevYearRev / 1000) * (weightedPmr / 365);
+  const receivablesChange = -(endingReceivables - beginningReceivables); // negative = cash used, positive = cash released
+
   return {
     grossRevenue: r(annualGrossRevenue), caasRevenue: r(annualCaas), saasRevenue: r(annualSaas),
     educationRevenue: r(annualEdu), baasRevenue: r(annualBaas),
@@ -617,6 +692,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     debtPayments: r(annualDebt), debtDetail: { loans: r(debtD.loans), suppliers: r(debtD.suppliers) },
     capex: r(annualCapex), capexDetail: { software: r(capexD.software), realestate: r(capexD.realestate) },
     finalResult: r(annualFinal),
+    receivablesChange: r(receivablesChange),
     totalClients: Math.round(lastClients),
     monthlyData: monthly,
     revenueDetail: {
@@ -752,6 +828,7 @@ const BASE_MARKETING = [
 ];
 
 const BASE_FINANCIAL = [
+  { c: '8.01', l: 'Juros Cheque Especial', v: V(-25,0,0,0,0,0) },
   { c: '8.02', l: 'Tarifas e Taxas Bancárias', v: V(0,0,0,0,0,0) },
   { c: '8.03', l: 'IOF', v: V(-1,0,0,0,0,0) },
   { c: '8.04', l: 'Juros sobre Empréstimos e Financiamentos', v: V(-2,0,0,0,0,0) },
@@ -1023,7 +1100,12 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
       code: '8D', label: 'Despesas Financeira', annual: finAn, monthly: finMo,
       children: buildDetailChildren(BASE_FINANCIAL, y => y.financialResult, d => d.financialResult, years),
     },
-    { code: 'OR', label: 'Outras Receitas', annual: z, monthly: zMo() },
+    { code: 'OR', label: 'Outras Receitas', annual: z, monthly: zMo(), children: [
+      { code: 'OR.01', label: 'Reembolsos', annual: z, monthly: zMo() },
+      { code: 'OR.02', label: 'Doações', annual: z, monthly: zMo() },
+      { code: 'OR.03', label: 'Empréstimos de Bancos', annual: z, monthly: zMo() },
+      { code: 'OR.04', label: 'Receitas Não Operacionais', annual: z, monthly: zMo() },
+    ]},
     {
       code: 'DNO', label: 'Despesas Não Operacionais', annual: a(y => y.otherExpenses), monthly: mo(d => d.otherExpenses),
       children: [

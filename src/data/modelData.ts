@@ -86,9 +86,9 @@ export const salesDeductionsByYear: Record<number, number> = {
 
 // ─── COGS monthly values Jan–Dec 2025 (BRL, negative) ───
 export const cogsMonthly2025 = {
-  caas:            [-95000, -98500, -68500, -122000, -130500, -150500, -185500, -220500, -268500, -326000, -393500, -469500],
-  customerService: [-6500, 0, -4000, -8000, -12000, -12000, -16000, -22000, -30000, -40000, -52000, -65000],
-  saas:            [-13800, -13800, -13800, -17800, -24700, -39450, -47450, -47450, -47450, -47450, -47450, -47450],
+  caas:            [-95000, -98500, -68500, -122000, -130500, -150500, -179000, -207500, -227500, -256000, -284500, -338000],
+  customerService: [-6500, 0, -4000, -8000, -12000, -12000, -16000, -16000, -20000, -24000, -24000, -28000],
+  saas:            [-13800, -13800, -13800, -17800, -24700, -39450, -47450, -47450, -53200, -53200, -53200, -62200],
   education:       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   baas:            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
 };
@@ -124,14 +124,12 @@ export const cacBySector = [
   { sector: 'Edtech',              cac: 2046 },
   { sector: 'BaaS',                cac: 2415 },
   { sector: 'Biotech',             cac: 4250 },
-  { sector: 'Cannabis',            cac: 3900 },
   { sector: 'Climate Tech',        cac: 3650 },
   { sector: 'Construtech',         cac: 2890 },
   { sector: 'Cybersecurity',       cac: 5100 },
   { sector: 'E-commerce',          cac: 2340 },
   { sector: 'Energy',              cac: 3200 },
   { sector: 'Foodtech',            cac: 2780 },
-  { sector: 'Gaming',              cac: 3450 },
   { sector: 'Healthtech',          cac: 4800 },
   { sector: 'HRtech',              cac: 2650 },
   { sector: 'Insurtech',           cac: 4100 },
@@ -150,20 +148,22 @@ export const cacBySector = [
 export const cacGrowthRate = 0.10;
 
 // ─── SG&A MONTHLY VALUES (BRL, 2025 base) ───
-export const sgaMonthly2025 = {
-  '4.02_energia':     -1354.49,
+// Items with monthly variation are arrays [Jan..Dec]; fixed items are scalars
+export const sgaMonthly2025: Record<string, number | number[]> = {
+  '4.02_energia':     [-844.57, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49, -1354.49],
   '4.03_internet':    -429.83,
-  '4.04_aluguel':     -6244.50,
+  '4.04_aluguel':     [-5159.20, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50, -6244.50],
   '4.05_condominio':  -2772.54,
-  '4.07_materiais':   -1427.75,
+  '4.07_materiais':   [-2356.00, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75, -1427.75],
   '4.08_higiene':     -2000.00,
   '4.10_maquinas':    -4286.00,
-  '4.11_contabil':    -2084.50,
+  '4.11_contabil':    [-4203.84, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -2084.50, -4169.00],
   '4.13_juridica':    -1000.00,
-  '4.15_seguros':     -513.48,
-  '4.18_eventos':     -832.52,
+  '4.14_assessoriaRH': [0, 0, 0, -300, -300, -300, -300, -300, -300, -300, -300, -300],
+  '4.15_seguros':     [-501.99, -513.48, -513.48, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '4.18_eventos':     -832.52,  // headcount-driven, handled in engine
   '4.22_alimentacao': -21260.20,
-  '4.25_softwares':   -10866.72,
+  '4.25_softwares':   -10866.72,  // headcount-driven, handled in engine
   '4.26_badDebt':     0, // computed: -2% × Net Revenue
 };
 
@@ -242,11 +242,12 @@ export const commercialHeadcountRatios = {
 };
 
 // ─── COMMERCIAL EXPENSES MONTHLY (BRL, 2025 base) ───
-export const commercialExpenses2025 = {
-  '6.03_softwares':    -1464.13,
-  '6.04_alimentacao':  0,
-  '6.05_deslocamento': -1318.32,
-  '6.06_hospedagem':   -2632.91,
+// Items with monthly variation are arrays [Jan..Dec]
+export const commercialExpenses2025: Record<string, number | number[]> = {
+  '6.03_softwares':    [-1268.11, -4112.39, -4112.39, -1464.13, -1464.13, -1464.13, -1464.13, -1464.13, -1464.13, -1464.13, -1464.13, -1464.13],
+  '6.04_alimentacao':  [-560.00, -1135.69, -1135.69, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '6.05_deslocamento': [-493.71, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32, -1318.32],
+  '6.06_hospedagem':   [-1537.84, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91, -2632.91],
   '6.08_assessoria':   -11367.00,
 };
 
@@ -384,12 +385,26 @@ export const scenarioMultipliers = {
 
 // ─── BENEFITS MONTHLY (2025) ───
 // Benefits grow with headcount through 2025 (Excel: R$10,500 → R$22,200)
-export const benefitsMonthly2025 = [10500, 10500, 11200, 12800, 13900, 15100, 16400, 17600, 18900, 20100, 21300, 22200];
+export const benefitsMonthly2025 = [5980, 5400, 7500, 10500, 12000, 13200, 15000, 16200, 17400, 18900, 20100, 22200];
 
 // ─── BASE PAYROLL 2025 ───
 export const basePayroll2025 = namedEmployees2025
   .filter(e => e.costCode === '5.01')
   .reduce((s, e) => s + e.salary, 0); // ~113,600
+
+// ─── FINANCIAL ITEMS MONTHLY 2025 (BRL, real values Jan-Mar, then formula-based) ───
+export const financialItems2025 = {
+  '8.01_jurosChEspecial': [-11364.10, -6628.01, -6628.01, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '8.03_iof':             [-196.93, -180.70, -180.70, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '8.04_jurosEmprestimos': [0, -2315.29, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '8.05_tarifaBoletos':   [-198.29, -3471.89, -3471.89, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Apr+ = f(clients), handled in engine
+  '8.08_antecipacao':     [-18704.46, -13862.82, -13862.82, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  '8.09_receitaFinanceira': [0.28, 0.23, 0.23, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+};
+
+// ─── "OUTROS" EXPENSES MONTHLY 2025 (BRL, code 10) ───
+// Ligapi R$1060.20/mês Jan-Aug + Exicon/Outros Jan-Mar
+export const outrosExpenses2025 = [-2358.70, -2441.70, -2441.70, -1060.20, -1060.20, -1060.20, -1060.20, -1060.20, 0, 0, 0, 0];
 
 // ─── EXPECTED ANNUAL OUTPUTS (for validation, R$ thousands) ───
 export const expectedOutputs = {
