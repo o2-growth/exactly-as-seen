@@ -258,7 +258,30 @@ export default function PnL() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold">P&L — Demonstração de Resultado</h2>
         <div className="flex items-center gap-3">
-          {/* View toggle */}
+          {/* Data source toggle */}
+          <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
+            <button
+              onClick={() => setDataSource('db')}
+              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                dataSource === 'db' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Database className="h-3 w-3" />
+              {dreLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Realizado'}
+            </button>
+            <button
+              onClick={() => setDataSource('model')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                dataSource === 'model' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Modelo
+            </button>
+          </div>
+
+          {dreError && (
+            <span className="text-[10px] text-destructive">DB: {dreError}</span>
+          )}
           <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
             {(['annual', 'monthly', 'summary'] as const).map(v => (
               <button
