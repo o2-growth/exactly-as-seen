@@ -453,8 +453,10 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
 
   if (!data) return null;
 
-  const { tree: oxyTree, balances: oxyBalances } = data
-    ? buildCashFlowTreeFromOxy(data)
+  // Use projection data for the expandable tree, historical for everything else
+  const projSource = projData || data;
+  const { tree: oxyTree, balances: oxyBalances } = projSource
+    ? buildCashFlowTreeFromOxy(projSource)
     : { tree: [], balances: [] };
 
   const waterfallMonthly = data ? data.chart.map(item => ({
