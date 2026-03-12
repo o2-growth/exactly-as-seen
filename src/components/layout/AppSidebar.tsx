@@ -31,7 +31,7 @@ export default function AppSidebar() {
               to={to}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-sidebar-accent text-sidebar-primary-foreground border border-primary/20'
+                  ? 'bg-sidebar-accent text-primary border border-primary/20'
                   : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
               }`}
             >
