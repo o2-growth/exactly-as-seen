@@ -1,1 +1,4 @@
 project_id = "nqpmyugsscvqsvjxdshd"
+
+[functions.explore-dre-db]
+verify_jwt = false
