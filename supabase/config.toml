@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.fetch-dre-data]
 verify_jwt = false
+
+[functions.fetch-oxy-cashflow]
+verify_jwt = false
