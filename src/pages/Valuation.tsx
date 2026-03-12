@@ -207,7 +207,7 @@ export default function Valuation() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Valuation & Cap Table</h2>
+      <h2 className="text-xl md:text-2xl font-bold text-primary">Valuation & Cap Table</h2>
 
       {/* Cap Table */}
       <div className="gradient-card p-5">

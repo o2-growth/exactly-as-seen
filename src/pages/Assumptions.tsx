@@ -465,7 +465,7 @@ export default function Assumptions() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold text-primary">Assumptions</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-primary">Assumptions</h2>
         <div className="flex items-center gap-2">
           {editing ? (
             <>

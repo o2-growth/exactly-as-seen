@@ -193,20 +193,20 @@ export default function Overview() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary flex items-center">
+      <h2 className="text-xl md:text-2xl font-bold text-primary flex items-center flex-wrap">
         Overview — {kpiYear}
         <YearBadge year={kpiYear} />
       </h2>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
         {kpis.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="kpi-card">
             <div className="flex items-center gap-2 mb-3">
               <Icon className={`h-4 w-4 ${color}`} />
               <span className="text-xs text-muted-foreground font-medium">{label}</span>
             </div>
-            <p className="text-2xl font-bold tracking-tight animate-count">{value}</p>
+            <p className="text-lg md:text-2xl font-bold tracking-tight animate-count">{value}</p>
           </div>
         ))}
         <RuleOf40Card />

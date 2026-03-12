@@ -256,7 +256,7 @@ export default function PnL() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-2xl font-bold text-primary">P&L — Demonstração de Resultado</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-primary">P&L — Demonstração de Resultado</h2>
         <div className="flex items-center gap-3">
           {/* Data source toggle */}
           <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
@@ -317,14 +317,14 @@ export default function PnL() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[260px] sticky left-0 bg-card">
+              <th className="text-left p-2 md:p-3 text-muted-foreground font-medium min-w-[180px] md:min-w-[260px] sticky left-0 bg-card">
                 Descrição
               </th>
               {columns.map(col => {
                 const isHistorical = typeof col === 'number' && col === 2025;
                 const isPartial    = typeof col === 'number' && col === 2026;
                 return (
-                  <th key={String(col)} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                  <th key={String(col)} className="text-right p-2 md:p-3 text-muted-foreground font-medium min-w-[80px] md:min-w-[100px]">
                     <div className="flex flex-col items-end gap-0.5">
                       <span>{String(col)}</span>
                       {isHistorical && (

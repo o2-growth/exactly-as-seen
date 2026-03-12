@@ -191,7 +191,7 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
       {/* Chart */}
       <div className="gradient-card p-5">
         <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Mensal — Dados Bancários (R$)</h3>
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={240} className="md:!h-[320px]">
           <ComposedChart data={chartData} barGap={4}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
@@ -219,16 +219,16 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">Descrição</th>
+              <th className="text-left p-2 md:p-3 text-muted-foreground font-medium min-w-[160px] md:min-w-[240px] sticky left-0 bg-card">Descrição</th>
               {data.periods.map(p => (
-                <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                <th key={p} className="text-right p-2 md:p-3 text-muted-foreground font-medium min-w-[80px] md:min-w-[100px]">
                   <div className="flex flex-col items-end gap-0.5">
                     <span>{monthLabel(p)}</span>
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 tracking-wide">Bancário</span>
                   </div>
                 </th>
               ))}
-              <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              <th className="text-right p-2 md:p-3 text-muted-foreground font-bold min-w-[90px] md:min-w-[110px]">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -310,11 +310,11 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">Contraparte</th>
+              <th className="text-left p-2 md:p-3 text-muted-foreground font-medium min-w-[160px] md:min-w-[240px] sticky left-0 bg-card">Contraparte</th>
               {data.periods.map(p => (
-                <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">{monthLabel(p)}</th>
+                <th key={p} className="text-right p-2 md:p-3 text-muted-foreground font-medium min-w-[80px] md:min-w-[100px]">{monthLabel(p)}</th>
               ))}
-              <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              <th className="text-right p-2 md:p-3 text-muted-foreground font-bold min-w-[90px] md:min-w-[110px]">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -372,7 +372,7 @@ export default function CashFlow() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Fluxo de Caixa</h2>
+      <h2 className="text-xl md:text-2xl font-bold text-primary">Fluxo de Caixa</h2>
       <OxyBankingView
         historicalStart={historicalStart}
         historicalEnd={historicalEnd}
