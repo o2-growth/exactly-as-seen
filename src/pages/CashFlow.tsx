@@ -530,6 +530,91 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
         </ResponsiveContainer>
       </div>
 
+      {/* Projection Table */}
+      {oxyTree.length > 0 && (
+        <div className="gradient-card overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">
+                  Descrição
+                </th>
+                {data!.periods.map(p => (
+                  <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span>{monthLabel(p)}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 tracking-wide">
+                        Bancário
+                      </span>
+                    </div>
+                  </th>
+                ))}
+                <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Saldo Inicial */}
+              <tr className="border-b border-border/30 bg-primary/5 font-bold">
+                <td className="p-3 sticky left-0 bg-card text-sm">Saldo Inicial</td>
+                {oxyBalances.map(b => (
+                  <td key={b.period} className="text-right p-3 tabular-nums text-sm">
+                    {b.opening === 0 ? '—' : formatBrl(b.opening)}
+                  </td>
+                ))}
+                <td className="text-right p-3 tabular-nums text-sm">—</td>
+              </tr>
+
+              {/* Entradas & Saídas */}
+              {oxyTree.map(row => (
+                <MonthlyExpandableRow key={row.code} row={row} depth={0} periods={data!.periods} />
+              ))}
+
+              {/* Saldo Final */}
+              <tr className="border-b border-border bg-primary/10 font-bold">
+                <td className="p-3 sticky left-0 bg-card text-sm text-foreground">Saldo Final</td>
+                {oxyBalances.map(b => (
+                  <td key={b.period} className={`text-right p-3 tabular-nums text-sm ${b.closing < 0 ? 'text-negative' : 'text-positive'}`}>
+                    {formatBrl(b.closing)}
+                  </td>
+                ))}
+                <td className="text-right p-3 tabular-nums text-sm font-bold">
+                  {formatBrl(oxyBalances[oxyBalances.length - 1]?.closing ?? 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Waterfall Chart */}
+      {waterfallMonthly.length > 0 && (
+        <div className="gradient-card p-5">
+          <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Mensal — Cascata (R$)</h3>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={waterfallMonthly} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{
+                  background: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}
+                formatter={(v: number, name: string) => [formatBrl(v), name]}
+              />
+              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+              <Bar dataKey="Entradas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Saídas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Saldo Líquido" fill="hsl(var(--ring))" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {/* Detail Table */}
       <div className="gradient-card overflow-x-auto">
         <div className="flex items-center gap-2 p-4 border-b border-border">
