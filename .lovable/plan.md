@@ -1,41 +1,57 @@
 
 
-# Plan: Cap Table Improvements
+# Diagnóstico: Cash Flow vs Banco DRE
 
-## Changes to `src/pages/Valuation.tsx`
+## Dados que o Cash Flow precisa
 
-### 1. Shareholder Types
-Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
+A página de Cash Flow usa **19 linhas** organizadas em Entradas e Saídas. Para o ano de 2025, os dados vêm de `historicalData.ts` (hardcoded). Mapeei cada linha para o banco DRE:
 
-### 2. Shares formatting with dots (pt-BR)
-Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
+### ENTRADAS (Inflows)
+| Linha | Fonte atual (hardcoded) | Banco DRE | Status |
+|-------|------------------------|-----------|--------|
+| Receita CaaS | `historicalRevenue['CaaS']` | Categoria `RB`, grupo "CaaS" | Disponível |
+| Receita SaaS | `historicalRevenue['SaaS']` | Categoria `RB`, grupo "SaaS" | Disponível |
+| Receita Education | `historicalRevenue['Education']` | Categoria `RB`, grupo "Education" | Disponível |
+| Receita BaaS | Engine only (0 em 2025) | Sem dados no DB | N/A (engine) |
+| Receita Expansão | `historicalRevenue['Expansão']` | Categoria `RB`, grupo "Expansão" | Disponível |
+| Outras Receitas | `historicalRevenue['Tax']` + `historicalFinancial['RNO']` | Categoria `RB` grupo "Tax" + Categoria `OR` | Disponível |
+| Receitas Financeiras | `historicalFinancial['RF']` | Categoria `RF` | Disponível |
+| Variação Contas a Receber | Engine (PMR calc) | Sem dados no DB | N/A (engine) |
 
-### 3. Input-driven % Ownership (% drives shares)
-Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+### SAÍDAS (Outflows)
+| Linha | Fonte atual (hardcoded) | Banco DRE | Status |
+|-------|------------------------|-----------|--------|
+| Deduções de Vendas | `historicalDeductions` | Categoria `DC` (total) | Disponível |
+| Custos Variáveis | `historicalCosts` | Categoria `CV` (total) | Disponível |
+| Despesas Administrativas | `historicalExpenses['Despesas Administrativas']` | Categoria `DX`, grupo "Despesas Administrativas" | Disponível |
+| Despesas Comerciais | `historicalExpenses['Despesas Comerciais']` | Categoria `DX`, grupo "Despesas Comerciais" | Disponível |
+| Despesas com Pessoal | `historicalExpenses['Despesas com Pessoal']` | Categoria `DX`, grupo "Despesas com Pessoal" | Disponível |
+| Despesas de Marketing | `historicalExpenses['Despesas de Marketing']` | Categoria `DX`, grupo "Despesas de Marketing" | Disponível |
+| Despesas Financeiras | `historicalFinancial['DF']` | Categoria `DF` | Disponível |
+| Despesas Não Operacionais | `historicalFinancial['DNO']` | Categoria `DN` | Disponível |
+| Provisões (IRPJ/CSLL) | `historicalFinancial['PROV']` | Categoria `IR` | Disponível |
+| Amortização de Dívida | `historicalFinancial['AD']` | Categoria `AM` | Disponível |
+| Investimentos (Capex) | `historicalFinancial['INV']` | Categoria `IN` | Disponível |
 
-### 4. Total Shares widget
-Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+## Conclusao
 
-### 5. One decimal place on % Ownership
-Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+**17 de 19 linhas** podem ser alimentadas 100% pelo banco DRE. As 2 restantes (Receita BaaS e Variação de Contas a Receber) são calculadas pelo engine de projeção e nao existem no DRE -- isso e correto.
 
-### 6. First row formatting
-Match the screenshot reference: consistent row styling with proper padding and alignment.
+**O banco DRE consegue alimentar o Cash Flow de maneira 100% correta.**
 
-## Data Model Change
-- Add `totalSharesPool` state (persisted to localStorage)
-- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
-- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+## Plano de execucao
 
-## Default Data
-```
-Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
-Tiago Pisoni — Founder — 30.0% — 2024-01
-Rafael Fleck — Investor — 0.0%
-```
+1. **Criar/atualizar a edge function `fetch-dre-data`** para retornar, alem da arvore P&L, um objeto `cashFlowData` com os valores agregados por periodo para cada linha do Cash Flow, separando:
+   - Revenue por BU (CaaS, SaaS, Education, Expansao, Tax)
+   - Deducoes (total categoria DC)
+   - Custos (total categoria CV)
+   - Despesas por grupo dentro de DX (Administrativas, Comerciais, Pessoal, Marketing)
+   - Financeiras (RF, DF), DNO, Provisoes (IR), Amortizacao (AM), Investimentos (IN)
 
-## Files Changed
-| File | Change |
-|------|--------|
-| `src/pages/Valuation.tsx` | All changes above |
+2. **Atualizar `useDreData.ts`** para expor os dados de Cash Flow alem do P&L tree
+
+3. **Atualizar `CashFlow.tsx`** para:
+   - Adicionar toggle Realizado/Modelo (como ja feito no P&L)
+   - Quando "Realizado", usar dados do banco para 2025 e 2026 em vez do `historicalData.ts` hardcoded
+   - Manter engine para anos projetados (2027+) e para PMR/receivables
 
