@@ -361,7 +361,7 @@ export default function PnL() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ mil (000's) · {scenario} scenario · Projeções estimadas
+        Valores em R$ mil (000's) · {effectiveSource === 'db' ? 'Dados do banco' : `${scenario} scenario`} · {effectiveSource === 'db' ? 'Dados reais' : 'Projeções estimadas'}
       </p>
     </div>
   );
