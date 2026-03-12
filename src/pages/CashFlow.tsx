@@ -429,8 +429,9 @@ function buildCashFlowTreeFromOxy(data: import('@/hooks/useOxyCashFlow').OxyCash
 
 // ─── Banking view component ──────────────────────────────────────────────────
 
-function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: string }) {
-  const { data, loading, error } = useOxyCashFlow(startDate, endDate, true);
+function OxyBankingView({ historicalStart, historicalEnd, projectionStart, projectionEnd }: { historicalStart: string; historicalEnd: string; projectionStart: string; projectionEnd: string }) {
+  const { data, loading, error } = useOxyCashFlow(historicalStart, historicalEnd, true);
+  const { data: projData, loading: projLoading } = useOxyCashFlow(projectionStart, projectionEnd, true);
   const [detailView, setDetailView] = useState<'recebido' | 'pago'>('recebido');
 
   if (loading) {
