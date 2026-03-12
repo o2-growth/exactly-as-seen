@@ -423,27 +423,8 @@ export default function Assumptions() {
             </div>
           )}
 
-          {/* CAC by BU / Sector */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="gradient-card p-5">
-              <h3 className="text-sm font-semibold mb-4">CAC por BU / Setor (BRL)</h3>
-              <div className="space-y-3">
-                {cacData.map(c => (
-                  <div key={c.sector}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{c.sector}</span>
-                      <span className="font-semibold">{formatCurrency(c.cac)}</span>
-                    </div>
-                    <div className="w-full bg-secondary rounded-full h-2">
-                      <div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (c.cac / 12000) * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Unit Economics */}
-            <div className="gradient-card p-5">
+          {/* Unit Economics */}
+          <div className="gradient-card p-5">
               <h3 className="text-sm font-semibold mb-4">Unit Economics</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -471,7 +452,6 @@ export default function Assumptions() {
                   <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
                 </div>
               </div>
-            </div>
           </div>
         </TabsContent>
 
