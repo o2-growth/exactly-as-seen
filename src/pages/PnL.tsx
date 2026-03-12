@@ -5,7 +5,7 @@ import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
 import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus, Database, Loader2 } from 'lucide-react';
 import { useDreData } from '@/hooks/useDreData';
-import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus } from 'lucide-react';
+
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
