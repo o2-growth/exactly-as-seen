@@ -3,7 +3,9 @@ import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency, formatPercent } from '@/lib/formatters';
-import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus } from 'lucide-react';
+import { ChevronRight, ChevronDown, Settings2, Eye, EyeOff, Plus, Database, Loader2 } from 'lucide-react';
+import { useDreData } from '@/hooks/useDreData';
+
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
@@ -231,9 +233,15 @@ function groupByHeaders(nodes: PnlNode[]): PnlNode[] {
 
 export default function PnL() {
   const { scenario, selectedYear, pnlTree: rawPnlTree, filteredYears } = useFinancialModel();
-  const pnlTree = useMemo(() => groupByHeaders(rawPnlTree), [rawPnlTree]);
+  const { dreTree, loading: dreLoading, error: dreError } = useDreData();
+  const [dataSource, setDataSource] = useState<'db' | 'model'>('db');
   const [viewMode, setViewMode] = useState<ViewMode>('annual');
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
+
+  // Use DB data when available and selected, otherwise fall back to model
+  const effectiveSource = dataSource === 'db' && dreTree ? 'db' : 'model';
+  const basePnlTree = effectiveSource === 'db' ? dreTree! : rawPnlTree;
+  const pnlTree = useMemo(() => groupByHeaders(basePnlTree), [basePnlTree]);
 
   // Use filteredYears for annual view; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
@@ -250,7 +258,30 @@ export default function PnL() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-2xl font-bold">P&L — Demonstração de Resultado</h2>
         <div className="flex items-center gap-3">
-          {/* View toggle */}
+          {/* Data source toggle */}
+          <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
+            <button
+              onClick={() => setDataSource('db')}
+              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                dataSource === 'db' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Database className="h-3 w-3" />
+              {dreLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Realizado'}
+            </button>
+            <button
+              onClick={() => setDataSource('model')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                dataSource === 'model' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Modelo
+            </button>
+          </div>
+
+          {dreError && (
+            <span className="text-[10px] text-destructive">DB: {dreError}</span>
+          )}
           <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
             {(['annual', 'monthly', 'summary'] as const).map(v => (
               <button
@@ -330,7 +361,7 @@ export default function PnL() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ mil (000's) · {scenario} scenario · Projeções estimadas
+        Valores em R$ mil (000's) · {effectiveSource === 'db' ? 'Dados do banco' : `${scenario} scenario`} · {effectiveSource === 'db' ? 'Dados reais' : 'Projeções estimadas'}
       </p>
     </div>
   );
