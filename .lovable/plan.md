@@ -1,49 +1,41 @@
 
 
-# Plano: Headcount, Salarios e Proporcoes por Cliente
+# Plan: Cap Table Improvements
 
-## O que o usuario pediu (do mapa mental)
-1. Headcount mensal vinculado a salarios base com opcao de alternar visualizacao
-2. Proporcao de atendimento por cargo editavel (ex: cada CFO atende 15 clientes)
-3. Administracao deve poder editar proporcoes para recalcular necessidades de pessoal
-4. Headcount por area (Comercial, Marketing etc.) refletindo funil e metas de vendas
-5. Premissas de headcount mensais editaveis por admin, com regras de proporcao por cliente e por area
+## Changes to `src/pages/Valuation.tsx`
 
-## O que ja existe
-- Tab "Headcount" no Assumptions.tsx com: Colaboradores Nomeados, Indicadores de Folha, Reembolsos e "Regras de Contratacao" (tabela estatica de proporcoes e salarios)
-- `headcountRatios` e `salaryRanges` em `modelData.ts` (somente leitura)
-- `getMonthlyHeadcount()` em `monthlyData.ts` que calcula headcount por role baseado em total de clientes e ratios
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-## O que sera feito
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
 
-### 1. Tornar proporcoes e salarios editaveis
-Na secao "Regras de Contratacao" (linha 1796), transformar as tabelas de proporcao e salarios em inputs editaveis quando `editing === true`. As alteracoes serao salvas no estado de `editState` (Assumptions).
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
 
-Adicionar ao tipo `Assumptions`:
-- `headcountRatios`: Record com os ratios editaveis (clientsPerCFO, clientsPerFPA, etc.)
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
 
-### 2. Adicionar tabela "Headcount Projetado por Area" (nova secao)
-Inserir antes da secao "Regras de Contratacao" uma tabela mensal que mostra, para cada area/role, o numero de pessoas necessarias mes a mes, calculado dinamicamente com base nos clientes projetados e nas proporcoes editaveis.
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
 
-Colunas: Jan...Dez + Total
-Linhas agrupadas por BU: CaaS (CFOs, FP&A, PF Director, Project Analyst), SaaS (Data Analyst), Operations (CSM), Commercial (Head, SDR), Marketing, Admin, Management
-Cada celula = `ceil(totalClients / ratio)` com `Math.max(base, calculado)`
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
 
-### 3. Toggle de visualizacao: Qtd Pessoas vs Custo Mensal
-Adicionar um botao toggle no header da tabela projetada que alterna entre:
-- **Pessoas**: mostra quantidade (ex: 6 CFOs)
-- **Custo**: mostra quantidade x salario base (ex: R$ 90.000)
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
 
-### 4. Headcount Comercial vinculado ao funil
-Adicionar linhas de SDR e Head Comercial na tabela projetada, usando `commercialHeadcountRatios` (ja existente no modelData.ts: 1 SDR/200 clientes, 1 Head/500 clientes).
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
+```
 
-## Alteracoes por arquivo
-
-**`src/lib/financialData.ts`** — Adicionar `headcountRatios` ao tipo `Assumptions` e `DEFAULT_ASSUMPTIONS`
-
-**`src/pages/Assumptions.tsx`**:
-- Tornar inputs editaveis na secao "Regras de Contratacao" (ratios e salarios)
-- Criar nova secao "Headcount Projetado por Area" com tabela mensal + toggle pessoas/custo
-- Incluir linhas de Commercial (SDR, Head) usando `commercialHeadcountRatios`
-- Usar os ratios do `editState` ao inves dos importados de `modelData`
+## Files Changed
+| File | Change |
+|------|--------|
+| `src/pages/Valuation.tsx` | All changes above |
 

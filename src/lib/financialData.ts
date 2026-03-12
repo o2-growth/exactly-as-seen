@@ -35,6 +35,17 @@ export interface Assumptions {
   headcountGrowth: number;
   headcountSalaries: Record<string, number>;
   sgaGrowthRate: number;
+  headcountRatios: {
+    clientsPerCFO: number;
+    clientsPerFPA: number;
+    clientsPerPF: number;
+    clientsPerProjectAnal: number;
+    clientsPerDataAnal: number;
+    clientsPerCSM: number;
+    clientsPerSDR: number;
+    clientsPerCommercialHead: number;
+  };
+  salaryRanges: Record<string, number>;
 }
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
@@ -76,6 +87,32 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     'Operations': 5500,
   },
   sgaGrowthRate: 10,
+  headcountRatios: {
+    clientsPerCFO: 15,
+    clientsPerFPA: 15,
+    clientsPerPF: 100,
+    clientsPerProjectAnal: 50,
+    clientsPerDataAnal: 50,
+    clientsPerCSM: 54,
+    clientsPerSDR: 200,
+    clientsPerCommercialHead: 500,
+  },
+  salaryRanges: {
+    'Project Finance Director': 25000,
+    'CFO': 15000,
+    'FP&A Analyst': 5000,
+    'Project Analyst': 3500,
+    'Data Processes Analyst': 5000,
+    'Customer Service': 4000,
+    'Senior Fullstack': 8300,
+    'Pleno Fullstack': 5500,
+    'AI Engineer': 18000,
+    'DevOps': 11500,
+    'UX Designer': 8000,
+    'PMO': 16000,
+    'SDR': 4000,
+    'Head Comercial': 12500,
+  },
 };
 
 // Base annual data (R$ thousands)
