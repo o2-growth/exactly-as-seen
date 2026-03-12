@@ -238,6 +238,7 @@ export default function Assumptions() {
 
   const [showGrowthPct, setShowGrowthPct] = useState(false);
   const [editingClients, setEditingClients] = useState(false);
+  const [hcViewMode, setHcViewMode] = useState<'people' | 'cost'>('people');
 
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
     const d: Record<string, Record<number, number>> = {};
