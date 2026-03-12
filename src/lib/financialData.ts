@@ -35,6 +35,17 @@ export interface Assumptions {
   headcountGrowth: number;
   headcountSalaries: Record<string, number>;
   sgaGrowthRate: number;
+  headcountRatios: {
+    clientsPerCFO: number;
+    clientsPerFPA: number;
+    clientsPerPF: number;
+    clientsPerProjectAnal: number;
+    clientsPerDataAnal: number;
+    clientsPerCSM: number;
+    clientsPerSDR: number;
+    clientsPerCommercialHead: number;
+  };
+  salaryRanges: Record<string, number>;
 }
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
