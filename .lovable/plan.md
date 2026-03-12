@@ -1,22 +1,24 @@
 
 
-# Diagnóstico: Integração Oxy Cash Flow
+# Plano: Adicionar Projeção de Caixa na Visão Bancária
 
-## Resultado da investigação
+## Situação atual
+A visão "Bancário" mostra: cards de resumo, gráfico mensal e tabela de contrapartes. Mas **não** inclui a tabela expandível de projeção de caixa (Saldo Inicial → Entradas → Saídas → Saldo Final) que existe nas views "Modelo" e "Realizado".
 
-A edge function `fetch-oxy-cashflow` **está funcionando corretamente** — testei diretamente e ela retorna status 200 com dados válidos dos 3 endpoints (cardRecebido, cardPago, chart).
+## O que será feito
 
-O hook `useOxyCashFlow.ts` e o componente `OxyBankingView` também estão com a lógica de parsing correta para a estrutura de dados retornada pela API.
+1. **Adicionar tabela de projeção na visão Bancário** — Reutilizar a mesma estrutura de tabela expandível (`CashFlowExpandableRow`) mas alimentada com os dados da API Oxy:
+   - Mapear os dados mensais do chart Oxy (entradas/saídas/saldo) para uma estrutura `CashFlowRow[]` compatível
+   - Colunas = meses (Jan/25, Fev/25, etc.) ao invés de anos
+   - Linhas: Total Entradas (com sub-itens do "recebido"), Total Saídas (com sub-itens do "pago"), Saldo Inicial/Final
 
-**Não encontrei erros no console nem requisições de rede no preview**, o que indica que a view "Bancário" pode não ter sido ativada ainda (o usuário precisa clicar no botão "Bancário" no topo da página de Fluxo de Caixa).
+2. **Adicionar gráfico cascata mensal** — Waterfall chart mensal com Entradas, Saídas e Saldo, seguindo o mesmo padrão visual do waterfall anual existente.
 
-## Possível problema: viewport
+3. **Manter os componentes existentes** — Os cards de resumo, gráfico e tabela de contrapartes continuam, com a tabela de projeção adicionada entre o gráfico e a tabela de detalhes.
 
-O preview atual está em 507px de largura (mobile). Os botões de toggle (Modelo / Realizado / Bancário) estão visíveis, mas podem estar apertados. Não há bug de código.
+## Estrutura técnica
 
-## Próximos passos
-
-Se ao clicar em "Bancário" os dados não aparecerem, preciso ver os logs do console e network requests nesse momento para diagnosticar. 
-
-**Recomendação:** Clique no botão "Bancário" na página de Fluxo de Caixa e me avise se aparece erro ou loading infinito — com isso consigo capturar os logs e identificar o problema real.
+- Criar função `buildCashFlowTreeFromOxy(data: OxyCashFlowData)` que retorna `CashFlowRow[]` com colunas mensais
+- Criar componente `OxyProjectionTable` dentro do `OxyBankingView` que renderiza a tabela com linhas expandíveis
+- As colunas serão os períodos mensais retornados pela API (ao invés dos anos 2025-2030)
 
