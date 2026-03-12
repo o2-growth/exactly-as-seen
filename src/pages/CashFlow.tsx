@@ -531,8 +531,11 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
       </div>
 
       {/* Projection Table */}
-      {oxyTree.length > 0 && (
-        <div className="gradient-card overflow-x-auto">
+      <div className="gradient-card overflow-x-auto">
+        <div className="flex items-center gap-2 p-4 border-b border-border">
+          <h3 className="text-sm font-semibold">Projeção de Caixa — Visão Expandível</h3>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 tracking-wide">Bancário</span>
+        </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
@@ -584,7 +587,7 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
             </tbody>
           </table>
         </div>
-      )}
+      
 
       {/* Waterfall Chart */}
       {waterfallMonthly.length > 0 && (
