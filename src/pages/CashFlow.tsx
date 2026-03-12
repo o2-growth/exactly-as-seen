@@ -228,7 +228,7 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
                   </div>
                 </th>
               ))}
-              <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              <th className="text-right p-2 md:p-3 text-muted-foreground font-bold min-w-[90px] md:min-w-[110px]">Total</th>
             </tr>
           </thead>
           <tbody>
