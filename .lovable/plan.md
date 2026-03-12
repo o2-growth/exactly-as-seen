@@ -1,41 +1,34 @@
 
 
-# Plan: Cap Table Improvements
+# Mobile-friendly Fluxo de Caixa
 
-## Changes to `src/pages/Valuation.tsx`
+## Problemas atuais
+- A sidebar ja esconde em mobile (`hidden md:flex`), mas nao ha menu hamburger para navegar
+- As tabelas com muitas colunas (12 meses + total) nao tem tratamento mobile — `min-w-[240px]` e `min-w-[100px]` forçam scroll horizontal largo
+- Cards de resumo ja sao responsivos (`grid-cols-1 md:grid-cols-3`)
+- Graficos ja usam `ResponsiveContainer` — ok
+- `main` tem `p-6` fixo, ocupa espaço demais em mobile
 
-### 1. Shareholder Types
-Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
+## Alterações
 
-### 2. Shares formatting with dots (pt-BR)
-Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
+### 1. `src/components/layout/AppLayout.tsx`
+- Reduzir padding em mobile: `p-3 md:p-6`
 
-### 3. Input-driven % Ownership (% drives shares)
-Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+### 2. `src/components/layout/AppHeader.tsx`
+- Adicionar botao hamburger (Menu icon) visivel apenas em mobile (`md:hidden`)
+- Controlar estado de sidebar mobile aberta/fechada
 
-### 4. Total Shares widget
-Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+### 3. `src/components/layout/AppSidebar.tsx`
+- Adicionar overlay mobile: quando aberto, renderizar sidebar como drawer/overlay com backdrop em telas `< md`
+- Fechar ao clicar em link ou backdrop
 
-### 5. One decimal place on % Ownership
-Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+### 4. `src/pages/CashFlow.tsx`
+- Reduzir `min-w` das colunas em tabelas para mobile (`min-w-[80px]` nas colunas de meses)
+- Reduzir font e padding em mobile nas celulas: `p-2 md:p-3`, `text-xs md:text-sm`
+- Reduzir altura dos graficos em mobile: `h-[240px] md:h-[320px]` via classe ou prop condicional
+- Header da pagina: `text-xl md:text-2xl`
+- Botoes Recebido/Pago: stack vertical em mobile se necessario
 
-### 6. First row formatting
-Match the screenshot reference: consistent row styling with proper padding and alignment.
-
-## Data Model Change
-- Add `totalSharesPool` state (persisted to localStorage)
-- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
-- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
-
-## Default Data
-```
-Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
-Tiago Pisoni — Founder — 30.0% — 2024-01
-Rafael Fleck — Investor — 0.0%
-```
-
-## Files Changed
-| File | Change |
-|------|--------|
-| `src/pages/Valuation.tsx` | All changes above |
+### 5. `src/components/layout/AppLayout.tsx`
+- Aceitar e propagar estado do sidebar mobile via state lifting ou contexto simples (useState no AppLayout passado como props)
 
