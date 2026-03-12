@@ -1800,7 +1800,7 @@ export default function Assumptions() {
             const hcData = editing ? editState : assumptions;
             const ratios = hcData.headcountRatios;
             const salaries = hcData.salaryRanges;
-            const salaries = data.salaryRanges;
+            
 
             // Compute monthly total clients for selectedYear
             const subProductKeys = Object.keys(data.subProductClients) as SubProductKey[];
