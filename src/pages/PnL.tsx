@@ -324,7 +324,7 @@ export default function PnL() {
                 const isHistorical = typeof col === 'number' && col === 2025;
                 const isPartial    = typeof col === 'number' && col === 2026;
                 return (
-                  <th key={String(col)} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                  <th key={String(col)} className="text-right p-2 md:p-3 text-muted-foreground font-medium min-w-[80px] md:min-w-[100px]">
                     <div className="flex flex-col items-end gap-0.5">
                       <span>{String(col)}</span>
                       {isHistorical && (

@@ -206,7 +206,7 @@ export default function Overview() {
               <Icon className={`h-4 w-4 ${color}`} />
               <span className="text-xs text-muted-foreground font-medium">{label}</span>
             </div>
-            <p className="text-2xl font-bold tracking-tight animate-count">{value}</p>
+            <p className="text-lg md:text-2xl font-bold tracking-tight animate-count">{value}</p>
           </div>
         ))}
         <RuleOf40Card />

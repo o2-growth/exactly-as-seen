@@ -310,11 +310,11 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">Contraparte</th>
+              <th className="text-left p-2 md:p-3 text-muted-foreground font-medium min-w-[160px] md:min-w-[240px] sticky left-0 bg-card">Contraparte</th>
               {data.periods.map(p => (
-                <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">{monthLabel(p)}</th>
+                <th key={p} className="text-right p-2 md:p-3 text-muted-foreground font-medium min-w-[80px] md:min-w-[100px]">{monthLabel(p)}</th>
               ))}
-              <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              <th className="text-right p-2 md:p-3 text-muted-foreground font-bold min-w-[90px] md:min-w-[110px]">Total</th>
             </tr>
           </thead>
           <tbody>
