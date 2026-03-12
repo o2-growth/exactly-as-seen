@@ -452,7 +452,6 @@ export default function Assumptions() {
                   <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
                 </div>
               </div>
-            </div>
           </div>
         </TabsContent>
 
