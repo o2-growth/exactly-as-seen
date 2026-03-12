@@ -815,10 +815,16 @@ export default function CashFlow() {
       {/* Banking view */}
       {cfSource === 'banking' ? (() => {
         const now = new Date();
-        const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        const endDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
-        const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-        return <OxyBankingView startDate={start} endDate={end} />;
+        // Historical: last 12 months
+        const histStart = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+        const historicalStart = `${histStart.getFullYear()}-${String(histStart.getMonth() + 1).padStart(2, '0')}-01`;
+        const histEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const historicalEnd = `${histEndDate.getFullYear()}-${String(histEndDate.getMonth() + 1).padStart(2, '0')}-${String(histEndDate.getDate()).padStart(2, '0')}`;
+        // Projection: next 12 months
+        const projStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const projEndDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
+        const projectionEnd = `${projEndDate.getFullYear()}-${String(projEndDate.getMonth() + 1).padStart(2, '0')}-${String(projEndDate.getDate()).padStart(2, '0')}`;
+        return <OxyBankingView historicalStart={historicalStart} historicalEnd={historicalEnd} projectionStart={projStart} projectionEnd={projectionEnd} />;
       })(
       ) : (
         <>
