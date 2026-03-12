@@ -36,17 +36,6 @@ export function useOxyCashFlow(startDate: string, endDate: string, enabled: bool
         setLoading(true);
         setError(null);
 
-        const { data: raw, error: fnError } = await supabase.functions.invoke(
-          'fetch-oxy-cashflow',
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-            body: undefined,
-          }
-        );
-
-        // Since invoke doesn't support query params natively, we'll use a POST approach
-        // Actually let's call with the URL directly
         const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
         const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const url = `https://${projectId}.supabase.co/functions/v1/fetch-oxy-cashflow?startDate=${startDate}&endDate=${endDate}`;
