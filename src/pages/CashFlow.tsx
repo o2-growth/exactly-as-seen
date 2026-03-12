@@ -309,6 +309,124 @@ function monthLabel(period: string): string {
   return `${MONTH_LABELS[m]}/${parts[0].slice(2)}`;
 }
 
+// ─── Monthly expandable row component ─────────────────────────────────────────
+
+interface MonthlyCashFlowRow {
+  code: string;
+  label: string;
+  isSummary?: boolean;
+  values: Record<string, number>; // period -> value
+  children?: MonthlyCashFlowRow[];
+}
+
+function MonthlyExpandableRow({ row, depth, periods }: { row: MonthlyCashFlowRow; depth: number; periods: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = row.children && row.children.length > 0;
+  const total = periods.reduce((s, p) => s + (row.values[p] ?? 0), 0);
+
+  return (
+    <>
+      <tr
+        className={`border-b border-border/30 transition-colors ${
+          row.isSummary ? 'bg-primary/5 font-bold' : 'hover:bg-secondary/20'
+        }`}
+      >
+        <td
+          className="p-3 whitespace-nowrap cursor-pointer select-none sticky left-0 bg-card"
+          style={{ paddingLeft: `${12 + depth * 20}px` }}
+          onClick={() => hasChildren && setExpanded(!expanded)}
+        >
+          <div className="flex items-center gap-1.5">
+            {hasChildren ? (
+              expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <span className="w-3.5" />
+            )}
+            <span className={`text-sm ${row.isSummary ? 'text-foreground' : 'text-foreground/90'}`}>
+              {row.label}
+            </span>
+          </div>
+        </td>
+        {periods.map(p => {
+          const val = row.values[p] ?? 0;
+          return (
+            <td key={p} className="text-right p-3 tabular-nums text-sm">
+              <span className={val < 0 ? 'text-negative' : ''}>
+                {val === 0 ? '—' : formatBrl(val)}
+              </span>
+            </td>
+          );
+        })}
+        <td className="text-right p-3 tabular-nums text-sm font-semibold">
+          <span className={total < 0 ? 'text-negative' : ''}>
+            {total === 0 ? '—' : formatBrl(total)}
+          </span>
+        </td>
+      </tr>
+      {expanded && row.children?.map(child => (
+        <MonthlyExpandableRow key={child.code} row={child} depth={depth + 1} periods={periods} />
+      ))}
+    </>
+  );
+}
+
+// ─── Build tree from Oxy data ─────────────────────────────────────────────────
+
+function buildCashFlowTreeFromOxy(data: import('@/hooks/useOxyCashFlow').OxyCashFlowData): {
+  tree: MonthlyCashFlowRow[];
+  balances: { period: string; opening: number; closing: number }[];
+} {
+  const periods = data.periods;
+
+  // Build inflow children from recebido details
+  const inflowChildren: MonthlyCashFlowRow[] = data.recebido.map((item, idx) => ({
+    code: `IR.${idx}`,
+    label: item.label,
+    values: Object.fromEntries(item.data.map(d => [d.period, d.value])),
+  }));
+
+  // Build outflow children from pago details
+  const outflowChildren: MonthlyCashFlowRow[] = data.pago.map((item, idx) => ({
+    code: `OP.${idx}`,
+    label: item.label,
+    values: Object.fromEntries(item.data.map(d => [d.period, -Math.abs(d.value)])),
+  }));
+
+  // Totals from chart data (more reliable)
+  const inflowValues: Record<string, number> = {};
+  const outflowValues: Record<string, number> = {};
+  data.chart.forEach(item => {
+    inflowValues[item.month] = item.entradas;
+    outflowValues[item.month] = -Math.abs(item.saidas);
+  });
+
+  const tree: MonthlyCashFlowRow[] = [
+    {
+      code: 'INFLOWS', label: 'Total Entradas', isSummary: true,
+      values: inflowValues,
+      children: inflowChildren,
+    },
+    {
+      code: 'OUTFLOWS', label: 'Total Saídas', isSummary: true,
+      values: outflowValues,
+      children: outflowChildren,
+    },
+  ];
+
+  // Compute running balances
+  let opening = 0;
+  const balances = periods.map(p => {
+    const inflow = inflowValues[p] ?? 0;
+    const outflow = outflowValues[p] ?? 0;
+    const closing = opening + inflow + outflow;
+    const row = { period: p, opening, closing };
+    opening = closing;
+    return row;
+  });
+
+  return { tree, balances };
+}
+
 // ─── Banking view component ──────────────────────────────────────────────────
 
 function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: string }) {
