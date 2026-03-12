@@ -1796,7 +1796,7 @@ export default function Assumptions() {
 
           {/* Headcount Projetado por Área */}
           {(() => {
-            const [hcViewMode, setHcViewMode] = React.useState<'people' | 'cost'>('people');
+            const data = editing ? editState : assumptions;
             const data = editing ? editState : assumptions;
             const ratios = data.headcountRatios;
             const salaries = data.salaryRanges;
