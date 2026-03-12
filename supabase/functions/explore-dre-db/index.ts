@@ -58,7 +58,10 @@ serve(async (req) => {
     conn.release();
     await pool.end();
 
-    return new Response(JSON.stringify({ tables, details: result }, null, 2), {
+    const jsonStr = JSON.stringify({ tables, details: result }, (_, v) =>
+      typeof v === 'bigint' ? Number(v) : v, 2);
+
+    return new Response(jsonStr, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
