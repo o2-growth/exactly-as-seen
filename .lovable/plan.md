@@ -1,59 +1,41 @@
 
 
-# Plan: Conectar P&L ao Banco de Dados PostgreSQL Externo
+# Plan: Cap Table Improvements
 
-## Resumo
+## Changes to `src/pages/Valuation.tsx`
 
-Habilitar Lovable Cloud, armazenar as credenciais do banco como secrets, criar uma edge function para explorar e consumir os dados do banco `dre_analytics`, e atualizar o frontend para buscar dados reais do DRE.
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-## Etapas
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
 
-### 1. Habilitar Lovable Cloud (Supabase)
-Necessário para criar edge functions que acessam o banco externo.
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
 
-### 2. Armazenar credenciais como secrets
-As seguintes variáveis serão armazenadas de forma segura (nunca no código):
-- `DRE_DB_HOST` → `5.78.97.125`
-- `DRE_DB_PORT` → `5432`
-- `DRE_DB_NAME` → `dre_analytics`
-- `DRE_DB_USER` → `postgres`
-- `DRE_DB_PASSWORD` → `b85ad58ebb9e9caed0e200bc640e1d82`
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
 
-### 3. Edge function: `explore-dre-db`
-Uma função temporária que conecta ao PostgreSQL usando a lib `postgres` (npm) e retorna:
-- Lista de tabelas
-- Colunas de cada tabela
-- Amostra de dados (LIMIT 5 por tabela)
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
 
-Isso nos permite entender a estrutura do banco antes de construir a integração final.
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
 
-```text
-Browser → Edge Function → PostgreSQL externo (5.78.97.125)
-                ↓
-         JSON com schema + amostra
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
 ```
 
-### 4. Analisar resultado e mapear para o P&L
-Com base na estrutura descoberta, criarei uma segunda edge function (`fetch-dre-data`) que:
-- Consulta as tabelas certas do banco
-- Retorna os dados formatados no shape do `PnlNode[]` atual
-- Substitui os dados hardcoded em `pnlData.ts`
-
-### 5. Atualizar frontend
-- Criar hook `useDreData` que chama a edge function
-- Integrar no `FinancialModelContext` para substituir os dados estáticos
-- Manter fallback para dados hardcoded caso a API falhe
-
-## Arquivos impactados
-
-| Arquivo | Ação |
-|---------|------|
-| `supabase/config.toml` | Criar com config da edge function |
-| `supabase/functions/explore-dre-db/index.ts` | Criar (exploração do schema) |
-| `supabase/functions/fetch-dre-data/index.ts` | Criar (consulta real dos dados) |
-| `src/hooks/useDreData.ts` | Criar (hook para consumir a API) |
-| `src/contexts/FinancialModelContext.tsx` | Atualizar para usar dados do banco |
-
-## Primeira ação
-Habilitar Lovable Cloud e armazenar os secrets, depois criar a edge function de exploração para entender o banco antes de qualquer integração.
+## Files Changed
+| File | Change |
+|------|--------|
+| `src/pages/Valuation.tsx` | All changes above |
 
