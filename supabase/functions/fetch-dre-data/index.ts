@@ -251,8 +251,54 @@ serve(async (req) => {
       }
     }
 
+    // ── Build Cash Flow aggregations ──────────────────────────────────────
+    // Group lookup by label (case-insensitive) within a category
+    function sumGroupByLabel(catCode: string, label: string): { annual: Record<number, number>; monthly: Record<number, number[]> } {
+      const matching = dataGroups.filter((g: any) => g.category_code === catCode && g.label === label);
+      const merged: Record<string, number> = {};
+      for (const g of matching) {
+        const d = dataByGroup[g.id] || {};
+        for (const [p, v] of Object.entries(d)) { merged[p] = (merged[p] || 0) + v; }
+      }
+      return buildTimeSeries(merged);
+    }
+
+    function sumCategory(catCode: string): { annual: Record<number, number>; monthly: Record<number, number[]> } {
+      const matching = dataGroups.filter((g: any) => g.category_code === catCode);
+      const merged: Record<string, number> = {};
+      for (const g of matching) {
+        const d = dataByGroup[g.id] || {};
+        for (const [p, v] of Object.entries(d)) { merged[p] = (merged[p] || 0) + v; }
+      }
+      return buildTimeSeries(merged);
+    }
+
+    const cashFlowData: Record<string, { annual: Record<number, number>; monthly: Record<number, number[]> }> = {
+      // Inflows - Revenue by BU
+      revenueCaaS: sumGroupByLabel('RB', 'CaaS'),
+      revenueSaaS: sumGroupByLabel('RB', 'SaaS'),
+      revenueEducation: sumGroupByLabel('RB', 'Education'),
+      revenueExpansao: sumGroupByLabel('RB', 'Expansão'),
+      revenueTax: sumGroupByLabel('RB', 'Tax'),
+      otherRevenue: sumCategory('OR'),
+      financialRevenue: sumCategory('RF'),
+      // Outflows
+      deductions: sumCategory('DC'),
+      variableCosts: sumCategory('CV'),
+      adminExpenses: sumGroupByLabel('DX', 'Despesas Administrativas'),
+      commercialExpenses: sumGroupByLabel('DX', 'Despesas Comerciais'),
+      personnelExpenses: sumGroupByLabel('DX', 'Despesas com Pessoal'),
+      marketingExpenses: sumGroupByLabel('DX', 'Despesas de Marketing'),
+      financialExpenses: sumCategory('DF'),
+      nonOpExpenses: sumCategory('DN'),
+      taxProvisions: sumCategory('IR'),
+      debtAmortization: sumCategory('AM'),
+      investments: sumCategory('IN'),
+    };
+
     const result = {
       pnlTree,
+      cashFlowData,
       years,
       periods,
       meta: {
