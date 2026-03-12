@@ -317,7 +317,7 @@ export default function PnL() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[260px] sticky left-0 bg-card">
+              <th className="text-left p-2 md:p-3 text-muted-foreground font-medium min-w-[180px] md:min-w-[260px] sticky left-0 bg-card">
                 Descrição
               </th>
               {columns.map(col => {
