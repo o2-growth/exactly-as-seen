@@ -372,7 +372,7 @@ export default function CashFlow() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary">Fluxo de Caixa</h2>
+      <h2 className="text-xl md:text-2xl font-bold text-primary">Fluxo de Caixa</h2>
       <OxyBankingView
         historicalStart={historicalStart}
         historicalEnd={historicalEnd}
