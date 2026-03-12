@@ -810,8 +810,13 @@ export default function CashFlow() {
       </div>
 
       {/* Banking view */}
-      {cfSource === 'banking' ? (
-        <OxyBankingView startDate="2025-01-01" endDate="2025-12-31" />
+      {cfSource === 'banking' ? (() => {
+        const now = new Date();
+        const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const endDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
+        const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+        return <OxyBankingView startDate={start} endDate={end} />;
+      })(
       ) : (
         <>
           {/* PMR Panel */}
