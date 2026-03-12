@@ -1793,53 +1793,208 @@ export default function Assumptions() {
             );
           })()}
 
-          {/* Regras de Contratacao */}
+          {/* Headcount Projetado por Área */}
+          {(() => {
+            const [hcViewMode, setHcViewMode] = React.useState<'people' | 'cost'>('people');
+            const data = editing ? editState : assumptions;
+            const ratios = data.headcountRatios;
+            const salaries = data.salaryRanges;
+
+            // Compute monthly total clients for selectedYear
+            const subProductKeys = Object.keys(data.subProductClients) as SubProductKey[];
+            const monthlyTotals: number[] = Array.from({ length: 12 }, (_, m) => {
+              return subProductKeys.reduce((sum, key) => {
+                const monthly = getMonthlyClients(key, selectedYear, data.subProductClients);
+                return sum + monthly[m];
+              }, 0);
+            });
+
+            const PROJECTED_ROLES = [
+              { key: 'cfos', label: 'CFOs', bu: 'CaaS', ratioKey: 'clientsPerCFO' as const, salaryKey: 'CFO', baseCount: namedEmployees2025.filter(e => e.role === 'CFO').length },
+              { key: 'fpa', label: 'FP&A Analysts', bu: 'CaaS', ratioKey: 'clientsPerFPA' as const, salaryKey: 'FP&A Analyst', baseCount: namedEmployees2025.filter(e => e.role === 'FP&A').length },
+              { key: 'pf', label: 'Project Finance Directors', bu: 'CaaS', ratioKey: 'clientsPerPF' as const, salaryKey: 'Project Finance Director', baseCount: 0 },
+              { key: 'projectAnalyst', label: 'Project Analysts', bu: 'CaaS', ratioKey: 'clientsPerProjectAnal' as const, salaryKey: 'Project Analyst', baseCount: 0 },
+              { key: 'dataAnalyst', label: 'Data Analysts', bu: 'SaaS', ratioKey: 'clientsPerDataAnal' as const, salaryKey: 'Data Processes Analyst', baseCount: 0 },
+              { key: 'csm', label: 'Customer Service', bu: 'Operations', ratioKey: 'clientsPerCSM' as const, salaryKey: 'Customer Service', baseCount: namedEmployees2025.filter(e => e.role === 'Customer Svc').length },
+              { key: 'sdr', label: 'SDRs', bu: 'Commercial', ratioKey: 'clientsPerSDR' as const, salaryKey: 'SDR', baseCount: namedEmployees2025.filter(e => e.role === 'SDR').length },
+              { key: 'head', label: 'Head Comercial', bu: 'Commercial', ratioKey: 'clientsPerCommercialHead' as const, salaryKey: 'Head Comercial', baseCount: namedEmployees2025.filter(e => e.role === 'Commercial').length },
+            ];
+
+            const computeQty = (role: typeof PROJECTED_ROLES[0], totalClients: number) => {
+              const ratio = ratios[role.ratioKey];
+              return Math.max(role.baseCount, Math.ceil(totalClients / ratio));
+            };
+
+            return (
+              <div className="gradient-card p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="h-4 w-4 text-primary" />
+                    <h3 className="text-sm font-semibold">Headcount Projetado por Área — {selectedYear}</h3>
+                  </div>
+                  <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
+                    <button
+                      onClick={() => setHcViewMode('people')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${hcViewMode === 'people' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Pessoas
+                    </button>
+                    <button
+                      onClick={() => setHcViewMode('cost')}
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${hcViewMode === 'cost' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                    >
+                      Custo
+                    </button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="sticky left-0 z-10 bg-card text-left px-3 py-2 text-muted-foreground font-medium text-xs min-w-[180px]">Cargo</th>
+                        <th className="text-left px-2 py-2 text-muted-foreground font-medium text-xs min-w-[80px]">BU</th>
+                        {MONTHS.map(m => (
+                          <th key={m} className="text-right px-2 py-2 text-muted-foreground font-medium text-xs min-w-[64px]">{m}</th>
+                        ))}
+                        <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs min-w-[80px]">Média</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {PROJECTED_ROLES.map(role => {
+                        const monthlyQty = monthlyTotals.map(t => computeQty(role, t));
+                        const salary = salaries[role.salaryKey] ?? 0;
+                        const avg = Math.round(monthlyQty.reduce((a, b) => a + b, 0) / 12);
+                        return (
+                          <tr key={role.key} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                            <td className="sticky left-0 z-10 bg-card px-3 py-1.5 font-medium text-xs">{role.label}</td>
+                            <td className="px-2 py-1.5 text-xs text-muted-foreground">{role.bu}</td>
+                            {monthlyQty.map((qty, i) => (
+                              <td key={i} className="text-right px-2 py-1.5 tabular-nums text-xs">
+                                {hcViewMode === 'people' ? qty : formatCurrencyFull(qty * salary)}
+                              </td>
+                            ))}
+                            <td className="text-right px-3 py-1.5 tabular-nums text-xs font-medium">
+                              {hcViewMode === 'people' ? avg : formatCurrencyFull(avg * salary)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="border-t-2 border-border bg-primary/5 font-bold">
+                        <td className="sticky left-0 z-10 bg-primary/5 px-3 py-2 text-xs" colSpan={2}>Total</td>
+                        {MONTHS.map((_, i) => {
+                          const totalQty = PROJECTED_ROLES.reduce((s, role) => s + computeQty(role, monthlyTotals[i]), 0);
+                          const totalCost = PROJECTED_ROLES.reduce((s, role) => {
+                            const qty = computeQty(role, monthlyTotals[i]);
+                            return s + qty * (salaries[role.salaryKey] ?? 0);
+                          }, 0);
+                          return (
+                            <td key={i} className="text-right px-2 py-2 tabular-nums text-xs">
+                              {hcViewMode === 'people' ? totalQty : formatCurrencyFull(totalCost)}
+                            </td>
+                          );
+                        })}
+                        <td className="text-right px-3 py-2 tabular-nums text-xs">
+                          {(() => {
+                            const avgTotal = Math.round(MONTHS.reduce((s, _, i) => s + PROJECTED_ROLES.reduce((ss, role) => ss + computeQty(role, monthlyTotals[i]), 0), 0) / 12);
+                            const avgCost = Math.round(MONTHS.reduce((s, _, i) => s + PROJECTED_ROLES.reduce((ss, role) => ss + computeQty(role, monthlyTotals[i]) * (salaries[role.salaryKey] ?? 0), 0), 0) / 12);
+                            return hcViewMode === 'people' ? avgTotal : formatCurrencyFull(avgCost);
+                          })()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Regras de Contratação (editável) */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <UserCheck className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Regras de Contratacao (Headcount)</h3>
+              <h3 className="text-sm font-semibold">Regras de Contratação (Headcount)</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Proporcao por clientes CaaS ativos</p>
+                <p className="text-xs text-muted-foreground mb-2">Proporção por clientes ativos</p>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-1.5 text-muted-foreground font-medium text-xs">Funcao</th>
+                      <th className="text-left py-1.5 text-muted-foreground font-medium text-xs">Função</th>
                       <th className="text-right py-1.5 text-muted-foreground font-medium text-xs">1 por cada</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { label: 'CFO', ratio: headcountRatios.clientsPerCFO },
-                      { label: 'FP&A Analyst', ratio: headcountRatios.clientsPerFPA },
-                      { label: 'Project Finance Director', ratio: headcountRatios.clientsPerPF },
-                      { label: 'Project Analyst', ratio: headcountRatios.clientsPerProjectAnal },
-                      { label: 'Data Processes Analyst', ratio: headcountRatios.clientsPerDataAnal },
-                      { label: 'Customer Service Manager', ratio: headcountRatios.clientsPerCSM },
-                    ].map(row => (
-                      <tr key={row.label} className="border-b border-border/30">
-                        <td className="py-1.5 text-xs font-medium">{row.label}</td>
-                        <td className="py-1.5 text-right text-xs tabular-nums">{row.ratio} clientes</td>
-                      </tr>
-                    ))}
+                    {([
+                      { label: 'CFO', ratioKey: 'clientsPerCFO' as const },
+                      { label: 'FP&A Analyst', ratioKey: 'clientsPerFPA' as const },
+                      { label: 'Project Finance Director', ratioKey: 'clientsPerPF' as const },
+                      { label: 'Project Analyst', ratioKey: 'clientsPerProjectAnal' as const },
+                      { label: 'Data Processes Analyst', ratioKey: 'clientsPerDataAnal' as const },
+                      { label: 'Customer Service Manager', ratioKey: 'clientsPerCSM' as const },
+                      { label: 'SDR', ratioKey: 'clientsPerSDR' as const },
+                      { label: 'Head Comercial', ratioKey: 'clientsPerCommercialHead' as const },
+                    ] as const).map(row => {
+                      const data = editing ? editState : assumptions;
+                      const val = data.headcountRatios[row.ratioKey];
+                      return (
+                        <tr key={row.label} className="border-b border-border/30">
+                          <td className="py-1.5 text-xs font-medium">{row.label}</td>
+                          <td className="py-1.5 text-right text-xs tabular-nums">
+                            {editing ? (
+                              <input
+                                type="number"
+                                className="w-20 bg-secondary border border-primary/30 rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                value={val}
+                                onChange={e => {
+                                  const v = Number(e.target.value) || 1;
+                                  setEditState(prev => ({
+                                    ...prev,
+                                    headcountRatios: { ...prev.headcountRatios, [row.ratioKey]: v },
+                                  }));
+                                }}
+                              />
+                            ) : (
+                              <>{val} clientes</>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground mb-2">Faixas salariais para novas contratacoes</p>
+                <p className="text-xs text-muted-foreground mb-2">Faixas salariais para novas contratações</p>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-1.5 text-muted-foreground font-medium text-xs">Cargo</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium text-xs">Salario/mes</th>
+                      <th className="text-right py-1.5 text-muted-foreground font-medium text-xs">Salário/mês</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(salaryRanges).map(([role, salary]) => (
+                    {Object.entries((editing ? editState : assumptions).salaryRanges).map(([role, salary]) => (
                       <tr key={role} className="border-b border-border/30">
                         <td className="py-1.5 text-xs font-medium">{role}</td>
-                        <td className="py-1.5 text-right text-xs tabular-nums">{formatCurrencyFull(salary)}</td>
+                        <td className="py-1.5 text-right text-xs tabular-nums">
+                          {editing ? (
+                            <input
+                              type="number"
+                              className="w-24 bg-secondary border border-primary/30 rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                              value={salary}
+                              onChange={e => {
+                                const v = Number(e.target.value) || 0;
+                                setEditState(prev => ({
+                                  ...prev,
+                                  salaryRanges: { ...prev.salaryRanges, [role]: v },
+                                }));
+                              }}
+                            />
+                          ) : (
+                            formatCurrencyFull(salary as number)
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
