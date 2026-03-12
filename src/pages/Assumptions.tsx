@@ -1797,8 +1797,9 @@ export default function Assumptions() {
           {/* Headcount Projetado por Área */}
           {(() => {
             const data = editing ? editState : assumptions;
-            const data = editing ? editState : assumptions;
-            const ratios = data.headcountRatios;
+            const hcData = editing ? editState : assumptions;
+            const ratios = hcData.headcountRatios;
+            const salaries = hcData.salaryRanges;
             const salaries = data.salaryRanges;
 
             // Compute monthly total clients for selectedYear
