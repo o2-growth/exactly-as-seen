@@ -199,7 +199,7 @@ export default function Overview() {
       </h2>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
         {kpis.map(({ label, value, icon: Icon, color }) => (
           <div key={label} className="kpi-card">
             <div className="flex items-center gap-2 mb-3">
