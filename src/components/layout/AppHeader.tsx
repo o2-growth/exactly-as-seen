@@ -1,8 +1,23 @@
+import { useState, useEffect } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { Scenario, DataSource } from '@/lib/financialData';
-import { FileDown } from 'lucide-react';
+import { FileDown, Sun, Moon } from 'lucide-react';
 import PeriodFilter from './PeriodFilter';
+
+function useTheme() {
+  const [dark, setDark] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('o2_theme') === 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    localStorage.setItem('o2_theme', dark ? 'dark' : 'light');
+  }, [dark]);
+
+  return { dark, toggle: () => setDark(d => !d) };
+}
 
 const scenarios: Scenario[] = ['BEAR', 'BASE', 'BULL'];
 
@@ -15,6 +30,7 @@ const DATA_SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
 export default function AppHeader() {
   const { scenario, setScenario, dataSource, setDataSource } = useFinancialModel();
   const { currentVersion } = useVersionHistory();
+  const { dark, toggle: toggleTheme } = useTheme();
 
   return (
     <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-3 bg-card/90 backdrop-blur-md border-b border-border">
@@ -77,6 +93,15 @@ export default function AppHeader() {
             ))}
           </div>
         </div>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+          title={dark ? 'Modo claro' : 'Modo escuro'}
+        >
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
         {/* Export Button */}
         <button className="hidden md:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:text-foreground hover:border-primary/40 transition-colors opacity-60 cursor-not-allowed">

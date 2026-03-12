@@ -16,7 +16,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 9%;
 
-    --primary: 139 100% 35%;
+    --primary: 139 100% 30%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 0 0% 94%;
@@ -127,11 +127,11 @@
   }
 
   .gradient-card {
-    @apply bg-card border border-border rounded-2xl;
+    @apply bg-card border border-border rounded-2xl shadow-sm;
   }
 
   .kpi-card {
-    @apply bg-card border border-border rounded-2xl p-6 transition-all duration-200 hover:border-primary/40;
+    @apply bg-card border border-border rounded-2xl p-6 transition-all duration-200 hover:border-primary/40 shadow-sm;
   }
 
   .text-positive {
