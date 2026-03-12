@@ -193,7 +193,7 @@ export default function Overview() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-primary flex items-center">
+      <h2 className="text-xl md:text-2xl font-bold text-primary flex items-center flex-wrap">
         Overview — {kpiYear}
         <YearBadge year={kpiYear} />
       </h2>
