@@ -346,7 +346,7 @@ export default function CashFlow() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Fluxo de Caixa</h2>
+        <h2 className="text-2xl font-bold text-primary">Fluxo de Caixa</h2>
 
         {/* Data source toggle */}
         <div className="flex items-center gap-2">

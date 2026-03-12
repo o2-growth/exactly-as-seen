@@ -133,7 +133,7 @@ export default function DebtFinance() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-foreground">Debt & Finance</h2>
+      <h2 className="text-2xl font-bold text-primary">Debt & Finance</h2>
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -29,7 +29,7 @@ export default function VersionHistory() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2">
+      <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
         <Clock className="h-6 w-6 text-primary" />
         Histórico de Versões
       </h2>
