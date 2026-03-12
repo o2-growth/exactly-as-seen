@@ -1803,10 +1803,10 @@ export default function Assumptions() {
             
 
             // Compute monthly total clients for selectedYear
-            const subProductKeys = Object.keys(data.subProductClients) as SubProductKey[];
+            const subProductKeys = Object.keys(hcData.subProductClients) as SubProductKey[];
             const monthlyTotals: number[] = Array.from({ length: 12 }, (_, m) => {
               return subProductKeys.reduce((sum, key) => {
-                const monthly = getMonthlyClients(key, selectedYear, data.subProductClients);
+                const monthly = getMonthlyClients(key, selectedYear, hcData.subProductClients);
                 return sum + monthly[m];
               }, 0);
             });
