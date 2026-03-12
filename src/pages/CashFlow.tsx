@@ -452,12 +452,23 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
 
   if (!data) return null;
 
-  const chartData = data.chart.map(item => ({
+  const { tree: oxyTree, balances: oxyBalances } = data
+    ? buildCashFlowTreeFromOxy(data)
+    : { tree: [], balances: [] };
+
+  const waterfallMonthly = data ? data.chart.map(item => ({
+    month: monthLabel(item.month),
+    Entradas: item.entradas,
+    'Saídas': -Math.abs(item.saidas),
+    'Saldo Líquido': item.saldo,
+  })) : [];
+
+  const chartData = data ? data.chart.map(item => ({
     month: monthLabel(item.month),
     Entradas: item.entradas,
     Saídas: item.saidas,
     Saldo: item.saldo,
-  }));
+  })) : [];
 
   // Summary totals
   const totalEntradas = data.chart.reduce((s, i) => s + i.entradas, 0);
