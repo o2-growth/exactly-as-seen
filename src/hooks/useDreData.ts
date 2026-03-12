@@ -5,6 +5,7 @@ import { Year, YEARS } from '@/lib/financialData';
 
 interface DreDataResponse {
   pnlTree: RawPnlNode[];
+  cashFlowData: Record<string, { annual: Record<string, number>; monthly: Record<string, number[]> }>;
   years: number[];
   periods: string[];
   meta: { groupCount: number; dataRowCount: number; itemCount: number };
@@ -21,6 +22,10 @@ interface RawPnlNode {
   children?: RawPnlNode[];
 }
 
+export interface CashFlowDbData {
+  [key: string]: { annual: Record<Year, number>; monthly: Record<Year, number[]> };
+}
+
 // Convert raw DB node (with string keys, values in R$) to PnlNode (Year keys, values in R$ mil)
 function convertNode(raw: RawPnlNode): PnlNode {
   const annual = {} as Record<Year, number>;
@@ -34,7 +39,6 @@ function convertNode(raw: RawPnlNode): PnlNode {
     if (raw.monthly && raw.monthly[key]) {
       monthly[y] = raw.monthly[key].map(v => (v || 0) / 1000);
     } else {
-      // Distribute annual evenly if no monthly data
       monthly[y] = Array(12).fill(annual[y] / 12);
     }
   }
@@ -56,8 +60,27 @@ function convertNode(raw: RawPnlNode): PnlNode {
   return node;
 }
 
+// Convert cash flow data: DB values are in R$, convert to R$ thousands
+function convertCashFlowData(raw: Record<string, { annual: Record<string, number>; monthly: Record<string, number[]> }>): CashFlowDbData {
+  const result: CashFlowDbData = {};
+  for (const [key, val] of Object.entries(raw)) {
+    const annual = {} as Record<Year, number>;
+    const monthly = {} as Record<Year, number[]>;
+    for (const y of YEARS) {
+      const k = String(y);
+      annual[y] = val.annual[k] != null ? val.annual[k] / 1000 : 0;
+      monthly[y] = val.monthly && val.monthly[k]
+        ? val.monthly[k].map(v => (v || 0) / 1000)
+        : Array(12).fill(0);
+    }
+    result[key] = { annual, monthly };
+  }
+  return result;
+}
+
 export function useDreData() {
   const [dreTree, setDreTree] = useState<PnlNode[] | null>(null);
+  const [cashFlowDb, setCashFlowDb] = useState<CashFlowDbData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dreYears, setDreYears] = useState<number[]>([]);
@@ -76,6 +99,7 @@ export function useDreData() {
         const converted = response.pnlTree.map(convertNode);
 
         setDreTree(converted);
+        setCashFlowDb(convertCashFlowData(response.cashFlowData || {}));
         setDreYears(response.years);
       } catch (err: any) {
         console.error('Error fetching DRE data:', err);
@@ -88,5 +112,5 @@ export function useDreData() {
     fetchData();
   }, []);
 
-  return { dreTree, loading, error, dreYears };
+  return { dreTree, cashFlowDb, loading, error, dreYears };
 }
