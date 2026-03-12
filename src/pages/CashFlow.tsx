@@ -309,6 +309,124 @@ function monthLabel(period: string): string {
   return `${MONTH_LABELS[m]}/${parts[0].slice(2)}`;
 }
 
+// ─── Monthly expandable row component ─────────────────────────────────────────
+
+interface MonthlyCashFlowRow {
+  code: string;
+  label: string;
+  isSummary?: boolean;
+  values: Record<string, number>; // period -> value
+  children?: MonthlyCashFlowRow[];
+}
+
+function MonthlyExpandableRow({ row, depth, periods }: { row: MonthlyCashFlowRow; depth: number; periods: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasChildren = row.children && row.children.length > 0;
+  const total = periods.reduce((s, p) => s + (row.values[p] ?? 0), 0);
+
+  return (
+    <>
+      <tr
+        className={`border-b border-border/30 transition-colors ${
+          row.isSummary ? 'bg-primary/5 font-bold' : 'hover:bg-secondary/20'
+        }`}
+      >
+        <td
+          className="p-3 whitespace-nowrap cursor-pointer select-none sticky left-0 bg-card"
+          style={{ paddingLeft: `${12 + depth * 20}px` }}
+          onClick={() => hasChildren && setExpanded(!expanded)}
+        >
+          <div className="flex items-center gap-1.5">
+            {hasChildren ? (
+              expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <span className="w-3.5" />
+            )}
+            <span className={`text-sm ${row.isSummary ? 'text-foreground' : 'text-foreground/90'}`}>
+              {row.label}
+            </span>
+          </div>
+        </td>
+        {periods.map(p => {
+          const val = row.values[p] ?? 0;
+          return (
+            <td key={p} className="text-right p-3 tabular-nums text-sm">
+              <span className={val < 0 ? 'text-negative' : ''}>
+                {val === 0 ? '—' : formatBrl(val)}
+              </span>
+            </td>
+          );
+        })}
+        <td className="text-right p-3 tabular-nums text-sm font-semibold">
+          <span className={total < 0 ? 'text-negative' : ''}>
+            {total === 0 ? '—' : formatBrl(total)}
+          </span>
+        </td>
+      </tr>
+      {expanded && row.children?.map(child => (
+        <MonthlyExpandableRow key={child.code} row={child} depth={depth + 1} periods={periods} />
+      ))}
+    </>
+  );
+}
+
+// ─── Build tree from Oxy data ─────────────────────────────────────────────────
+
+function buildCashFlowTreeFromOxy(data: import('@/hooks/useOxyCashFlow').OxyCashFlowData): {
+  tree: MonthlyCashFlowRow[];
+  balances: { period: string; opening: number; closing: number }[];
+} {
+  const periods = data.periods;
+
+  // Build inflow children from recebido details
+  const inflowChildren: MonthlyCashFlowRow[] = data.recebido.map((item, idx) => ({
+    code: `IR.${idx}`,
+    label: item.label,
+    values: Object.fromEntries(item.data.map(d => [d.period, d.value])),
+  }));
+
+  // Build outflow children from pago details
+  const outflowChildren: MonthlyCashFlowRow[] = data.pago.map((item, idx) => ({
+    code: `OP.${idx}`,
+    label: item.label,
+    values: Object.fromEntries(item.data.map(d => [d.period, -Math.abs(d.value)])),
+  }));
+
+  // Totals from chart data (more reliable)
+  const inflowValues: Record<string, number> = {};
+  const outflowValues: Record<string, number> = {};
+  data.chart.forEach(item => {
+    inflowValues[item.month] = item.entradas;
+    outflowValues[item.month] = -Math.abs(item.saidas);
+  });
+
+  const tree: MonthlyCashFlowRow[] = [
+    {
+      code: 'INFLOWS', label: 'Total Entradas', isSummary: true,
+      values: inflowValues,
+      children: inflowChildren,
+    },
+    {
+      code: 'OUTFLOWS', label: 'Total Saídas', isSummary: true,
+      values: outflowValues,
+      children: outflowChildren,
+    },
+  ];
+
+  // Compute running balances
+  let opening = 0;
+  const balances = periods.map(p => {
+    const inflow = inflowValues[p] ?? 0;
+    const outflow = outflowValues[p] ?? 0;
+    const closing = opening + inflow + outflow;
+    const row = { period: p, opening, closing };
+    opening = closing;
+    return row;
+  });
+
+  return { tree, balances };
+}
+
 // ─── Banking view component ──────────────────────────────────────────────────
 
 function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: string }) {
@@ -334,12 +452,23 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
 
   if (!data) return null;
 
-  const chartData = data.chart.map(item => ({
+  const { tree: oxyTree, balances: oxyBalances } = data
+    ? buildCashFlowTreeFromOxy(data)
+    : { tree: [], balances: [] };
+
+  const waterfallMonthly = data ? data.chart.map(item => ({
+    month: monthLabel(item.month),
+    Entradas: item.entradas,
+    'Saídas': -Math.abs(item.saidas),
+    'Saldo Líquido': item.saldo,
+  })) : [];
+
+  const chartData = data ? data.chart.map(item => ({
     month: monthLabel(item.month),
     Entradas: item.entradas,
     Saídas: item.saidas,
     Saldo: item.saldo,
-  }));
+  })) : [];
 
   // Summary totals
   const totalEntradas = data.chart.reduce((s, i) => s + i.entradas, 0);
@@ -400,6 +529,91 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Projection Table */}
+      {oxyTree.length > 0 && (
+        <div className="gradient-card overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">
+                  Descrição
+                </th>
+                {data!.periods.map(p => (
+                  <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span>{monthLabel(p)}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 tracking-wide">
+                        Bancário
+                      </span>
+                    </div>
+                  </th>
+                ))}
+                <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Saldo Inicial */}
+              <tr className="border-b border-border/30 bg-primary/5 font-bold">
+                <td className="p-3 sticky left-0 bg-card text-sm">Saldo Inicial</td>
+                {oxyBalances.map(b => (
+                  <td key={b.period} className="text-right p-3 tabular-nums text-sm">
+                    {b.opening === 0 ? '—' : formatBrl(b.opening)}
+                  </td>
+                ))}
+                <td className="text-right p-3 tabular-nums text-sm">—</td>
+              </tr>
+
+              {/* Entradas & Saídas */}
+              {oxyTree.map(row => (
+                <MonthlyExpandableRow key={row.code} row={row} depth={0} periods={data!.periods} />
+              ))}
+
+              {/* Saldo Final */}
+              <tr className="border-b border-border bg-primary/10 font-bold">
+                <td className="p-3 sticky left-0 bg-card text-sm text-foreground">Saldo Final</td>
+                {oxyBalances.map(b => (
+                  <td key={b.period} className={`text-right p-3 tabular-nums text-sm ${b.closing < 0 ? 'text-negative' : 'text-positive'}`}>
+                    {formatBrl(b.closing)}
+                  </td>
+                ))}
+                <td className="text-right p-3 tabular-nums text-sm font-bold">
+                  {formatBrl(oxyBalances[oxyBalances.length - 1]?.closing ?? 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Waterfall Chart */}
+      {waterfallMonthly.length > 0 && (
+        <div className="gradient-card p-5">
+          <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Mensal — Cascata (R$)</h3>
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={waterfallMonthly} barGap={4}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{
+                  background: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: 8,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}
+                formatter={(v: number, name: string) => [formatBrl(v), name]}
+              />
+              <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+              <Bar dataKey="Entradas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Saídas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Saldo Líquido" fill="hsl(var(--ring))" radius={[4, 4, 0, 0]} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Detail Table */}
       <div className="gradient-card overflow-x-auto">
