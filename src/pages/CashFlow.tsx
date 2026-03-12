@@ -709,7 +709,7 @@ function OxyBankingView({ historicalStart, historicalEnd, projectionStart, proje
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ · Fonte: Dados Bancários (Oxy Finance) · Período: {startDate} a {endDate}
+        Valores em R$ · Fonte: Dados Bancários (Oxy Finance) · Período: {historicalStart} a {historicalEnd} (histórico) / {projectionStart} a {projectionEnd} (projeção)
       </p>
     </div>
   );
