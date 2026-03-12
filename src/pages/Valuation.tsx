@@ -70,7 +70,10 @@ function formatSharesInput(value: number): string {
 }
 
 export default function Valuation() {
-  const { projections, assumptions, scenario } = useFinancialModel();
+  const { projections, assumptions, scenario, filteredYears } = useFinancialModel();
+
+  // Use filteredYears for tables/charts; fall back to all YEARS if empty
+  const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
   const [shareholders, setShareholders] = useState<Shareholder[]>(loadCapTable);
   const [totalSharesPool, setTotalSharesPool] = useState(loadTotalShares);
   const [ebitdaMultiple, setEbitdaMultiple] = useState(10);
@@ -156,16 +159,16 @@ export default function Valuation() {
   }));
 
   // EBITDA valuation
-  const ebitdaValuations = useMemo(() => YEARS.map(y => ({
+  const ebitdaValuations = useMemo(() => activeYears.map(y => ({
     year: y,
     ebitda: projections.ebitda[y],
     valuation: projections.ebitda[y] * ebitdaMultiple,
-  })), [projections, ebitdaMultiple]);
+  })), [projections, ebitdaMultiple, activeYears]);
 
   // ARR valuation (MRR from sub-product clients × tickets)
   const arrValuations = useMemo(() => {
     const { subProductClients, tickets } = assumptions;
-    return YEARS.map(y => {
+    return activeYears.map(y => {
       const mrr =
         (subProductClients.caasAssessoria[y] * tickets.caasAssessoria +
          subProductClients.caasEnterprise[y] * tickets.caasEnterprise +
@@ -177,7 +180,7 @@ export default function Valuation() {
       const arr = mrr * 12;
       return { year: y, mrr, arr, valuation: arr * arrMultiple };
     });
-  }, [assumptions, arrMultiple]);
+  }, [assumptions, arrMultiple, activeYears]);
 
   // Scenario cards
   const baseVal2025Ebitda = projections.ebitda[2025] * ebitdaMultiple;

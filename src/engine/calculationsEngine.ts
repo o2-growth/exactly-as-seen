@@ -14,6 +14,11 @@ import {
   salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
   financialItems2025, outrosExpenses2025,
 } from '@/data/modelData';
+import {
+  historicalMetrics,
+  historicalRevenue,
+  historicalRevenueItems,
+} from '@/data/historicalData';
 
 // ─── TYPES ───
 
@@ -656,16 +661,18 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
   // ─── PMR / Receivables Change ───
   // Ending receivables = annual gross revenue * weighted PMR / 365
+  // All revenue accumulators (annualGrossRevenue, annualCaas, etc.) are already in R$ thousands.
   const pmr = assumptions.pmrConfig ?? { caas: 30, saas: 15, education: 30, baas: 0 };
   const totalRevForPmr = annualCaas + annualSaas + annualEdu + annualBaas;
   const weightedPmr = totalRevForPmr > 0
     ? (annualCaas * pmr.caas + annualSaas * pmr.saas + annualEdu * pmr.education + annualBaas * pmr.baas) / totalRevForPmr
     : 0;
-  const endingReceivables = (annualGrossRevenue / 1000) * (weightedPmr / 365); // in R$ thousands
-  // For prior year we approximate using same formula with prior year revenue
+  // annualGrossRevenue is in R$ thousands — no /1000 needed
+  const endingReceivables = annualGrossRevenue * (weightedPmr / 365); // in R$ thousands
+  // For prior year revenue, expectedOutputs.grossRevenue is also in R$ thousands
   const prevYear = (year - 1) as Year;
   const prevYearRev = YEARS.includes(prevYear) ? expectedOutputs.grossRevenue[prevYear] ?? 0 : 0;
-  const beginningReceivables = (prevYearRev / 1000) * (weightedPmr / 365);
+  const beginningReceivables = prevYearRev * (weightedPmr / 365); // in R$ thousands
   const receivablesChange = -(endingReceivables - beginningReceivables); // negative = cash used, positive = cash released
 
   return {
@@ -718,7 +725,9 @@ export function computeFullModel(assumptions: Assumptions, scenario: Scenario): 
     validateOutputs(years);
   }
 
-  return { years, pnlTree: buildPnlTree(years) };
+  const pnlTree = buildPnlTree(years);
+  applyHistoricalOverrides(pnlTree, years);
+  return { years, pnlTree };
 }
 
 // ─── VALIDATION ───
@@ -866,6 +875,327 @@ function buildDetailChildren(
   });
 }
 
+// ─── HISTORICAL DATA HELPERS ───
+
+/**
+ * Sum all monthly values for a given year from a historical data source.
+ * Returns the annual total in R$ thousands (source values are in R$).
+ * Returns null if no data exists for the key/year combination.
+ */
+function getHistoricalAnnual(
+  source: Record<string, Record<string, number>>,
+  key: string,
+  year: number,
+): number | null {
+  let total = 0;
+  let found = false;
+  for (let m = 1; m <= 12; m++) {
+    const period = `${year}-${String(m).padStart(2, '0')}`;
+    if (source[key]?.[period] !== undefined) {
+      total += source[key][period];
+      found = true;
+    }
+  }
+  return found ? total / 1000 : null; // R$ → R$ thousands
+}
+
+/**
+ * Sum only the available real months for a partial year (e.g. 2026 Jan-Mar),
+ * then add engine monthly data for the remaining months.
+ * Returns annual total in R$ thousands.
+ */
+function getPartialHistoricalAnnual(
+  source: Record<string, Record<string, number>>,
+  key: string,
+  year: number,
+  engineMonthly: MonthlyPnL[],
+  engineMonthlyFn: (d: MonthlyPnL) => number,
+): number {
+  let total = 0;
+  // Count how many months have real data
+  let lastRealMonth = -1;
+  for (let m = 1; m <= 12; m++) {
+    const period = `${year}-${String(m).padStart(2, '0')}`;
+    if (source[key]?.[period] !== undefined) {
+      lastRealMonth = m;
+    }
+  }
+  // Sum real months
+  for (let m = 1; m <= lastRealMonth; m++) {
+    const period = `${year}-${String(m).padStart(2, '0')}`;
+    total += (source[key]?.[period] ?? 0) / 1000;
+  }
+  // Sum projected months (engine) for remaining months
+  for (let m = lastRealMonth; m < 12; m++) {
+    total += engineMonthlyFn(engineMonthly[m]);
+  }
+  return total;
+}
+
+/**
+ * Find a node by code in the PnlNode tree (recursive).
+ */
+function findNode(nodes: PnlNode[], code: string): PnlNode | null {
+  for (const node of nodes) {
+    if (node.code === code) return node;
+    if (node.children) {
+      const found = findNode(node.children, code);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Apply real historical data overrides to the PnlNode tree for years with actual data.
+ * - 2025: Full year override using sum of all 12 real months.
+ * - 2026: Partial override — real Jan-Mar + engine Apr-Dec.
+ */
+function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOutput>): void {
+  // Helper: set annual value for a year on a node found by code
+  function override(code: string, year: Year, value: number): void {
+    const node = findNode(tree, code);
+    if (node) node.annual[year] = Math.round(value);
+  }
+
+  // Helper: get partial-year value mixing real + engine for a metric node
+  function mixedYear(
+    source: Record<string, Record<string, number>>,
+    key: string,
+    year: number,
+    engineFn: (d: MonthlyPnL) => number,
+  ): number {
+    return getPartialHistoricalAnnual(source, key, year, years[year as Year].monthlyData, engineFn);
+  }
+
+  // ── 2025: Full year real data ──────────────────────────────────────────────
+
+  const hist2025 = (key: string) => getHistoricalAnnual(historicalMetrics, key, 2025) ?? 0;
+  const histRev2025 = (key: string) => getHistoricalAnnual(historicalRevenue, key, 2025) ?? 0;
+  const histItem2025 = (group: string, item: string) =>
+    getHistoricalAnnual(historicalRevenueItems[group] ?? {}, item, 2025) ?? 0;
+
+  // Revenue BU groups
+  const caas2025    = histRev2025('CaaS');
+  const saas2025    = histRev2025('SaaS');
+  const edu2025     = histRev2025('Education');
+  const expansao2025 = histRev2025('Expansão');
+  const tax2025     = histRev2025('Tax');
+  const grossRev2025 = hist2025('RECEITA BRUTA');
+  const netRev2025   = hist2025('RECEITA LÍQUIDA');
+  const grossProfit2025 = hist2025('LUCRO BRUTO');
+  const ebitda2025   = hist2025('EBITDA');
+  const netIncome2025 = hist2025('RESULTADO LÍQUIDO');
+  const finalResult2025 = hist2025('RESULTADO FINAL');
+
+  // Deductions = RECEITA BRUTA - RECEITA LÍQUIDA (always negative)
+  const deductions2025 = netRev2025 - grossRev2025;
+
+  // COGS = LUCRO BRUTO - RECEITA LÍQUIDA (always negative)
+  const totalCogs2025 = grossProfit2025 - netRev2025;
+
+  // DESPESAS FIXAS total
+  const fixedExpenses2025 = hist2025('DESPESAS FIXAS');
+
+  // Revenue top level
+  override('1', 2025, grossRev2025);
+  override('1.1', 2025, caas2025);
+  override('1.2', 2025, saas2025);
+  override('1.3', 2025, edu2025);
+  override('1.5', 2025, expansao2025);
+  override('1.6', 2025, tax2025);
+
+  // CaaS sub-items (code, historicalRevenueItems["CaaS"] key)
+  override('1.1.1', 2025, histItem2025('CaaS', 'Serviços Especializados'));
+  override('1.1.2', 2025, histItem2025('CaaS', 'Enterprise'));
+  override('1.1.3', 2025, histItem2025('CaaS', 'Corporate'));
+  override('1.1.4', 2025, histItem2025('CaaS', 'Parceiros'));
+  override('1.1.5', 2025, histItem2025('CaaS', 'BPO Financeiro'));
+
+  // SaaS sub-items — merge "Oxy + Gênio" and "Oxy + Gênio + Especialista" into 1.2.2
+  const saasOxy2025      = histItem2025('SaaS', 'Oxy');
+  const saasOxyGenio2025 = histItem2025('SaaS', 'Oxy + Gênio') + histItem2025('SaaS', 'Oxy + Gênio + Especialista');
+  const saasSetup2025    = histItem2025('SaaS', 'Setup');
+  const saasParceiros2025 = histItem2025('SaaS', 'Parceiros');
+  override('1.2.1', 2025, saasOxy2025);
+  override('1.2.2', 2025, saasOxyGenio2025);
+  override('1.2.3', 2025, saasSetup2025);
+  override('1.2.4', 2025, saasParceiros2025);
+  override('1.2.5', 2025, 0); // merged into 1.2.2
+
+  // Education sub-items
+  override('1.3.1', 2025, histItem2025('Education', 'Dono CFO'));
+  override('1.3.2', 2025, histItem2025('Education', 'Engenheiro de Negócios'));
+  override('1.3.3', 2025, histItem2025('Education', 'Financeiro Raiz'));
+  override('1.3.4', 2025, histItem2025('Education', 'Finance Sales Program'));
+
+  // Expansão sub-items
+  override('1.5.1', 2025, histItem2025('Expansão', 'Oxy Hacker - Micro Franqueado'));
+  override('1.5.2', 2025, histItem2025('Expansão', 'Franquia'));
+  override('1.5.3', 2025, histItem2025('Expansão', 'Master Franquia'));
+
+  // Deductions node (code '2' is a child of '1' in the tree)
+  override('2', 2025, deductions2025);
+
+  // RECEITA LÍQUIDA summary
+  override('NR', 2025, netRev2025);
+
+  // COGS — distribute across BU sub-nodes using engine proportions
+  const engCogs2025 = years[2025].cogs;
+  if (engCogs2025 !== 0) {
+    const engCogsCaas = years[2025].cogsDetail.caas;
+    const engCogsCS   = years[2025].cogsDetail.customerService;
+    const engCogsSaas = years[2025].cogsDetail.saas;
+    const engCogsEdu  = years[2025].cogsDetail.education;
+    const engCogsBaas = years[2025].cogsDetail.baas;
+    override('3.1', 2025, totalCogs2025 * (engCogsCaas / engCogs2025));
+    override('3.2', 2025, totalCogs2025 * (engCogsSaas / engCogs2025));
+    override('3.3', 2025, totalCogs2025 * (engCogsEdu  / engCogs2025));
+    override('3.4', 2025, totalCogs2025 * (engCogsCS   / engCogs2025));
+    override('3.5', 2025, totalCogs2025 * (engCogsBaas / engCogs2025));
+  }
+
+  // LUCRO BRUTO summary
+  override('GP', 2025, grossProfit2025);
+
+  // Margin %: GM% = LUCRO BRUTO / RECEITA LÍQUIDA * 100
+  const gmPct2025 = netRev2025 !== 0 ? (grossProfit2025 / netRev2025) * 100 : 0;
+  override('GM%', 2025, Number(gmPct2025.toFixed(1)));
+
+  // Fixed expenses — distribute across category nodes using engine proportions
+  const engMkt2025 = years[2025].marketing;
+  const engComm2025 = years[2025].commercial;
+  const engHc2025  = years[2025].headcount;
+  const engSga2025 = years[2025].sga;
+  const engFixed2025 = engMkt2025 + engComm2025 + engHc2025 + engSga2025;
+  if (engFixed2025 !== 0) {
+    override('7', 2025, fixedExpenses2025 * (engMkt2025  / engFixed2025));
+    override('6', 2025, fixedExpenses2025 * (engComm2025 / engFixed2025));
+    override('5', 2025, fixedExpenses2025 * (engHc2025   / engFixed2025));
+    override('4', 2025, fixedExpenses2025 * (engSga2025  / engFixed2025));
+  }
+
+  // EBITDA summary
+  override('EBITDA', 2025, ebitda2025);
+  const ebitdaPct2025 = netRev2025 !== 0 ? (ebitda2025 / netRev2025) * 100 : 0;
+  override('EBITDA%', 2025, Number(ebitdaPct2025.toFixed(1)));
+
+  // Financial result, taxes, net income — use engine values for 2025 since historicalData
+  // does not break these out separately (RESULTADO LÍQUIDO already incorporates them)
+  // Override NI and FCR with real values
+  override('NI', 2025, netIncome2025);
+  const nmPct2025 = netRev2025 !== 0 ? (netIncome2025 / netRev2025) * 100 : 0;
+  override('NM%', 2025, Number(nmPct2025.toFixed(1)));
+  override('FCR', 2025, finalResult2025);
+
+  // ── 2026: Partial year — real Jan-Mar + engine Apr-Dec ────────────────────
+
+  const eng26 = years[2026].monthlyData;
+
+  const caas2026     = mixedYear(historicalRevenue, 'CaaS',     2026, d => d.caasRevenue);
+  const saas2026     = mixedYear(historicalRevenue, 'SaaS',     2026, d => d.saasRevenue);
+  const edu2026      = mixedYear(historicalRevenue, 'Education', 2026, d => d.educationRevenue);
+  const expansao2026 = mixedYear(historicalRevenue, 'Expansão', 2026, d => d.baasRevenue);
+  const tax2026      = getHistoricalAnnual(historicalRevenue, 'Tax', 2026) ?? 0;
+  const grossRev2026 = mixedYear(historicalMetrics, 'RECEITA BRUTA',    2026, d => d.grossRevenue);
+  const netRev2026   = mixedYear(historicalMetrics, 'RECEITA LÍQUIDA',  2026, d => d.netRevenue);
+  const grossProfit2026 = mixedYear(historicalMetrics, 'LUCRO BRUTO',   2026, d => d.grossProfit);
+  const ebitda2026   = mixedYear(historicalMetrics, 'EBITDA',           2026, d => d.ebitda);
+  const netIncome2026 = mixedYear(historicalMetrics, 'RESULTADO LÍQUIDO', 2026, d => d.netIncome);
+  const finalResult2026 = mixedYear(historicalMetrics, 'RESULTADO FINAL', 2026, d => d.finalResult);
+  const deductions2026 = netRev2026 - grossRev2026;
+  const totalCogs2026 = grossProfit2026 - netRev2026;
+  const fixedExpenses2026 = mixedYear(historicalMetrics, 'DESPESAS FIXAS', 2026, d =>
+    d.marketing + d.commercial + d.headcount + d.sga
+  );
+
+  // Revenue top level
+  override('1', 2026, grossRev2026);
+  override('1.1', 2026, caas2026);
+  override('1.2', 2026, saas2026);
+  override('1.3', 2026, edu2026);
+  override('1.5', 2026, expansao2026);
+  override('1.6', 2026, tax2026);
+
+  // CaaS sub-items 2026
+  const histItem2026 = (group: string, item: string) =>
+    getPartialHistoricalAnnual(
+      historicalRevenueItems[group] ?? {},
+      item,
+      2026,
+      eng26,
+      () => 0, // no per-sub-item engine monthly breakdown; just use real months
+    );
+  override('1.1.1', 2026, histItem2026('CaaS', 'Serviços Especializados'));
+  override('1.1.2', 2026, histItem2026('CaaS', 'Enterprise'));
+  override('1.1.3', 2026, histItem2026('CaaS', 'Corporate'));
+  override('1.1.4', 2026, histItem2026('CaaS', 'Parceiros'));
+  override('1.1.5', 2026, histItem2026('CaaS', 'BPO Financeiro'));
+
+  // SaaS sub-items 2026
+  const saasOxy2026       = histItem2026('SaaS', 'Oxy');
+  const saasOxyGenio2026  = histItem2026('SaaS', 'Oxy + Gênio') + histItem2026('SaaS', 'Oxy + Gênio + Especialista');
+  const saasSetup2026     = histItem2026('SaaS', 'Setup');
+  const saasParceiros2026 = histItem2026('SaaS', 'Parceiros');
+  override('1.2.1', 2026, saasOxy2026);
+  override('1.2.2', 2026, saasOxyGenio2026);
+  override('1.2.3', 2026, saasSetup2026);
+  override('1.2.4', 2026, saasParceiros2026);
+  override('1.2.5', 2026, 0);
+
+  // Education sub-items 2026
+  override('1.3.1', 2026, histItem2026('Education', 'Dono CFO'));
+  override('1.3.2', 2026, histItem2026('Education', 'Engenheiro de Negócios'));
+  override('1.3.3', 2026, histItem2026('Education', 'Financeiro Raiz'));
+  override('1.3.4', 2026, histItem2026('Education', 'Finance Sales Program'));
+
+  // Expansão sub-items 2026
+  override('1.5.1', 2026, histItem2026('Expansão', 'Oxy Hacker - Micro Franqueado'));
+  override('1.5.2', 2026, histItem2026('Expansão', 'Franquia'));
+  override('1.5.3', 2026, histItem2026('Expansão', 'Master Franquia'));
+
+  // Deductions
+  override('2', 2026, deductions2026);
+  override('NR', 2026, netRev2026);
+
+  // COGS distribution 2026
+  const engCogs2026 = years[2026].cogs;
+  if (engCogs2026 !== 0) {
+    const { caas: ec, customerService: ecs, saas: es, education: ee, baas: eb } = years[2026].cogsDetail;
+    override('3.1', 2026, totalCogs2026 * (ec  / engCogs2026));
+    override('3.2', 2026, totalCogs2026 * (es  / engCogs2026));
+    override('3.3', 2026, totalCogs2026 * (ee  / engCogs2026));
+    override('3.4', 2026, totalCogs2026 * (ecs / engCogs2026));
+    override('3.5', 2026, totalCogs2026 * (eb  / engCogs2026));
+  }
+
+  override('GP', 2026, grossProfit2026);
+  const gmPct2026 = netRev2026 !== 0 ? (grossProfit2026 / netRev2026) * 100 : 0;
+  override('GM%', 2026, Number(gmPct2026.toFixed(1)));
+
+  // Fixed expenses distribution 2026
+  const engMkt2026  = years[2026].marketing;
+  const engComm2026 = years[2026].commercial;
+  const engHc2026   = years[2026].headcount;
+  const engSga2026  = years[2026].sga;
+  const engFixed2026 = engMkt2026 + engComm2026 + engHc2026 + engSga2026;
+  if (engFixed2026 !== 0) {
+    override('7', 2026, fixedExpenses2026 * (engMkt2026  / engFixed2026));
+    override('6', 2026, fixedExpenses2026 * (engComm2026 / engFixed2026));
+    override('5', 2026, fixedExpenses2026 * (engHc2026   / engFixed2026));
+    override('4', 2026, fixedExpenses2026 * (engSga2026  / engFixed2026));
+  }
+
+  override('EBITDA', 2026, ebitda2026);
+  const ebitdaPct2026 = netRev2026 !== 0 ? (ebitda2026 / netRev2026) * 100 : 0;
+  override('EBITDA%', 2026, Number(ebitdaPct2026.toFixed(1)));
+
+  override('NI', 2026, netIncome2026);
+  const nmPct2026 = netRev2026 !== 0 ? (netIncome2026 / netRev2026) * 100 : 0;
+  override('NM%', 2026, Number(nmPct2026.toFixed(1)));
+  override('FCR', 2026, finalResult2026);
+}
+
 // ─── BUILD PNL TREE ───
 
 function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
@@ -968,8 +1298,9 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.3.4', label: 'Finance Sales Program', annual: z, monthly: zMo() },
         ]},
         { code: '1.5', label: 'Expansão', annual: baasAn, monthly: baasMo, children: [
-          { code: '1.5.1', label: 'Assinatura', annual: baAn, monthly: allocMo(baasMo, baAn, baasAn) },
-          { code: '1.5.2', label: 'Custódia', annual: z, monthly: zMo() },
+          { code: '1.5.1', label: 'Oxy Hacker - Micro Franqueado', annual: baAn, monthly: allocMo(baasMo, baAn, baasAn) },
+          { code: '1.5.2', label: 'Franquia', annual: z, monthly: zMo() },
+          { code: '1.5.3', label: 'Master Franquia', annual: z, monthly: zMo() },
         ]},
         { code: '1.6', label: 'Tax', annual: z, monthly: zMo() },
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {

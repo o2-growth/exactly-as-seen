@@ -66,15 +66,18 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function RuleOf40() {
-  const { projections, selectedYear } = useFinancialModel();
+  const { projections, selectedYear, filteredYears } = useFinancialModel();
 
-  // Compute Rule of 40 for all years
-  const chartData = YEARS.map((y, i) => {
-    const prev = i > 0 ? projections.grossRevenue[YEARS[i - 1]] : 0;
+  // Use filteredYears for the chart; fall back to all YEARS if empty
+  const activeYears = filteredYears.length > 0 ? filteredYears : YEARS;
+
+  // Compute Rule of 40 for active years. For growth rate we need the previous year value,
+  // which may be outside activeYears so we look it up from projections directly.
+  const chartData = activeYears.map((y, i) => {
+    const prevYear = activeYears[i - 1] ?? (y > YEARS[0] ? (y - 1) as typeof YEARS[number] : undefined);
+    const prev = prevYear != null ? projections.grossRevenue[prevYear as Year] : 0;
     const curr = projections.grossRevenue[y];
-    const revenueGrowth = i > 0 && prev > 0
-      ? ((curr - prev) / prev) * 100
-      : 0;
+    const revenueGrowth = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
     const profitMargin = projections.netMargins[y];
     const score = revenueGrowth + profitMargin;
     return { year: y.toString(), revenueGrowth: Number(revenueGrowth.toFixed(1)), profitMargin: Number(profitMargin.toFixed(1)), score: Number(score.toFixed(1)) };
@@ -128,12 +131,16 @@ export default function RuleOf40() {
 }
 
 export function RuleOf40Chart() {
-  const { projections } = useFinancialModel();
+  const { projections, filteredYears } = useFinancialModel();
 
-  const chartData = YEARS.map((y, i) => {
-    const prev = i > 0 ? projections.grossRevenue[YEARS[i - 1]] : 0;
+  // Use filteredYears for the chart; fall back to all YEARS if empty
+  const activeYears = filteredYears.length > 0 ? filteredYears : YEARS;
+
+  const chartData = activeYears.map((y, i) => {
+    const prevYear = activeYears[i - 1] ?? (y > YEARS[0] ? (y - 1) as typeof YEARS[number] : undefined);
+    const prev = prevYear != null ? projections.grossRevenue[prevYear as Year] : 0;
     const curr = projections.grossRevenue[y];
-    const revenueGrowth = i > 0 && prev > 0 ? ((curr - prev) / prev) * 100 : 0;
+    const revenueGrowth = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
     const profitMargin = projections.netMargins[y];
     const score = revenueGrowth + profitMargin;
     return { year: y.toString(), revenueGrowth: Number(revenueGrowth.toFixed(1)), profitMargin: Number(profitMargin.toFixed(1)), score: Number(score.toFixed(1)) };

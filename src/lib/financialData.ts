@@ -223,3 +223,29 @@ function buildHeadcount(): HeadcountRow[] {
 }
 
 export const HEADCOUNT = buildHeadcount();
+
+// ─── Date Range / Period Filter ────────────────────────────────────────────────
+
+export interface DateRange {
+  startYear: number;
+  endYear: number;
+}
+
+/**
+ * Returns the subset of YEARS that fall within the given DateRange.
+ * Falls back to all YEARS if the range is undefined or yields no results.
+ */
+export function getFilteredYears(range: DateRange | undefined): Year[] {
+  if (!range) return [...YEARS];
+  const filtered = YEARS.filter(y => y >= range.startYear && y <= range.endYear);
+  return filtered.length > 0 ? filtered : [...YEARS];
+}
+
+/**
+ * Returns true if the given year falls within the DateRange.
+ * If range is undefined, all years are considered in-range.
+ */
+export function isYearInRange(year: number, range: DateRange | undefined): boolean {
+  if (!range) return true;
+  return year >= range.startYear && year <= range.endYear;
+}

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
 import {
   Assumptions, DEFAULT_ASSUMPTIONS, Scenario, Year, YEARS,
-  ProjectionData, PeriodPreset, DataSource,
+  ProjectionData, PeriodPreset, DataSource, DateRange, getFilteredYears,
 } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
@@ -15,12 +15,15 @@ interface FinancialModelContextType {
   projections: ProjectionData;
   model: FullModelOutput;
   pnlTree: PnlNode[];
+  dateRange: DateRange | undefined;
+  filteredYears: Year[];
   setAssumptions: (a: Assumptions) => void;
   updateAssumption: <K extends keyof Assumptions>(key: K, value: Assumptions[K]) => void;
   setScenario: (s: Scenario) => void;
   setSelectedYear: (y: Year) => void;
   setSelectedPeriod: (p: PeriodPreset) => void;
   setDataSource: (d: DataSource) => void;
+  setDateRange: (r: DateRange | undefined) => void;
   resetAssumptions: () => void;
 }
 
@@ -32,6 +35,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const [selectedYear, setSelectedYear] = useState<Year>(2025);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>('all');
   const [dataSource, setDataSource] = useState<DataSource>('model');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Compute full model from engine
   const model = useMemo(
@@ -69,6 +73,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
   const pnlTree = model.pnlTree;
 
+  const filteredYears = useMemo(() => getFilteredYears(dateRange), [dateRange]);
+
   const updateAssumption = useCallback(<K extends keyof Assumptions>(key: K, value: Assumptions[K]) => {
     setAssumptions(prev => ({ ...prev, [key]: value }));
   }, []);
@@ -80,7 +86,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   return (
     <FinancialModelContext.Provider value={{
       assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
-      setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, resetAssumptions,
+      dateRange, filteredYears,
+      setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions,
     }}>
       {children}
     </FinancialModelContext.Provider>

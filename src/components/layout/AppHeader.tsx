@@ -1,17 +1,10 @@
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Scenario, PeriodPreset, DataSource } from '@/lib/financialData';
+import { Scenario, DataSource } from '@/lib/financialData';
 import { FileDown } from 'lucide-react';
+import PeriodFilter from './PeriodFilter';
 
 const scenarios: Scenario[] = ['BEAR', 'BASE', 'BULL'];
-
-const PERIOD_OPTIONS: { value: PeriodPreset; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: '3y', label: '3 Anos' },
-  { value: '5y', label: '5 Anos' },
-  { value: 'historical', label: 'Historico' },
-  { value: 'projected', label: 'Projetado' },
-];
 
 const DATA_SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
   { value: 'model', label: 'Modelo' },
@@ -20,7 +13,7 @@ const DATA_SOURCE_OPTIONS: { value: DataSource; label: string }[] = [
 ];
 
 export default function AppHeader() {
-  const { scenario, setScenario, selectedYear, setSelectedYear, selectedPeriod, setSelectedPeriod, dataSource, setDataSource } = useFinancialModel();
+  const { scenario, setScenario, dataSource, setDataSource } = useFinancialModel();
   const { currentVersion } = useVersionHistory();
 
   return (
@@ -62,30 +55,8 @@ export default function AppHeader() {
           ))}
         </div>
 
-        {/* Year Selector */}
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value) as typeof selectedYear)}
-          className="bg-secondary border border-border text-foreground text-xs font-medium rounded-lg px-3 py-2 focus:ring-1 focus:ring-primary outline-none"
-        >
-          {YEARS.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
-
-        {/* Period dropdown */}
-        <div className="hidden md:flex items-center gap-1.5">
-          <span className="text-[10px] text-muted-foreground font-medium">Periodo</span>
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value as PeriodPreset)}
-            className="bg-secondary border border-border text-foreground text-xs font-medium rounded-lg px-3 py-2 focus:ring-1 focus:ring-primary outline-none"
-          >
-            {PERIOD_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
+        {/* Period Filter */}
+        <PeriodFilter />
 
         {/* Data Source toggle */}
         <div className="hidden md:flex items-center gap-1.5">

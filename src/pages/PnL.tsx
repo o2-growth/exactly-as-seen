@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
@@ -62,19 +62,6 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLab
 
   if (hiddenItems.has(node.code)) return null;
 
-  if (node.isHeader) {
-    return (
-      <tr className="border-b border-border/50">
-        <td
-          colSpan={columns.length + 1}
-          className="p-3 pt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground"
-        >
-          {label}
-        </td>
-      </tr>
-    );
-  }
-
   // Engine already applies scenario — no double-multiplication needed
   const getValue = (col: Year | string): number => {
     if (viewMode === 'monthly' && typeof col === 'string') {
@@ -92,11 +79,13 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLab
     <>
       <tr
         className={`border-b border-border/30 transition-colors ${
-          node.isSummary 
-            ? 'bg-primary/5 font-bold' 
-            : node.isMargin 
-              ? 'bg-transparent' 
-              : 'hover:bg-secondary/20'
+          node.isSummary
+            ? 'bg-primary/5 font-bold'
+            : node.isMargin
+              ? 'bg-transparent'
+              : node.isHeader
+                ? 'bg-secondary/30 font-bold'
+                : 'hover:bg-secondary/20'
         }`}
       >
         <td
@@ -110,8 +99,14 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLab
             ) : (
               <span className="w-3.5" />
             )}
-            <span className="text-[11px] text-muted-foreground font-mono mr-1.5">{node.code}</span>
-            <span className={`text-sm ${node.isSummary ? 'text-foreground' : node.isMargin ? 'text-muted-foreground italic' : 'text-foreground/90'}`}>
+            {!node.isHeader && (
+              <span className="text-[11px] text-muted-foreground font-mono mr-1.5">{node.code}</span>
+            )}
+            <span className={`text-sm ${
+              node.isHeader
+                ? 'text-xs font-bold uppercase tracking-wider text-muted-foreground'
+                : node.isSummary ? 'text-foreground' : node.isMargin ? 'text-muted-foreground italic' : 'text-foreground/90'
+            }`}>
               {label}
             </span>
           </div>
@@ -194,17 +189,61 @@ function CoaModal({ customLabels, hiddenItems, setLabel, toggleHidden, pnlTree }
   );
 }
 
+// Transform isHeader nodes into expandable parents that group subsequent items
+function groupByHeaders(nodes: PnlNode[]): PnlNode[] {
+  const result: PnlNode[] = [];
+  let i = 0;
+  while (i < nodes.length) {
+    const node = nodes[i];
+    if (node.isHeader) {
+      // Collect subsequent non-summary, non-margin, non-header nodes as children
+      const children: PnlNode[] = [];
+      let j = i + 1;
+      while (j < nodes.length && !nodes[j].isSummary && !nodes[j].isMargin && !nodes[j].isHeader) {
+        children.push(nodes[j]);
+        j++;
+      }
+      // Compute sum of children for annual/monthly values
+      const groupAnnual = {} as Record<Year, number>;
+      const groupMonthly = {} as Record<Year, number[]>;
+      for (const y of YEARS) {
+        groupAnnual[y] = children.reduce((sum, c) => sum + (c.annual[y] || 0), 0);
+        groupMonthly[y] = Array.from({ length: 12 }, (_, m) =>
+          children.reduce((sum, c) => sum + (c.monthly?.[y]?.[m] || 0), 0)
+        );
+      }
+      result.push({
+        code: node.code,
+        label: node.label,
+        annual: groupAnnual,
+        monthly: groupMonthly,
+        isHeader: true,
+        children,
+      });
+      i = j;
+    } else {
+      result.push(node);
+      i++;
+    }
+  }
+  return result;
+}
+
 export default function PnL() {
-  const { scenario, selectedYear, pnlTree } = useFinancialModel();
+  const { scenario, selectedYear, pnlTree: rawPnlTree, filteredYears } = useFinancialModel();
+  const pnlTree = useMemo(() => groupByHeaders(rawPnlTree), [rawPnlTree]);
   const [viewMode, setViewMode] = useState<ViewMode>('annual');
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
+
+  // Use filteredYears for annual view; fall back to all YEARS if empty
+  const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const columns: (Year | string)[] = viewMode === 'monthly'
     ? months
     : viewMode === 'summary'
-      ? [2025, 2030] as Year[]
-      : [...YEARS];
+      ? ([activeYears[0], activeYears[activeYears.length - 1]] as Year[])
+      : [...activeYears];
 
   return (
     <div className="space-y-4">
@@ -250,11 +289,27 @@ export default function PnL() {
               <th className="text-left p-3 text-muted-foreground font-medium min-w-[260px] sticky left-0 bg-card">
                 Descrição
               </th>
-              {columns.map(col => (
-                <th key={String(col)} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
-                  {String(col)}
-                </th>
-              ))}
+              {columns.map(col => {
+                const isHistorical = typeof col === 'number' && col === 2025;
+                const isPartial    = typeof col === 'number' && col === 2026;
+                return (
+                  <th key={String(col)} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span>{String(col)}</span>
+                      {isHistorical && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 tracking-wide">
+                          Realizado
+                        </span>
+                      )}
+                      {isPartial && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 tracking-wide">
+                          Parcial
+                        </span>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>

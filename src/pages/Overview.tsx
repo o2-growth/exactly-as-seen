@@ -1,5 +1,5 @@
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS, HEADCOUNT } from '@/lib/financialData';
+import { YEARS, HEADCOUNT, Year } from '@/lib/financialData';
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/formatters';
 import { TrendingUp, Users, DollarSign, BarChart3, Percent } from 'lucide-react';
 import {
@@ -7,6 +7,72 @@ import {
   AreaChart, Area, LineChart, Line, Legend, ComposedChart,
 } from 'recharts';
 import RuleOf40Card, { RuleOf40Chart } from '@/components/overview/RuleOf40';
+import { historicalMetrics } from '@/data/historicalData';
+
+// ---------------------------------------------------------------------------
+// Historical helpers
+// ---------------------------------------------------------------------------
+
+/** Sum a metric across all 12 months of a given year, returning R$ thousands. */
+function getHistoricalAnnualMetric(metricName: string, year: number): number {
+  const data = historicalMetrics[metricName];
+  if (!data) return 0;
+  let sum = 0;
+  for (let m = 1; m <= 12; m++) {
+    const period = `${year}-${String(m).padStart(2, '0')}`;
+    sum += data[period] ?? 0;
+  }
+  return sum / 1000; // R$ → R$ thousands
+}
+
+/**
+ * For 2026: real Jan–Mar + engine value scaled to remaining 9 months.
+ * `engineVal` is already in R$ thousands (full-year projection).
+ */
+function getBlended2026Metric(metricName: string, engineVal: number): number {
+  const data = historicalMetrics[metricName];
+  if (!data) return engineVal;
+  let realSum = 0;
+  for (let m = 1; m <= 3; m++) {
+    realSum += data[`2026-${String(m).padStart(2, '0')}`] ?? 0;
+  }
+  return (realSum / 1000) + engineVal * (9 / 12);
+}
+
+/**
+ * Returns the best available value for a KPI metric for the given year.
+ * - 2025 → full-year actuals from Oxy DB
+ * - 2026 → 3 months real + 9 months engine
+ * - 2027+ → pure engine
+ */
+function getKpiValue(metric: string, year: Year, engineVal: number): number {
+  if (year === 2025) return getHistoricalAnnualMetric(metric, 2025);
+  if (year === 2026) return getBlended2026Metric(metric, engineVal);
+  return engineVal;
+}
+
+/** Badge shown next to the year to indicate data type. */
+function YearBadge({ year }: { year: Year }) {
+  if (year === 2025) {
+    return (
+      <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        Realizado
+      </span>
+    );
+  }
+  if (year === 2026) {
+    return (
+      <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
+        Parcial
+      </span>
+    );
+  }
+  return (
+    <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+      Projeção
+    </span>
+  );
+}
 
 const CustomRevenueTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload) return null;
@@ -27,21 +93,53 @@ const CustomRevenueTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function Overview() {
-  const { projections, selectedYear, assumptions } = useFinancialModel();
+  const { projections, selectedYear, assumptions, filteredYears } = useFinancialModel();
+
+  // Use filteredYears for chart ranges; fall back to YEARS if undefined/empty
+  const activeYears = filteredYears.length > 0 ? filteredYears : YEARS;
+
+  // KPI year: use selectedYear if it's within the active range, otherwise use last year in range
+  const kpiYear: Year = activeYears.includes(selectedYear)
+    ? selectedYear
+    : activeYears[activeYears.length - 1];
+
+  // ---------------------------------------------------------------------------
+  // Override projections with historical data for 2025 / partial 2026
+  // ---------------------------------------------------------------------------
+  const grossRevenue = getKpiValue('RECEITA BRUTA', kpiYear, projections.grossRevenue[kpiYear]);
+  const netRevenue   = getKpiValue('RECEITA LÍQUIDA', kpiYear, projections.netRevenue[kpiYear]);
+  const ebitda       = getKpiValue('EBITDA', kpiYear, projections.ebitda[kpiYear]);
+  const grossProfit  = getKpiValue('LUCRO BRUTO', kpiYear, projections.grossProfit[kpiYear]);
+  const netIncome    = getKpiValue('RESULTADO FINAL', kpiYear, projections.netIncome[kpiYear]);
+
+  // Compute margins from overridden values to keep them consistent
+  const grossMarginPct = netRevenue > 0 ? (grossProfit / netRevenue) * 100 : 0;
+  const ebitdaMarginPct = grossRevenue > 0 ? (ebitda / grossRevenue) * 100 : 0;
+  const netMarginPct   = netRevenue > 0 ? (netIncome / netRevenue) * 100 : 0;
 
   const kpis = [
-    { label: 'Total Clients', value: formatNumber(projections.totalClients[selectedYear]), icon: Users, color: 'text-primary' },
-    { label: 'Gross Revenue', value: formatCurrency(projections.grossRevenue[selectedYear] * 1000), icon: DollarSign, color: 'text-positive' },
-    { label: 'EBITDA', value: formatCurrency(projections.ebitda[selectedYear] * 1000), icon: BarChart3, color: 'text-warning' },
-    { label: 'Gross Margin', value: formatPercent(projections.grossMargins[selectedYear]), icon: TrendingUp, color: 'text-primary' },
-    { label: 'Net Margin', value: formatPercent(projections.netMargins[selectedYear]), icon: Percent, color: projections.netMargins[selectedYear] >= 0 ? 'text-positive' : 'text-negative' },
+    { label: 'Total Clients', value: formatNumber(projections.totalClients[kpiYear]), icon: Users, color: 'text-primary' },
+    { label: 'Gross Revenue', value: formatCurrency(grossRevenue * 1000), icon: DollarSign, color: 'text-positive' },
+    { label: 'EBITDA', value: formatCurrency(ebitda * 1000), icon: BarChart3, color: 'text-warning' },
+    { label: 'Gross Margin', value: formatPercent(grossMarginPct), icon: TrendingUp, color: 'text-primary' },
+    { label: 'Net Margin', value: formatPercent(netMarginPct), icon: Percent, color: netMarginPct >= 0 ? 'text-positive' : 'text-negative' },
   ];
 
-  // YoY Revenue Growth
-  const yoyGrowth = YEARS.slice(1).map((y, i) => {
-    const prev = projections.grossRevenue[YEARS[i]];
-    const curr = projections.grossRevenue[y];
-    return { period: `${YEARS[i]}→${y}`, growth: prev > 0 ? Number((((curr - prev) / prev) * 100).toFixed(1)) : 0 };
+  // ---------------------------------------------------------------------------
+  // Chart data — use overridden values per year
+  // ---------------------------------------------------------------------------
+
+  const revenueChartData = activeYears.map(y => ({
+    year: y.toString(),
+    'Gross Revenue': getKpiValue('RECEITA BRUTA', y, projections.grossRevenue[y]),
+    'Net Revenue':   getKpiValue('RECEITA LÍQUIDA', y, projections.netRevenue[y]),
+  }));
+
+  // YoY Revenue Growth (based on overridden gross revenue)
+  const yoyGrowth = activeYears.slice(1).map((y, i) => {
+    const prev = getKpiValue('RECEITA BRUTA', activeYears[i], projections.grossRevenue[activeYears[i]]);
+    const curr = getKpiValue('RECEITA BRUTA', y, projections.grossRevenue[y]);
+    return { period: `${activeYears[i]}→${y}`, growth: prev > 0 ? Number((((curr - prev) / prev) * 100).toFixed(1)) : 0 };
   });
 
   // Total headcount per year
@@ -50,18 +148,12 @@ export default function Overview() {
     return acc;
   }, {} as Record<number, number>);
 
-  const revenueChartData = YEARS.map(y => ({
-    year: y.toString(),
-    'Gross Revenue': projections.grossRevenue[y],
-    'Net Revenue': projections.netRevenue[y],
-  }));
-
   // Client chart with actual BU data from assumptions + YoY growth
-  const clientChartData = YEARS.map((y, i) => {
+  const clientChartData = activeYears.map((y, i) => {
     const baasClients = assumptions.subProductClients.baas[y];
     const total = assumptions.caasClients[y] + assumptions.saasClients[y] + assumptions.educationClients[y] + baasClients;
-    const prevBaas = i > 0 ? assumptions.subProductClients.baas[YEARS[i-1]] : 0;
-    const prevTotal = i > 0 ? assumptions.caasClients[YEARS[i-1]] + assumptions.saasClients[YEARS[i-1]] + assumptions.educationClients[YEARS[i-1]] + prevBaas : 0;
+    const prevBaas = i > 0 ? assumptions.subProductClients.baas[activeYears[i-1]] : 0;
+    const prevTotal = i > 0 ? assumptions.caasClients[activeYears[i-1]] + assumptions.saasClients[activeYears[i-1]] + assumptions.educationClients[activeYears[i-1]] + prevBaas : 0;
     const growthPct = i > 0 && prevTotal > 0 ? Number((((total - prevTotal) / prevTotal) * 100).toFixed(0)) : 0;
     return {
       year: y.toString(),
@@ -73,21 +165,38 @@ export default function Overview() {
     };
   });
 
-  const marginChartData = YEARS.map(y => ({
-    year: y.toString(),
-    'Gross Margin': projections.grossMargins[y],
-    'EBITDA %': projections.grossRevenue[y] > 0
-      ? Number(((projections.ebitda[y] / projections.grossRevenue[y]) * 100).toFixed(1))
-      : 0,
-    'Net Margin': projections.netMargins[y],
-    'Cash Gen %': projections.netRevenue[y] > 0
-      ? Number(((projections.operatingCashFlow[y] / projections.netRevenue[y]) * 100).toFixed(1))
-      : 0,
-  }));
+  const marginChartData = activeYears.map(y => {
+    const yr_grossRevenue = getKpiValue('RECEITA BRUTA', y, projections.grossRevenue[y]);
+    const yr_netRevenue   = getKpiValue('RECEITA LÍQUIDA', y, projections.netRevenue[y]);
+    const yr_grossProfit  = getKpiValue('LUCRO BRUTO', y, projections.grossProfit[y]);
+    const yr_ebitda       = getKpiValue('EBITDA', y, projections.ebitda[y]);
+    const yr_netIncome    = getKpiValue('RESULTADO FINAL', y, projections.netIncome[y]);
+
+    const yr_grossMarginPct = yr_netRevenue > 0 ? Number(((yr_grossProfit / yr_netRevenue) * 100).toFixed(1)) : 0;
+    const yr_ebitdaMarginPct = yr_grossRevenue > 0 ? Number(((yr_ebitda / yr_grossRevenue) * 100).toFixed(1)) : 0;
+    const yr_netMarginPct   = yr_netRevenue > 0 ? Number(((yr_netIncome / yr_netRevenue) * 100).toFixed(1)) : 0;
+
+    // Cash Gen % uses engine value for 2027+; for 2025/2026 use net income as proxy
+    const cashFlow = (y === 2025 || y === 2026)
+      ? yr_netIncome
+      : projections.operatingCashFlow[y];
+    const yr_cashGenPct = yr_netRevenue > 0 ? Number(((cashFlow / yr_netRevenue) * 100).toFixed(1)) : 0;
+
+    return {
+      year: y.toString(),
+      'Gross Margin':  yr_grossMarginPct,
+      'EBITDA %':      yr_ebitdaMarginPct,
+      'Net Margin':    yr_netMarginPct,
+      'Cash Gen %':    yr_cashGenPct,
+    };
+  });
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Overview — {selectedYear}</h2>
+      <h2 className="text-2xl font-bold flex items-center">
+        Overview — {kpiYear}
+        <YearBadge year={kpiYear} />
+      </h2>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
@@ -143,8 +252,8 @@ export default function Overview() {
                 <p className="font-bold text-foreground">{assumptions.churnCaas}% / {assumptions.churnSaas}%</p>
               </div>
               <div className="bg-secondary/40 rounded-lg p-2.5">
-                <p className="text-muted-foreground">Headcount {selectedYear}</p>
-                <p className="font-bold text-foreground">{totalHeadcount[selectedYear]?.toLocaleString('pt-BR') ?? '—'}</p>
+                <p className="text-muted-foreground">Headcount {kpiYear}</p>
+                <p className="font-bold text-foreground">{totalHeadcount[kpiYear]?.toLocaleString('pt-BR') ?? '—'}</p>
               </div>
             </div>
           </div>
@@ -220,7 +329,7 @@ export default function Overview() {
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-4">
-        Valores em R$ mil (000's) · Projeções estimadas · Modelo v7
+        Valores em R$ mil (000's) · 2025: dados realizados Oxy DB · 2026: Jan–Mar real + Abr–Dez estimado · Modelo v7
       </p>
     </div>
   );
