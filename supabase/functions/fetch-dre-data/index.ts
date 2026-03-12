@@ -60,27 +60,32 @@ serve(async (req) => {
     // Group dre_data by group_id → { period: value }
     const dataByGroup: Record<string, Record<string, number>> = {};
     for (const d of dreData) {
+      if (!d.period || d.period === 'TOTAL') continue;
       if (!dataByGroup[d.group_id]) dataByGroup[d.group_id] = {};
-      dataByGroup[d.group_id][d.period] = d.value;
+      dataByGroup[d.group_id][d.period] = parseFloat(d.value) || 0;
     }
 
     // Group items by group_id → item_name → { period: value }
     const itemsByGroup: Record<string, Record<string, Record<string, number>>> = {};
     for (const item of items) {
+      if (!item.period || item.period === 'TOTAL') continue;
       if (!itemsByGroup[item.group_id]) itemsByGroup[item.group_id] = {};
       if (!itemsByGroup[item.group_id][item.item_name]) itemsByGroup[item.group_id][item.item_name] = {};
-      itemsByGroup[item.group_id][item.item_name][item.period] = item.value;
+      itemsByGroup[item.group_id][item.item_name][item.period] = parseFloat(item.value) || 0;
     }
 
-    // Discover all periods available
+    // Discover all periods available (exclude TOTAL)
     const allPeriods = new Set<string>();
-    for (const d of dreData) allPeriods.add(d.period);
-    for (const item of items) allPeriods.add(item.period);
+    for (const d of dreData) { if (d.period && d.period !== 'TOTAL') allPeriods.add(d.period); }
+    for (const item of items) { if (item.period && item.period !== 'TOTAL') allPeriods.add(item.period); }
     const periods = [...allPeriods].sort();
 
     // Derive years from periods
     const yearsSet = new Set<number>();
-    for (const p of periods) yearsSet.add(parseInt(p.split('-')[0]));
+    for (const p of periods) {
+      const y = parseInt(p.split('-')[0]);
+      if (!isNaN(y)) yearsSet.add(y);
+    }
     const years = [...yearsSet].sort();
 
     // Helper: build annual & monthly from period→value map
