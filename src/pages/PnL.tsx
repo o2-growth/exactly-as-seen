@@ -233,9 +233,15 @@ function groupByHeaders(nodes: PnlNode[]): PnlNode[] {
 
 export default function PnL() {
   const { scenario, selectedYear, pnlTree: rawPnlTree, filteredYears } = useFinancialModel();
-  const pnlTree = useMemo(() => groupByHeaders(rawPnlTree), [rawPnlTree]);
+  const { dreTree, loading: dreLoading, error: dreError } = useDreData();
+  const [dataSource, setDataSource] = useState<'db' | 'model'>('db');
   const [viewMode, setViewMode] = useState<ViewMode>('annual');
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
+
+  // Use DB data when available and selected, otherwise fall back to model
+  const effectiveSource = dataSource === 'db' && dreTree ? 'db' : 'model';
+  const basePnlTree = effectiveSource === 'db' ? dreTree! : rawPnlTree;
+  const pnlTree = useMemo(() => groupByHeaders(basePnlTree), [basePnlTree]);
 
   // Use filteredYears for annual view; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
