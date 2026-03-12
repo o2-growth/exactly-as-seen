@@ -1,17 +1,41 @@
 
 
-# Simplificar Fluxo de Caixa — Manter apenas Bancário
+# Plan: Cap Table Improvements
 
-## Objetivo
-Remover as opções "Modelo" e "Realizado" da página de Fluxo de Caixa, mantendo apenas a visão "Bancário" como única fonte de dados.
+## Changes to `src/pages/Valuation.tsx`
 
-## Alterações em `src/pages/CashFlow.tsx`
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-1. **Remover o toggle de fonte de dados** — Eliminar os 3 botões (Modelo/Realizado/Bancário) e o estado `cfSource`
-2. **Renderizar sempre o `OxyBankingView`** — Sem condicionais, o componente bancário é renderizado diretamente
-3. **Remover código morto** — Todo o bloco condicional do modelo/realizado (PMR, tabela de árvore, gráficos de waterfall do modelo, balanço) que ficava no `else` do `cfSource === 'banking'` (linhas ~829–997)
-4. **Limpar imports não utilizados** — Remover imports de `Calculator`, `Database`, `useDreData`, `historicalData`, funções auxiliares do modelo (`sumFlat`, `sumDeductions`, etc.), e as funções `buildCashFlowTree`/`buildCashFlowTreeFromDb` se ficarem sem uso
-5. **Simplificar estado** — Remover `pmrOpen`, `editingPmr`, `pmrDraft`, `cfSource` e variáveis derivadas (`tree`, `balanceData`, `waterfallData`, etc.)
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
 
-O header ficará apenas com o título "Fluxo de Caixa" e o `OxyBankingView` será renderizado logo abaixo com as datas dinâmicas (histórico 12 meses + projeção 12 meses).
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
+
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
+```
+
+## Files Changed
+| File | Change |
+|------|--------|
+| `src/pages/Valuation.tsx` | All changes above |
 
