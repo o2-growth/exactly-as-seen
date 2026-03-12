@@ -75,7 +75,7 @@ export default function RuleOf40() {
   // which may be outside activeYears so we look it up from projections directly.
   const chartData = activeYears.map((y, i) => {
     const prevYear = activeYears[i - 1] ?? (y > YEARS[0] ? (y - 1) as typeof YEARS[number] : undefined);
-    const prev = prevYear != null ? projections.grossRevenue[prevYear as Year] : 0;
+    const prev = prevYear != null ? projections.grossRevenue[prevYear as typeof YEARS[number]] : 0;
     const curr = projections.grossRevenue[y];
     const revenueGrowth = prev > 0 ? ((curr - prev) / prev) * 100 : 0;
     const profitMargin = projections.netMargins[y];
