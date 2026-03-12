@@ -94,13 +94,13 @@ serve(async (req) => {
       const monthly: Record<number, number[]> = {};
 
       for (const y of years) {
-        monthly[y] = Array(12).fill(0);
+        monthly[y] = Array.from({ length: 12 }, () => 0);
         for (let m = 0; m < 12; m++) {
           const period = `${y}-${String(m + 1).padStart(2, '0')}`;
-          const val = periodValues[period] || 0;
+          const val = Number(periodValues[period]) || 0;
           monthly[y][m] = val;
         }
-        annual[y] = monthly[y].reduce((a, b) => a + b, 0);
+        annual[y] = monthly[y].reduce((a: number, b: number) => a + b, 0);
       }
 
       return { annual, monthly };
