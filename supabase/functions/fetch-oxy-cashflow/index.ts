@@ -22,7 +22,7 @@ serve(async (req) => {
     const endDate = url.searchParams.get('endDate') || '2025-12-31';
 
     const commonParams = `startDate=${startDate}&endDate=${endDate}&cnpjs[]=${encodeURIComponent(CNPJ)}`;
-    const headers = { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' };
+    const headers = { 'x-api-key': apiKey, 'Accept': 'application/json' };
 
     // Call both endpoints in parallel
     const [cardRecebido, cardPago, chart] = await Promise.all([
