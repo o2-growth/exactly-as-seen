@@ -3,10 +3,10 @@ import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { formatCurrency } from '@/lib/formatters';
-import { ChevronRight, ChevronDown, ChevronUp, Database, Calculator, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronUp, Database, Calculator, Loader2, Landmark } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, ReferenceLine,
+  Legend, ReferenceLine, LineChart, Line, ComposedChart,
 } from 'recharts';
 import {
   HISTORICAL_PERIODS,
@@ -17,6 +17,7 @@ import {
   historicalFinancial,
 } from '@/data/historicalData';
 import { useDreData, CashFlowDbData } from '@/hooks/useDreData';
+import { useOxyCashFlow } from '@/hooks/useOxyCashFlow';
 
 // ─── Period helpers ───────────────────────────────────────────────────────────
 
@@ -294,9 +295,209 @@ const formatAxis = (v: number) => {
   return `R$${v.toFixed(0)}k`;
 };
 
+const formatBrl = (v: number) => {
+  return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+
+// ─── Month label helper ───────────────────────────────────────────────────────
+
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+function monthLabel(period: string): string {
+  const parts = period.split('-');
+  const m = parseInt(parts[1]) - 1;
+  return `${MONTH_LABELS[m]}/${parts[0].slice(2)}`;
+}
+
+// ─── Banking view component ──────────────────────────────────────────────────
+
+function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: string }) {
+  const { data, loading, error } = useOxyCashFlow(startDate, endDate, true);
+  const [detailView, setDetailView] = useState<'recebido' | 'pago'>('recebido');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 gap-3">
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        <span className="text-sm text-muted-foreground">Carregando dados bancários...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="gradient-card p-6 text-center">
+        <p className="text-sm text-destructive">Erro ao carregar dados bancários: {error}</p>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  const chartData = data.chart.map(item => ({
+    month: monthLabel(item.month),
+    Entradas: item.entradas,
+    Saídas: item.saidas,
+    Saldo: item.saldo,
+  }));
+
+  // Summary totals
+  const totalEntradas = data.chart.reduce((s, i) => s + i.entradas, 0);
+  const totalSaidas = data.chart.reduce((s, i) => s + i.saidas, 0);
+  const saldoTotal = totalEntradas - totalSaidas;
+
+  const details = detailView === 'recebido' ? data.recebido : data.pago;
+  // Sort by total descending
+  const sortedDetails = [...details].sort((a, b) => {
+    const totalA = a.data.reduce((s, d) => s + d.value, 0);
+    const totalB = b.data.reduce((s, d) => s + d.value, 0);
+    return totalB - totalA;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="gradient-card p-5">
+          <p className="text-xs text-muted-foreground font-medium">Total Entradas</p>
+          <p className="text-xl font-bold text-primary mt-1">{formatBrl(totalEntradas)}</p>
+        </div>
+        <div className="gradient-card p-5">
+          <p className="text-xs text-muted-foreground font-medium">Total Saídas</p>
+          <p className="text-xl font-bold text-destructive mt-1">{formatBrl(totalSaidas)}</p>
+        </div>
+        <div className="gradient-card p-5">
+          <p className="text-xs text-muted-foreground font-medium">Saldo Líquido</p>
+          <p className={`text-xl font-bold mt-1 ${saldoTotal >= 0 ? 'text-primary' : 'text-destructive'}`}>
+            {formatBrl(saldoTotal)}
+          </p>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="gradient-card p-5">
+        <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Mensal — Dados Bancários (R$)</h3>
+        <ResponsiveContainer width="100%" height={320}>
+          <ComposedChart data={chartData} barGap={4}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" fontSize={11} />
+            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+            <Tooltip
+              contentStyle={{
+                background: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700 }}
+              formatter={(v: number, name: string) => [formatBrl(v), name]}
+            />
+            <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+            <Bar dataKey="Entradas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Saídas" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+            <Line type="monotone" dataKey="Saldo" stroke="hsl(var(--ring))" strokeWidth={2} dot={{ r: 3 }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Detail Table */}
+      <div className="gradient-card overflow-x-auto">
+        <div className="flex items-center gap-2 p-4 border-b border-border">
+          <h3 className="text-sm font-semibold mr-4">Detalhamento por Contraparte</h3>
+          <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border">
+            <button
+              onClick={() => setDetailView('recebido')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+                detailView === 'recebido'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Recebido ({data.recebido.length})
+            </button>
+            <button
+              onClick={() => setDetailView('pago')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+                detailView === 'pago'
+                  ? 'bg-destructive text-destructive-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Pago ({data.pago.length})
+            </button>
+          </div>
+        </div>
+
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">
+                Contraparte
+              </th>
+              {data.periods.map(p => (
+                <th key={p} className="text-right p-3 text-muted-foreground font-medium min-w-[100px]">
+                  {monthLabel(p)}
+                </th>
+              ))}
+              <th className="text-right p-3 text-muted-foreground font-bold min-w-[110px]">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedDetails.slice(0, 30).map((item, idx) => {
+              const total = item.data.reduce((s, d) => s + d.value, 0);
+              return (
+                <tr key={idx} className="border-b border-border/30 hover:bg-secondary/20">
+                  <td className="p-3 text-sm whitespace-nowrap sticky left-0 bg-card truncate max-w-[240px]" title={item.label}>
+                    {item.label}
+                  </td>
+                  {data.periods.map(p => {
+                    const found = item.data.find(d => d.period === p);
+                    const val = found?.value ?? 0;
+                    return (
+                      <td key={p} className="text-right p-3 tabular-nums text-sm">
+                        {val === 0 ? '—' : formatBrl(val)}
+                      </td>
+                    );
+                  })}
+                  <td className="text-right p-3 tabular-nums text-sm font-semibold">
+                    {formatBrl(total)}
+                  </td>
+                </tr>
+              );
+            })}
+            {/* Total row */}
+            <tr className="border-t-2 border-border bg-primary/5 font-bold">
+              <td className="p-3 text-sm sticky left-0 bg-card">Total</td>
+              {data.periods.map(p => {
+                const periodTotal = sortedDetails.reduce((s, item) => {
+                  const found = item.data.find(d => d.period === p);
+                  return s + (found?.value ?? 0);
+                }, 0);
+                return (
+                  <td key={p} className="text-right p-3 tabular-nums text-sm">
+                    {formatBrl(periodTotal)}
+                  </td>
+                );
+              })}
+              <td className="text-right p-3 tabular-nums text-sm font-bold">
+                {formatBrl(sortedDetails.reduce((s, item) => s + item.data.reduce((ss, d) => ss + d.value, 0), 0))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-[10px] text-muted-foreground text-center pt-2">
+        Valores em R$ · Fonte: Dados Bancários (Oxy Finance) · Período: {startDate} a {endDate}
+      </p>
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type CfSource = 'model' | 'db';
+type CfSource = 'model' | 'db' | 'banking';
 
 export default function CashFlow() {
   const { scenario, pnlTree, model, assumptions, setAssumptions, filteredYears } = useFinancialModel();
@@ -376,173 +577,191 @@ export default function CashFlow() {
               <Database className="h-3.5 w-3.5" />
               Realizado
             </button>
+            <button
+              onClick={() => setCfSource('banking')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all duration-200 ${
+                cfSource === 'banking'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Bancário
+            </button>
           </div>
         </div>
       </div>
 
-      {/* PMR Panel */}
-      <div className="gradient-card">
-        <button
-          className="w-full flex items-center justify-between p-5 text-left"
-          onClick={() => setPmrOpen(o => !o)}
-        >
-          <div>
-            <h3 className="text-sm font-semibold">Prazo Médio de Recebimento (PMR)</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              CaaS {assumptions.pmrConfig.caas}d · SaaS {assumptions.pmrConfig.saas}d · Education {assumptions.pmrConfig.education}d · BaaS {assumptions.pmrConfig.baas}d
-            </p>
-          </div>
-          {pmrOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-        </button>
+      {/* Banking view */}
+      {cfSource === 'banking' ? (
+        <OxyBankingView startDate="2025-01-01" endDate="2025-12-31" />
+      ) : (
+        <>
+          {/* PMR Panel */}
+          <div className="gradient-card">
+            <button
+              className="w-full flex items-center justify-between p-5 text-left"
+              onClick={() => setPmrOpen(o => !o)}
+            >
+              <div>
+                <h3 className="text-sm font-semibold">Prazo Médio de Recebimento (PMR)</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  CaaS {assumptions.pmrConfig.caas}d · SaaS {assumptions.pmrConfig.saas}d · Education {assumptions.pmrConfig.education}d · BaaS {assumptions.pmrConfig.baas}d
+                </p>
+              </div>
+              {pmrOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            </button>
 
-        {pmrOpen && (
-          <div className="px-5 pb-5 border-t border-border pt-4 space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {(['caas', 'saas', 'education', 'baas'] as const).map(bu => (
-                <div key={bu} className="space-y-1">
-                  <p className="text-xs text-muted-foreground capitalize">{bu} (dias)</p>
-                  {editingPmr ? (
-                    <input
-                      type="number"
-                      min="0"
-                      max="180"
-                      className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={pmrDraft[bu]}
-                      onChange={e => setPmrDraft(p => ({ ...p, [bu]: Number(e.target.value) || 0 }))}
-                    />
-                  ) : (
-                    <p className="text-sm font-semibold">{assumptions.pmrConfig[bu]} dias</p>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex gap-2">
-              {editingPmr ? (
-                <>
-                  <button onClick={savePmr} className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                    Salvar PMR
-                  </button>
-                  <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(false); }} className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
-                    Cancelar
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(true); }} className="px-3 py-1.5 text-xs font-semibold border border-primary/40 rounded-lg text-primary hover:bg-primary/10 transition-colors">
-                  Editar PMR
-                </button>
-              )}
-            </div>
-
-            {/* Receivables change preview */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-1.5 text-muted-foreground font-medium">Variação de Recebíveis</th>
-                    {activeYears.map(y => (
-                      <th key={y} className="text-right py-1.5 text-muted-foreground font-medium min-w-[90px]">{y}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="py-1.5 font-medium">Delta Contas a Receber</td>
-                    {activeYears.map(y => {
-                      const val = receivablesChange[y] ?? 0;
-                      return (
-                        <td key={y} className={`text-right py-1.5 tabular-nums ${val < 0 ? 'text-negative' : 'text-positive'}`}>
-                          {val === 0 ? '—' : formatCurrency(val * 1000)}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Expandable Table */}
-      <div className="gradient-card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">
-                Descrição
-              </th>
-              {activeYears.map(y => {
-                const isDb = cfSource === 'db';
-                return (
-                  <th key={y} className="text-right p-3 text-muted-foreground font-medium min-w-[110px]">
-                    <div className="flex flex-col items-end gap-0.5">
-                      <span>{y}</span>
-                      {isDb && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 tracking-wide">
-                          Realizado
-                        </span>
+            {pmrOpen && (
+              <div className="px-5 pb-5 border-t border-border pt-4 space-y-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {(['caas', 'saas', 'education', 'baas'] as const).map(bu => (
+                    <div key={bu} className="space-y-1">
+                      <p className="text-xs text-muted-foreground capitalize">{bu} (dias)</p>
+                      {editingPmr ? (
+                        <input
+                          type="number"
+                          min="0"
+                          max="180"
+                          className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                          value={pmrDraft[bu]}
+                          onChange={e => setPmrDraft(p => ({ ...p, [bu]: Number(e.target.value) || 0 }))}
+                        />
+                      ) : (
+                        <p className="text-sm font-semibold">{assumptions.pmrConfig[bu]} dias</p>
                       )}
                     </div>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  {editingPmr ? (
+                    <>
+                      <button onClick={savePmr} className="px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                        Salvar PMR
+                      </button>
+                      <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(false); }} className="px-3 py-1.5 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => { setPmrDraft(assumptions.pmrConfig); setEditingPmr(true); }} className="px-3 py-1.5 text-xs font-semibold border border-primary/40 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                      Editar PMR
+                    </button>
+                  )}
+                </div>
+
+                {/* Receivables change preview */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-1.5 text-muted-foreground font-medium">Variação de Recebíveis</th>
+                        {activeYears.map(y => (
+                          <th key={y} className="text-right py-1.5 text-muted-foreground font-medium min-w-[90px]">{y}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td className="py-1.5 font-medium">Delta Contas a Receber</td>
+                        {activeYears.map(y => {
+                          const val = receivablesChange[y] ?? 0;
+                          return (
+                            <td key={y} className={`text-right py-1.5 tabular-nums ${val < 0 ? 'text-negative' : 'text-positive'}`}>
+                              {val === 0 ? '—' : formatCurrency(val * 1000)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Expandable Table */}
+          <div className="gradient-card overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[240px] sticky left-0 bg-card">
+                    Descrição
                   </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Saldo Inicial */}
-            <tr className="border-b border-border/30 bg-primary/5 font-bold">
-              <td className="p-3 sticky left-0 bg-card text-sm">Saldo Inicial</td>
-              {balanceData.map(d => (
-                <td key={d.year} className="text-right p-3 tabular-nums text-sm">
-                  {d.opening === 0 ? '—' : formatCurrency(d.opening * 1000)}
-                </td>
-              ))}
-            </tr>
+                  {activeYears.map(y => {
+                    const isDb = cfSource === 'db';
+                    return (
+                      <th key={y} className="text-right p-3 text-muted-foreground font-medium min-w-[110px]">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span>{y}</span>
+                          {isDb && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 tracking-wide">
+                              Realizado
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Saldo Inicial */}
+                <tr className="border-b border-border/30 bg-primary/5 font-bold">
+                  <td className="p-3 sticky left-0 bg-card text-sm">Saldo Inicial</td>
+                  {balanceData.map(d => (
+                    <td key={d.year} className="text-right p-3 tabular-nums text-sm">
+                      {d.opening === 0 ? '—' : formatCurrency(d.opening * 1000)}
+                    </td>
+                  ))}
+                </tr>
 
-            {/* Entradas & Saídas */}
-            {tree.map(row => (
-              <CashFlowExpandableRow key={row.code} row={row} depth={0} activeYears={activeYears} />
-            ))}
+                {/* Entradas & Saídas */}
+                {tree.map(row => (
+                  <CashFlowExpandableRow key={row.code} row={row} depth={0} activeYears={activeYears} />
+                ))}
 
-            {/* Saldo Final */}
-            <tr className="border-b border-border bg-primary/10 font-bold">
-              <td className="p-3 sticky left-0 bg-card text-sm text-foreground">Saldo Final</td>
-              {balanceData.map(d => (
-                <td key={d.year} className={`text-right p-3 tabular-nums text-sm ${d.closing < 0 ? 'text-negative' : 'text-positive'}`}>
-                  {formatCurrency(d.closing * 1000)}
-                </td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-      </div>
+                {/* Saldo Final */}
+                <tr className="border-b border-border bg-primary/10 font-bold">
+                  <td className="p-3 sticky left-0 bg-card text-sm text-foreground">Saldo Final</td>
+                  {balanceData.map(d => (
+                    <td key={d.year} className={`text-right p-3 tabular-nums text-sm ${d.closing < 0 ? 'text-negative' : 'text-positive'}`}>
+                      {formatCurrency(d.closing * 1000)}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-      {/* Waterfall Chart */}
-      <div className="gradient-card p-5">
-        <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Anual — Cascata (R$ mil)</h3>
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={waterfallData} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
-            <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
-            <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={formatAxis} />
-            <Tooltip
-              contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }}
-              labelStyle={{ color: 'hsl(210 40% 98%)', fontWeight: 700 }}
-              formatter={(v: number, name: string) => [formatCurrency(v * 1000), name]}
-            />
-            <ReferenceLine y={0} stroke="hsl(215 20% 55%)" strokeDasharray="3 3" />
-            <Bar dataKey="Entradas" fill="hsl(166 72% 28%)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Saídas" fill="hsl(0 72% 51%)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Saldo Líquido" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+          {/* Waterfall Chart */}
+          <div className="gradient-card p-5">
+            <h3 className="text-sm font-semibold mb-4">Fluxo de Caixa Anual — Cascata (R$ mil)</h3>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={waterfallData} barGap={4}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
+                <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
+                <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={formatAxis} />
+                <Tooltip
+                  contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }}
+                  labelStyle={{ color: 'hsl(210 40% 98%)', fontWeight: 700 }}
+                  formatter={(v: number, name: string) => [formatCurrency(v * 1000), name]}
+                />
+                <ReferenceLine y={0} stroke="hsl(215 20% 55%)" strokeDasharray="3 3" />
+                <Bar dataKey="Entradas" fill="hsl(166 72% 28%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Saídas" fill="hsl(0 72% 51%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Saldo Líquido" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-      <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ mil (000's) · {scenario} scenario · Fonte: {cfSource === 'db' ? 'Realizado (Banco DRE)' : 'Modelo de Projeção'}
-      </p>
+          <p className="text-[10px] text-muted-foreground text-center pt-2">
+            Valores em R$ mil (000's) · {scenario} scenario · Fonte: {cfSource === 'db' ? 'Realizado (Banco DRE)' : 'Modelo de Projeção'}
+          </p>
+        </>
+      )}
     </div>
   );
 }
