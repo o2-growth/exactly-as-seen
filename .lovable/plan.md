@@ -1,41 +1,26 @@
 
 
-# Plan: Cap Table Improvements
+# Menu Mobile - Diagnóstico
 
-## Changes to `src/pages/Valuation.tsx`
+## Situação atual do código
+O código está corretamente implementado:
+- **AppLayout** gerencia `sidebarOpen` state e passa props corretas
+- **AppHeader** tem o botão hamburger com `md:hidden` (visível apenas < 768px)
+- **AppSidebar** tem o overlay mobile com `mobileOpen && md:hidden`
 
-### 1. Shareholder Types
-Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
+O wiring está correto: `setSidebarOpen(true)` → `mobileOpen={sidebarOpen}` → overlay renderiza.
 
-### 2. Shares formatting with dots (pt-BR)
-Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
+## Possível problema
+O viewport atual do preview é **1017px**, que está acima do breakpoint `md` (768px). Nesse tamanho, o sidebar desktop aparece e o hamburger fica escondido — comportamento esperado.
 
-### 3. Input-driven % Ownership (% drives shares)
-Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
+Para testar mobile, clique no **ícone de celular** acima do preview para reduzir o viewport para ~375px. Nesse tamanho o hamburger deve aparecer.
 
-### 4. Total Shares widget
-Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+**Se mesmo assim não funcionar**, o problema pode ser que o botão hamburger existe mas não é visualmente perceptível (está em `text-muted-foreground` com borda fina). 
 
-### 5. One decimal place on % Ownership
-Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+## Plano de ajuste (caso confirme o bug)
+1. Aumentar destaque visual do hamburger no header mobile
+2. Garantir que o z-index do overlay (z-50) não conflite com outros elementos
+3. Testar em viewport 375px
 
-### 6. First row formatting
-Match the screenshot reference: consistent row styling with proper padding and alignment.
-
-## Data Model Change
-- Add `totalSharesPool` state (persisted to localStorage)
-- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
-- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
-
-## Default Data
-```
-Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
-Tiago Pisoni — Founder — 30.0% — 2024-01
-Rafael Fleck — Investor — 0.0%
-```
-
-## Files Changed
-| File | Change |
-|------|--------|
-| `src/pages/Valuation.tsx` | All changes above |
+Nenhuma alteração de código é necessária neste momento — o código está correto. O teste precisa ser feito em viewport mobile (< 768px).
 
