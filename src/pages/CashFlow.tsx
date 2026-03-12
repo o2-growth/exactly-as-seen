@@ -429,8 +429,9 @@ function buildCashFlowTreeFromOxy(data: import('@/hooks/useOxyCashFlow').OxyCash
 
 // ─── Banking view component ──────────────────────────────────────────────────
 
-function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: string }) {
-  const { data, loading, error } = useOxyCashFlow(startDate, endDate, true);
+function OxyBankingView({ historicalStart, historicalEnd, projectionStart, projectionEnd }: { historicalStart: string; historicalEnd: string; projectionStart: string; projectionEnd: string }) {
+  const { data, loading, error } = useOxyCashFlow(historicalStart, historicalEnd, true);
+  const { data: projData, loading: projLoading } = useOxyCashFlow(projectionStart, projectionEnd, true);
   const [detailView, setDetailView] = useState<'recebido' | 'pago'>('recebido');
 
   if (loading) {
@@ -452,8 +453,10 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
 
   if (!data) return null;
 
-  const { tree: oxyTree, balances: oxyBalances } = data
-    ? buildCashFlowTreeFromOxy(data)
+  // Use projection data for the expandable tree, historical for everything else
+  const projSource = projData || data;
+  const { tree: oxyTree, balances: oxyBalances } = projSource
+    ? buildCashFlowTreeFromOxy(projSource)
     : { tree: [], balances: [] };
 
   const waterfallMonthly = data ? data.chart.map(item => ({
@@ -706,7 +709,7 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
       </div>
 
       <p className="text-[10px] text-muted-foreground text-center pt-2">
-        Valores em R$ · Fonte: Dados Bancários (Oxy Finance) · Período: {startDate} a {endDate}
+        Valores em R$ · Fonte: Dados Bancários (Oxy Finance) · Período: {historicalStart} a {historicalEnd} (histórico) / {projectionStart} a {projectionEnd} (projeção)
       </p>
     </div>
   );
@@ -812,10 +815,16 @@ export default function CashFlow() {
       {/* Banking view */}
       {cfSource === 'banking' ? (() => {
         const now = new Date();
-        const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-        const endDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
-        const end = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-        return <OxyBankingView startDate={start} endDate={end} />;
+        // Historical: last 12 months
+        const histStart = new Date(now.getFullYear(), now.getMonth() - 12, 1);
+        const historicalStart = `${histStart.getFullYear()}-${String(histStart.getMonth() + 1).padStart(2, '0')}-01`;
+        const histEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const historicalEnd = `${histEndDate.getFullYear()}-${String(histEndDate.getMonth() + 1).padStart(2, '0')}-${String(histEndDate.getDate()).padStart(2, '0')}`;
+        // Projection: next 12 months
+        const projStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+        const projEndDate = new Date(now.getFullYear(), now.getMonth() + 12, 0);
+        const projectionEnd = `${projEndDate.getFullYear()}-${String(projEndDate.getMonth() + 1).padStart(2, '0')}-${String(projEndDate.getDate()).padStart(2, '0')}`;
+        return <OxyBankingView historicalStart={historicalStart} historicalEnd={historicalEnd} projectionStart={projStart} projectionEnd={projectionEnd} />;
       })(
       ) : (
         <>

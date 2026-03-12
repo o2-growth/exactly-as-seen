@@ -1,21 +1,41 @@
 
 
-# Separar período histórico e futuro na visão Bancária
+# Plan: Cap Table Improvements
 
-## Problema
-Atualmente toda a visão Bancária usa o mesmo range de datas (futuro). O usuário quer que apenas a **tabela de Projeção de Caixa** mostre dados futuros — os cards de resumo, gráficos e tabela de contrapartes devem mostrar dados históricos/recentes.
+## Changes to `src/pages/Valuation.tsx`
 
-## Solução
-Fazer **duas chamadas** à API Oxy com ranges diferentes:
+### 1. Shareholder Types
+Update `ShareholderType` from `'Founder' | 'Investor' | 'ESOP'` to `'Founder' | 'Investor' | 'SOP C-Level' | 'SOP Team'` and update the `<select>` options accordingly.
 
-1. **Dados históricos** (últimos 12 meses) → alimenta cards de resumo, gráfico mensal, cascata e tabela de contrapartes
-2. **Dados futuros** (próximos 12 meses) → alimenta apenas a tabela expandível de Projeção de Caixa
+### 2. Shares formatting with dots (pt-BR)
+Shares are already displayed via `formatNumber()` which uses `toLocaleString('pt-BR')` — this produces dots. The issue is the **input field** shows raw numbers. Will replace the shares `<Input type="number">` with a text input that formats with dots on display and strips non-digits on change.
 
-## Alterações em `src/pages/CashFlow.tsx`
+### 3. Input-driven % Ownership (% drives shares)
+Currently shares are the input and % is computed. Reverse this: make **% Ownership an editable input** and compute shares from `% * totalShares`. Add a **"Total Shares" widget** at the top of the cap table where the user sets the total pool (default 1,000,000). Each shareholder row gets a `%` input, and `shares = Math.round(totalShares * pct / 100)`.
 
-1. **`OxyBankingView`** passa a receber 4 props: `historicalStart`, `historicalEnd`, `projectionStart`, `projectionEnd`
-2. Dentro do componente, chamar `useOxyCashFlow` duas vezes — uma para histórico e outra para projeção
-3. Cards, gráficos e tabela de contrapartes usam os dados históricos
-4. Tabela "Projeção de Caixa — Visão Expandível" usa os dados de projeção (futuros)
-5. Na invocação (linha ~814), calcular as 4 datas: histórico = últimos 12 meses, projeção = próximos 12 meses
+### 4. Total Shares widget
+Add an editable field above the cap table: "Total Shares: [input]" stored in state + localStorage. Default: 1,000,000.
+
+### 5. One decimal place on % Ownership
+Already using `.toFixed(1)` — will ensure the input also constrains to one decimal.
+
+### 6. First row formatting
+Match the screenshot reference: consistent row styling with proper padding and alignment.
+
+## Data Model Change
+- Add `totalSharesPool` state (persisted to localStorage)
+- Change shareholder model: store `ownershipPct` (number) instead of `shares`; compute `shares = Math.round(totalSharesPool * ownershipPct / 100)`
+- Keep backward compat: on load, if old data has shares but no pct, derive pct from shares/total
+
+## Default Data
+```
+Pedro Albite — Founder — 70.0% — Entry Val 8 — 2017-08
+Tiago Pisoni — Founder — 30.0% — 2024-01
+Rafael Fleck — Investor — 0.0%
+```
+
+## Files Changed
+| File | Change |
+|------|--------|
+| `src/pages/Valuation.tsx` | All changes above |
 
