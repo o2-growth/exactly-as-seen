@@ -587,7 +587,7 @@ function OxyBankingView({ startDate, endDate }: { startDate: string; endDate: st
             </tbody>
           </table>
         </div>
-      )}
+      
 
       {/* Waterfall Chart */}
       {waterfallMonthly.length > 0 && (
