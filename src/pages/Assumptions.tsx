@@ -433,8 +433,8 @@ export default function Assumptions() {
       return updated;
     });
 
-    // Propagate December target to global model so the engine recalculates
-    updateModel(prev => ({
+    // Propagate December target directly (bypass edit mode)
+    setAssumptions(prev => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
