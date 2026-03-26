@@ -503,8 +503,8 @@ export default function Assumptions() {
       return updated;
     });
 
-    // Propagate Dec target
-    updateModel(prev => ({
+    // Propagate Dec target directly (bypass edit mode)
+    setAssumptions(prev => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
