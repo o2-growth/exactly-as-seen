@@ -407,7 +407,6 @@ export default function Assumptions() {
     const currentGrowthArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
     const prevClients = computeProjectedClients(key, year, currentGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
     const prevVal = monthIdx > 0 ? prevClients[monthIdx - 1] : (() => {
-      // prevVal of first projected month = last historical
       if (year === 2026) {
         return Math.round(getMonthlyClients(key, 2026, data.subProductClients, data.tickets)[2]);
       }
@@ -420,54 +419,98 @@ export default function Assumptions() {
       backCalcGrowth = (newCount / prevVal) - 1 + monthlyChurn;
     }
 
+    // Build new growth array and compute resulting Dec target
+    const newGrowthArr = [...currentGrowthArr];
+    newGrowthArr[monthIdx] = backCalcGrowth;
+    const newMonthly = computeProjectedClients(key, year, newGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
+    const newDecTarget = newMonthly[11];
+
     setGrowthRates(prev => {
       const updated = { ...prev };
       const yearRates = { ...updated[year] };
-      const arr = [...(yearRates[key] ?? Array(12).fill(0.06))];
-      arr[monthIdx] = backCalcGrowth;
-      yearRates[key] = arr;
+      yearRates[key] = newGrowthArr;
       updated[year] = yearRates;
       return updated;
     });
+
+    // Propagate December target to global model so the engine recalculates
+    updateModel(prev => ({
+      ...prev,
+      subProductClients: {
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+      },
+    }));
   };
 
   const handleApplyAll = () => {
     const rate = applyAllPct / 100;
-    setGrowthRates(prev => {
-      const updated = { ...prev };
-      for (const y of YEARS) {
-        const yearRates = { ...updated[y] };
-        for (const group of CLIENTS_ROWS) {
-          for (const row of group.items) {
-            if (!row.dataKey) continue;
-            const k = row.dataKey;
-            const arr = [...(yearRates[k] ?? Array(12).fill(0.06))];
-            for (let m = 0; m < 12; m++) {
-              if (!isHistorical(y, m)) arr[m] = rate;
-            }
-            yearRates[k] = arr;
+    const newGrowthRates = { ...growthRates };
+    const subProductUpdates: Partial<Record<SubProductKey, Record<number, number>>> = {};
+
+    for (const y of YEARS) {
+      const yearRates = { ...newGrowthRates[y] };
+      for (const group of CLIENTS_ROWS) {
+        for (const row of group.items) {
+          if (!row.dataKey) continue;
+          const k = row.dataKey;
+          const arr = [...(yearRates[k] ?? Array(12).fill(0.06))];
+          for (let m = 0; m < 12; m++) {
+            if (!isHistorical(y, m)) arr[m] = rate;
           }
+          yearRates[k] = arr;
+          // Compute Dec target
+          const monthlyChurn = getChurnMonthly(k, data);
+          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets);
+          if (!subProductUpdates[k]) subProductUpdates[k] = {};
+          subProductUpdates[k]![y] = newMonthly[11];
         }
-        updated[y] = yearRates;
       }
-      return updated;
+      newGrowthRates[y] = yearRates;
+    }
+
+    setGrowthRates(newGrowthRates);
+
+    // Propagate all Dec targets
+    updateModel(prev => {
+      const newSPC = { ...prev.subProductClients };
+      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+        newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+      }
+      return { ...prev, subProductClients: newSPC };
     });
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
     const pct = rowApplyPct[key] ?? 6;
     const rate = pct / 100;
+    const currentArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
+    const arr = [...currentArr];
+    for (let m = 0; m < 12; m++) {
+      if (!isHistorical(year, m)) arr[m] = rate;
+    }
+
+    // Compute Dec target
+    const monthlyChurn = getChurnMonthly(key, data);
+    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets);
+    const newDecTarget = newMonthly[11];
+
     setGrowthRates(prev => {
       const updated = { ...prev };
       const yearRates = { ...updated[year] };
-      const arr = [...(yearRates[key] ?? Array(12).fill(0.06))];
-      for (let m = 0; m < 12; m++) {
-        if (!isHistorical(year, m)) arr[m] = rate;
-      }
       yearRates[key] = arr;
       updated[year] = yearRates;
       return updated;
     });
+
+    // Propagate Dec target
+    updateModel(prev => ({
+      ...prev,
+      subProductClients: {
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+      },
+    }));
   };
 
   // Used by Marketing tab actual-data table
