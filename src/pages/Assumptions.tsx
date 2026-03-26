@@ -484,17 +484,33 @@ export default function Assumptions() {
   const handleApplyRow = (key: SubProductKey, year: Year) => {
     const pct = rowApplyPct[key] ?? 6;
     const rate = pct / 100;
+    const currentArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
+    const arr = [...currentArr];
+    for (let m = 0; m < 12; m++) {
+      if (!isHistorical(year, m)) arr[m] = rate;
+    }
+
+    // Compute Dec target
+    const monthlyChurn = getChurnMonthly(key, data);
+    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets);
+    const newDecTarget = newMonthly[11];
+
     setGrowthRates(prev => {
       const updated = { ...prev };
       const yearRates = { ...updated[year] };
-      const arr = [...(yearRates[key] ?? Array(12).fill(0.06))];
-      for (let m = 0; m < 12; m++) {
-        if (!isHistorical(year, m)) arr[m] = rate;
-      }
       yearRates[key] = arr;
       updated[year] = yearRates;
       return updated;
     });
+
+    // Propagate Dec target
+    updateModel(prev => ({
+      ...prev,
+      subProductClients: {
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+      },
+    }));
   };
 
   // Used by Marketing tab actual-data table
