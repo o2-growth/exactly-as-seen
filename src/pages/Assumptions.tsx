@@ -445,24 +445,39 @@ export default function Assumptions() {
 
   const handleApplyAll = () => {
     const rate = applyAllPct / 100;
-    setGrowthRates(prev => {
-      const updated = { ...prev };
-      for (const y of YEARS) {
-        const yearRates = { ...updated[y] };
-        for (const group of CLIENTS_ROWS) {
-          for (const row of group.items) {
-            if (!row.dataKey) continue;
-            const k = row.dataKey;
-            const arr = [...(yearRates[k] ?? Array(12).fill(0.06))];
-            for (let m = 0; m < 12; m++) {
-              if (!isHistorical(y, m)) arr[m] = rate;
-            }
-            yearRates[k] = arr;
+    const newGrowthRates = { ...growthRates };
+    const subProductUpdates: Partial<Record<SubProductKey, Record<number, number>>> = {};
+
+    for (const y of YEARS) {
+      const yearRates = { ...newGrowthRates[y] };
+      for (const group of CLIENTS_ROWS) {
+        for (const row of group.items) {
+          if (!row.dataKey) continue;
+          const k = row.dataKey;
+          const arr = [...(yearRates[k] ?? Array(12).fill(0.06))];
+          for (let m = 0; m < 12; m++) {
+            if (!isHistorical(y, m)) arr[m] = rate;
           }
+          yearRates[k] = arr;
+          // Compute Dec target
+          const monthlyChurn = getChurnMonthly(k, data);
+          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets);
+          if (!subProductUpdates[k]) subProductUpdates[k] = {};
+          subProductUpdates[k]![y] = newMonthly[11];
         }
-        updated[y] = yearRates;
       }
-      return updated;
+      newGrowthRates[y] = yearRates;
+    }
+
+    setGrowthRates(newGrowthRates);
+
+    // Propagate all Dec targets
+    updateModel(prev => {
+      const newSPC = { ...prev.subProductClients };
+      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+        newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+      }
+      return { ...prev, subProductClients: newSPC };
     });
   };
 
