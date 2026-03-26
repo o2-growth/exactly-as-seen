@@ -106,9 +106,8 @@ export function getMonthlyClients(
   const ticket = ticketPrices?.[key] ?? STATIC_TICKET_FALLBACK[key];
 
   if (year === 2025) {
-    // Use real historical data for all 12 months of 2025
-    const hist = getHistoricalClients(key, 2025, ticket);
-    return hist.map(v => v ?? 0);
+    // Use actual client base data for 2025 — never derive from ticket
+    return [...SUB_PRODUCT_2025_DATA[key]];
   }
 
   if (year === 2026) {
