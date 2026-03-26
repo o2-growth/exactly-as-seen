@@ -448,7 +448,7 @@ export default function Assumptions() {
           yearRates[k] = arr;
           // Compute Dec target
           const monthlyChurn = getChurnMonthly(k, data);
-          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets);
+          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
           if (!subProductUpdates[k]) subProductUpdates[k] = {};
           subProductUpdates[k]![y] = newMonthly[11];
         }
@@ -477,7 +477,7 @@ export default function Assumptions() {
 
     // Compute Dec target
     const monthlyChurn = getChurnMonthly(key, data);
-    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets);
+    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
     const newDecTarget = newMonthly[11];
 
     setGrowthRates(prev => {
@@ -672,7 +672,7 @@ export default function Assumptions() {
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                       const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
                       const monthly: number[] = row.dataKey
-                        ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets)
+                        ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides)
                         : Array(12).fill(0);
                       const ticketVal = row.dataKey ? data.tickets[row.dataKey as TicketKey] ?? 0 : 0;
 
@@ -874,7 +874,7 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churn = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets);
+                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                   const newClients = monthly.map((val, i) => {
                     if (i === 0) {
                       let prevBase: number;
@@ -918,7 +918,7 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churnRate = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets);
+                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                   const churnClients = monthly.map((val, i) => {
                     const prev = i === 0
                       ? (selectedYear === 2025 ? 0 : selectedYear === 2026
@@ -959,7 +959,7 @@ export default function Assumptions() {
                     const rowKey = row.dataKey!;
                     const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                     const churnRate = getChurnMonthly(rowKey, data);
-                    const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets);
+                    const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                     for (let i = 0; i < 12; i++) {
                       const prev = i === 0
                         ? (selectedYear === 2025 ? 0 : selectedYear === 2026
