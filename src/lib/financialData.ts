@@ -29,6 +29,8 @@ export interface Assumptions {
   };
   // Item 1: Monthly ticket overrides (per product, per year, 12 months)
   monthlyTickets?: Partial<Record<TicketKey, Partial<Record<Year, number[]>>>>;
+  // Monthly client overrides — direct per-month client counts that bypass geometric interpolation
+  monthlyClientOverrides?: Partial<Record<TicketKey, Partial<Record<Year, (number | null)[]>>>>;
   churnCaas: number;
   churnSaas: number;
   churnBaas: number;

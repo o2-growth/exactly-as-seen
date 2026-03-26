@@ -186,8 +186,9 @@ function computeProjectedClients(
   monthlyChurn: number,
   subProductClients: SubProductClients,
   ticketPrices?: Partial<Record<SubProductKey, number>>,
+  monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
 ): number[] {
-  const historicalMonths = getMonthlyClients(key, year, subProductClients, ticketPrices).map(v => Math.round(v));
+  const historicalMonths = getMonthlyClients(key, year, subProductClients, ticketPrices, monthlyClientOverrides as any).map(v => Math.round(v));
 
   if (year === 2025) {
     return historicalMonths;
@@ -198,13 +199,20 @@ function computeProjectedClients(
     base = historicalMonths[2]; // Mar 2026 (index 2) — last historical month
   } else {
     const prevYear = (year - 1) as Year;
-    base = Math.round(getMonthlyClients(key, prevYear, subProductClients, ticketPrices)[11]);
+    base = Math.round(getMonthlyClients(key, prevYear, subProductClients, ticketPrices, monthlyClientOverrides as any)[11]);
   }
+
+  // Check for overrides for this product/year
+  const overrides = monthlyClientOverrides?.[key]?.[year];
 
   const result: number[] = [];
   let prev = base;
   for (let m = 0; m < 12; m++) {
-    if (isHistorical(year, m)) {
+    // If there's a direct override for this month, use it
+    if (overrides && overrides[m] !== null && overrides[m] !== undefined) {
+      result.push(overrides[m]!);
+      prev = overrides[m]!;
+    } else if (isHistorical(year, m)) {
       result.push(historicalMonths[m]);
       prev = historicalMonths[m];
     } else {
@@ -403,42 +411,21 @@ export default function Assumptions() {
   };
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
-    const monthlyChurn = getChurnMonthly(key, data);
-    const currentGrowthArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
-    const prevClients = computeProjectedClients(key, year, currentGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
-    const prevVal = monthIdx > 0 ? prevClients[monthIdx - 1] : (() => {
-      if (year === 2026) {
-        return Math.round(getMonthlyClients(key, 2026, data.subProductClients, data.tickets)[2]);
-      }
-      const prevYear = (year - 1) as Year;
-      return Math.round(getMonthlyClients(key, prevYear, data.subProductClients, data.tickets)[11]);
-    })();
+    // Direct override: store the value in monthlyClientOverrides
+    const currentOverrides = assumptions.monthlyClientOverrides ?? {};
+    const yearArr = currentOverrides[key as TicketKey]?.[year]
+      ? [...currentOverrides[key as TicketKey]![year]!]
+      : Array(12).fill(null);
+    yearArr[monthIdx] = newCount;
 
-    let backCalcGrowth = 0.06;
-    if (prevVal > 0) {
-      backCalcGrowth = (newCount / prevVal) - 1 + monthlyChurn;
-    }
-
-    // Build new growth array and compute resulting Dec target
-    const newGrowthArr = [...currentGrowthArr];
-    newGrowthArr[monthIdx] = backCalcGrowth;
-    const newMonthly = computeProjectedClients(key, year, newGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
-    const newDecTarget = newMonthly[11];
-
-    setGrowthRates(prev => {
-      const updated = { ...prev };
-      const yearRates = { ...updated[year] };
-      yearRates[key] = newGrowthArr;
-      updated[year] = yearRates;
-      return updated;
-    });
-
-    // Propagate December target directly (bypass edit mode)
     setAssumptions({
       ...assumptions,
-      subProductClients: {
-        ...assumptions.subProductClients,
-        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
+      monthlyClientOverrides: {
+        ...currentOverrides,
+        [key]: {
+          ...(currentOverrides[key as TicketKey] ?? {}),
+          [year]: yearArr,
+        },
       },
     });
   };
@@ -461,7 +448,7 @@ export default function Assumptions() {
           yearRates[k] = arr;
           // Compute Dec target
           const monthlyChurn = getChurnMonthly(k, data);
-          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets);
+          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
           if (!subProductUpdates[k]) subProductUpdates[k] = {};
           subProductUpdates[k]![y] = newMonthly[11];
         }
@@ -490,7 +477,7 @@ export default function Assumptions() {
 
     // Compute Dec target
     const monthlyChurn = getChurnMonthly(key, data);
-    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets);
+    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
     const newDecTarget = newMonthly[11];
 
     setGrowthRates(prev => {
@@ -685,7 +672,7 @@ export default function Assumptions() {
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                       const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
                       const monthly: number[] = row.dataKey
-                        ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets)
+                        ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides)
                         : Array(12).fill(0);
                       const ticketVal = row.dataKey ? data.tickets[row.dataKey as TicketKey] ?? 0 : 0;
 
@@ -887,13 +874,13 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churn = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets);
+                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                   const newClients = monthly.map((val, i) => {
                     if (i === 0) {
                       let prevBase: number;
                       if (selectedYear === 2025) prevBase = 0;
-                      else if (selectedYear === 2026) prevBase = Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11]);
-                      else prevBase = Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]);
+                      else if (selectedYear === 2026) prevBase = Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
+                      else prevBase = Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
                       return Math.max(0, val - prevBase);
                     }
                     return Math.max(0, val - monthly[i - 1]);
@@ -931,12 +918,12 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churnRate = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets);
+                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                   const churnClients = monthly.map((val, i) => {
                     const prev = i === 0
                       ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11])
-                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]))
+                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
+                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
                       : monthly[i - 1];
                     return Math.round(prev * churnRate);
                   });
@@ -972,12 +959,12 @@ export default function Assumptions() {
                     const rowKey = row.dataKey!;
                     const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                     const churnRate = getChurnMonthly(rowKey, data);
-                    const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets);
+                    const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                     for (let i = 0; i < 12; i++) {
                       const prev = i === 0
                         ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                          ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11])
-                          : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]))
+                          ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
+                          : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
                         : monthly[i - 1];
                       totalNew[i] += Math.max(0, monthly[i] - prev);
                       totalChurn[i] += Math.round(prev * churnRate);
