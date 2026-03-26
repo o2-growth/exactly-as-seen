@@ -418,16 +418,17 @@ export default function Assumptions() {
       : Array(12).fill(null);
     yearArr[monthIdx] = newCount;
 
-    setAssumptions({
-      ...assumptions,
+    console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, yearArr);
+    setAssumptions(prev => ({
+      ...prev,
       monthlyClientOverrides: {
-        ...currentOverrides,
+        ...(prev.monthlyClientOverrides ?? {}),
         [key]: {
-          ...(currentOverrides[key as TicketKey] ?? {}),
+          ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
           [year]: yearArr,
         },
       },
-    });
+    }));
   };
 
   const handleApplyAll = () => {
