@@ -96,7 +96,7 @@ export function useAssumptionsPersistence() {
         .eq('user_id', user.id);
 
       // Upsert active snapshot
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await (supabase as any)
         .from('assumptions_snapshots')
         .insert({
           user_id: user.id,
