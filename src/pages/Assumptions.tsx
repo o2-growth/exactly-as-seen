@@ -709,19 +709,19 @@ export default function Assumptions() {
                             const prodKey = row.dataKey as SubProductKey;
                             // Direct update functions — bypass lock/unlock, update assumptions directly
                             const directUpdateClients = (yearToUpdate: Year, val: number) => {
-                              setAssumptions({
-                                ...assumptions,
+                              setAssumptions(prev => ({
+                                ...prev,
                                 subProductClients: {
-                                  ...assumptions.subProductClients,
-                                  [prodKey]: { ...assumptions.subProductClients[prodKey], [yearToUpdate]: val },
+                                  ...prev.subProductClients,
+                                  [prodKey]: { ...prev.subProductClients[prodKey], [yearToUpdate]: val },
                                 },
-                              });
+                              }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              setAssumptions({
-                                ...assumptions,
-                                tickets: { ...assumptions.tickets, [prodKey]: val },
-                              });
+                              setAssumptions(prev => ({
+                                ...prev,
+                                tickets: { ...prev.tickets, [prodKey]: val },
+                              }));
                             };
                             return (
                             <tr className="border-b border-border/30">
