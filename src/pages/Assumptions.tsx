@@ -724,12 +724,10 @@ export default function Assumptions() {
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                            <input
-                                              type="number"
-                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
+                                            <MonthlyClientInput
                                               value={monthly[i]}
-                                              onClick={e => e.stopPropagation()}
-                                              onChange={e => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
+                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
+                                              onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
                                             />
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                                               {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
