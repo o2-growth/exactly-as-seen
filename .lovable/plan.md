@@ -1,27 +1,24 @@
 
 
-# Adicionar "Esqueci minha senha" à tela de login
+# Corrigir edição de clientes mensais no Assumptions
 
-## Resumo
-Adicionar link "Esqueci minha senha" na tela de login e criar página `/reset-password` para definir nova senha.
+## Problema
+Os inputs de clientes mensais (grid 12 meses) estão com `value={monthly[i]}` ligado a um valor **calculado/derivado**. Quando o usuário digita, o `onChange` atualiza `growthRates`, o componente re-renderiza, e `monthly[i]` é recalculado com arredondamentos — fazendo o valor "voltar" ou piscar. O input nunca mantém o que o usuário digitou.
 
-## Alterações
+## Solução
+Usar estado local temporário no input (padrão do `InlineEditCell` já existente no projeto): o usuário edita livremente e o valor só é commitado no `blur` ou `Enter`.
 
-### 1. `src/pages/Auth.tsx`
-- Adicionar estado `isForgotPassword` para alternar entre login/signup/forgot
-- No modo "forgot": exibir apenas campo de email + botão "Enviar link de recuperação"
-- Chamar `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
-- Adicionar link "Esqueceu sua senha?" abaixo do campo de senha (visível apenas no modo login)
-- Manter identidade visual (Space Grotesk, card com borda, cores do tema)
+## Alteração
 
-### 2. `src/pages/ResetPassword.tsx` (novo)
-- Página pública (fora do ProtectedRoute) na rota `/reset-password`
-- Detectar token de recovery no URL hash (`type=recovery`)
-- Formulário para digitar nova senha + confirmação
-- Chamar `supabase.auth.updateUser({ password })`
-- Após sucesso, redirecionar para `/auth`
-- Mesma identidade visual da tela de login
+### `src/pages/Assumptions.tsx`
+1. Criar um pequeno componente interno `MonthlyClientInput` que:
+   - Recebe `value` (computed) e `onCommit` (callback)
+   - Mantém `localValue` em estado interno
+   - Sincroniza `localValue` com `value` via `useEffect` (quando não está em foco)
+   - No `onChange`: atualiza apenas `localValue`
+   - No `onBlur` / `Enter`: chama `onCommit(localValue)` → que dispara `handleClientChange`
+   
+2. Substituir o `<input>` nas linhas ~727-733 pelo novo `MonthlyClientInput`
 
-### 3. `src/App.tsx`
-- Adicionar rota `/reset-password` apontando para `ResetPassword` (rota pública, fora do ProtectedRoute)
+Isso segue exatamente o mesmo padrão do `InlineEditCell` já usado no projeto.
 
