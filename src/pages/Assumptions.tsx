@@ -460,11 +460,13 @@ export default function Assumptions() {
     setGrowthRates(newGrowthRates);
 
     // Propagate all Dec targets directly (bypass edit mode)
-    const newSPC = { ...assumptions.subProductClients };
-    for (const [k, yearMap] of Object.entries(subProductUpdates)) {
-      newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
-    }
-    setAssumptions({ ...assumptions, subProductClients: newSPC });
+    setAssumptions(prev => {
+      const newSPC = { ...prev.subProductClients };
+      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+        newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+      }
+      return { ...prev, subProductClients: newSPC };
+    });
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
