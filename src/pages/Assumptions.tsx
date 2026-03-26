@@ -830,16 +830,16 @@ export default function Assumptions() {
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
                                                   yearArr[i] = v;
-                                                  setAssumptions(prev => ({
-                                                    ...prev,
+                                                  setAssumptions({
+                                                    ...assumptions,
                                                     monthlyTickets: {
-                                                      ...prev.monthlyTickets,
+                                                      ...assumptions.monthlyTickets,
                                                       [prodKey]: {
-                                                        ...(prev.monthlyTickets?.[prodKey] ?? {}),
+                                                        ...(assumptions.monthlyTickets?.[prodKey] ?? {}),
                                                         [selectedYear]: yearArr,
                                                       },
                                                     },
-                                                  }));
+                                                  });
                                                 }}
                                               />
                                             )}
