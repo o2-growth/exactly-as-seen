@@ -492,13 +492,13 @@ export default function Assumptions() {
     });
 
     // Propagate Dec target directly (bypass edit mode)
-    setAssumptions({
-      ...assumptions,
+    setAssumptions(prev => ({
+      ...prev,
       subProductClients: {
-        ...assumptions.subProductClients,
-        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
       },
-    });
+    }));
   };
 
   // Used by Marketing tab actual-data table
