@@ -471,8 +471,8 @@ export default function Assumptions() {
 
     setGrowthRates(newGrowthRates);
 
-    // Propagate all Dec targets
-    updateModel(prev => {
+    // Propagate all Dec targets directly (bypass edit mode)
+    setAssumptions(prev => {
       const newSPC = { ...prev.subProductClients };
       for (const [k, yearMap] of Object.entries(subProductUpdates)) {
         newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
