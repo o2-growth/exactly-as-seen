@@ -1,4 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+/** Input with local state buffer — commits on blur/Enter, syncs when not focused */
+function MonthlyClientInput({ value, onCommit, className }: { value: number; onCommit: (v: number) => void; className?: string }) {
+  const [local, setLocal] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setLocal(value); }, [value]);
+  const commit = () => { focused.current = false; if (local !== value) onCommit(local); };
+  return (
+    <input
+      type="number"
+      className={className}
+      value={local}
+      onClick={e => e.stopPropagation()}
+      onFocus={() => { focused.current = true; }}
+      onChange={e => setLocal(Number(e.target.value) || 0)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
+    />
+  );
+}
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Year, Assumptions as AssumptionsType, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients } from '@/lib/financialData';
