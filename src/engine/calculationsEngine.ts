@@ -103,18 +103,6 @@ export interface FullModelOutput {
 }
 
 // ─── HELPER: Get monthly clients for a product ───
-// Uses the unified getMonthlyClients from monthlyData.ts for consistency with the UI
-
-import { getMonthlyClients as getMonthlyClientsFromData } from '@/lib/monthlyData';
-
-type SubProductKey = keyof Assumptions['subProductClients'];
-
-const BU_PRODUCT_TO_SUBKEY: Record<string, SubProductKey> = {
-  'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
-  'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
-  'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio',
-  'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
-};
 
 function getDecClients2025(bu: string, product: string): number {
   const buData = (clientsBase2025 as any)[bu];
@@ -129,12 +117,29 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
     return arr ? arr[month] : 0;
   }
 
-  const subKey = BU_PRODUCT_TO_SUBKEY[`${bu}.${product}`];
+  // For years > 2025: interpolate from previous year-end to current year-end
+  const keyMap: Record<string, string> = {
+    'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
+    'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
+    'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio',
+    'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
+  };
+  const subKey = keyMap[`${bu}.${product}`];
   if (!subKey) return 0;
 
-  // Use the same function as the UI for geometric interpolation
-  const monthlyArr = getMonthlyClientsFromData(subKey, year as Year, assumptions.subProductClients, assumptions.tickets);
-  return monthlyArr[month];
+  const prevYear = (year - 1) as Year;
+  let startClients: number;
+  if (prevYear === 2025) {
+    startClients = getDecClients2025(bu, product);
+  } else if (YEARS.includes(prevYear)) {
+    startClients = (assumptions.subProductClients as any)[subKey]?.[prevYear] ?? 0;
+  } else {
+    startClients = 0;
+  }
+
+  const endClients = (assumptions.subProductClients as any)[subKey]?.[year] ?? 0;
+  // Linear interpolation within the year
+  return startClients + (endClients - startClients) * ((month + 1) / 12);
 }
 
 // ─── TICKET HELPER (Item 1: monthly ticket overrides) ───
