@@ -91,6 +91,7 @@ export function getMonthlyClients(
   year: Year,
   subProductClients: SubProductClients,
   ticketPrices?: Partial<Record<SubProductKey, number>>,
+  monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
 ): number[] {
   // Determine the ticket price for this sub-product
   const STATIC_TICKET_FALLBACK: Record<SubProductKey, number> = {
