@@ -1,4 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+/** Input with local state buffer — commits on blur/Enter, syncs when not focused */
+function MonthlyClientInput({ value, onCommit, className }: { value: number; onCommit: (v: number) => void; className?: string }) {
+  const [local, setLocal] = useState(value);
+  const focused = useRef(false);
+  useEffect(() => { if (!focused.current) setLocal(value); }, [value]);
+  const commit = () => { focused.current = false; if (local !== value) onCommit(local); };
+  return (
+    <input
+      type="number"
+      className={className}
+      value={local}
+      onClick={e => e.stopPropagation()}
+      onFocus={() => { focused.current = true; }}
+      onChange={e => setLocal(Number(e.target.value) || 0)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur(); } }}
+    />
+  );
+}
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Year, Assumptions as AssumptionsType, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients } from '@/lib/financialData';
@@ -724,12 +744,10 @@ export default function Assumptions() {
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                            <input
-                                              type="number"
-                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
+                                            <MonthlyClientInput
                                               value={monthly[i]}
-                                              onClick={e => e.stopPropagation()}
-                                              onChange={e => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
+                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
+                                              onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
                                             />
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                                               {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
