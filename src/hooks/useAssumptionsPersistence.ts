@@ -40,7 +40,7 @@ export function useAssumptionsPersistence() {
         return null;
       }
 
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('*')
         .order('updated_at', { ascending: false });
