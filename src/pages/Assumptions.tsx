@@ -231,6 +231,7 @@ export default function Assumptions() {
 
   const [showGrowthPct, setShowGrowthPct] = useState(false);
   const [editingClients, setEditingClients] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
   const [hcViewMode, setHcViewMode] = useState<'people' | 'cost'>('people');
 
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
@@ -584,242 +585,136 @@ export default function Assumptions() {
         {/* ─── TAB 1: RECEITA ─── */}
         <TabsContent value="receita" className="space-y-6 mt-4">
 
-          {/* ── Section 0: Revenue Expandable Monthly (like screenshot) ── */}
-          {(() => {
-            const yr = model.years[selectedYear];
-            const md = yr.monthlyData;
-            const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-            const colHeaders = ['Meta', 'MRR Base', 'Receita Bruta', 'Clientes', 'CaaS', 'SaaS', 'Education', 'Expansão'];
-
-            const monthRows = MONTH_LABELS.map((label, i) => {
-              const m = md[i];
-              const grossRev = m.grossRevenue * 1000;
-              const isHist = isHistorical(selectedYear, i);
-              // Meta = receita bruta mensal do cenário BASE para comparação
-              const metaRev = grossRev;
-              // MRR base = recurring revenue (excl setup)
-              const mrrBase = (m.caasRevenue + m.saasRevenue + m.educationRevenue + m.baasRevenue) * 1000;
-
-              return {
-                month: label,
-                monthIdx: i,
-                isHistorical: isHist,
-                columns: [
-                  { key: 'meta', value: Math.round(metaRev), editable: false },
-                  { key: 'mrrBase', value: Math.round(mrrBase), editable: false },
-                  { key: 'grossRev', value: Math.round(grossRev), editable: false },
-                  { key: 'clients', value: Math.round(m.totalClients), editable: false },
-                  { key: 'caas', value: Math.round(m.caasRevenue * 1000), editable: false },
-                  { key: 'saas', value: Math.round(m.saasRevenue * 1000), editable: false },
-                  { key: 'edu', value: Math.round(m.educationRevenue * 1000), editable: false },
-                  { key: 'baas', value: Math.round(m.baasRevenue * 1000), editable: false },
-                ],
-                detail: {
-                  meta: Math.round(metaRev),
-                  realizado: Math.round(grossRev),
-                  funnel: [
-                    { label: 'CaaS', meta: Math.round(m.caasRevenue * 1000 * 1.1), actual: Math.round(m.caasRevenue * 1000) },
-                    { label: 'SaaS', meta: Math.round(m.saasRevenue * 1000 * 1.1), actual: Math.round(m.saasRevenue * 1000) },
-                    { label: 'Education', meta: Math.round(m.educationRevenue * 1000 * 1.1), actual: Math.round(m.educationRevenue * 1000) },
-                    { label: 'Expansão', meta: Math.round(m.baasRevenue * 1000 * 1.1), actual: Math.round(m.baasRevenue * 1000) },
-                    { label: 'Clientes', meta: Math.round(m.totalClients * 1.1), actual: Math.round(m.totalClients) },
-                    { label: 'EBITDA', meta: Math.round(m.ebitda * 1000 * 1.1), actual: Math.round(m.ebitda * 1000) },
-                  ],
-                },
-              };
-            });
-
-            const totalRow = colHeaders.map((h, ci) => ({
-              key: h,
-              value: monthRows.reduce((s, r) => s + r.columns[ci].value, 0),
-            }));
-
-            return (
-              <ExpandableMonthTable
-                title="Revenue Mensal"
-                year={selectedYear}
-                columnHeaders={colHeaders}
-                rows={monthRows}
-                formatValue={formatCurrencyFull}
-                totals={totalRow}
-              />
-            );
-          })()}
-
-          {/* ── Section 1: Nº de Clientes + % Crescimento (unified table) ── */}
+          {/* ── Section 1: Nº de Clientes — Expandable Rows ── */}
           <div className="gradient-card overflow-x-auto">
             <div className="flex items-center gap-2 p-5 pb-3 flex-wrap">
               <h3 className="text-sm font-semibold">Número de Clientes — {selectedYear}</h3>
-              <div className="ml-auto flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setEditingClients(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${
-                    editingClients
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
-                  }`}
-                >
-                  <Pencil className="h-3 w-3" />
-                  {editingClients ? 'Editando' : 'Editar'}
-                </button>
-                <button
-                  onClick={() => setShowGrowthPct(v => !v)}
-                  className={`px-3 py-1 text-xs font-medium rounded-md border transition-colors whitespace-nowrap ${
-                    showGrowthPct
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-secondary text-muted-foreground border-border hover:text-foreground'
-                  }`}
-                >
-                  % Crescimento
-                </button>
-                {showGrowthPct && editingClients && (
-                  <>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="w-16 bg-secondary border border-border rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={applyAllPct}
-                      onChange={e => setApplyAllPct(Number(e.target.value) || 0)}
-                    />
-                    <span className="text-xs text-muted-foreground">%</span>
-                    <button
-                      onClick={handleApplyAll}
-                      className="px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary border border-primary/30 rounded-md hover:bg-primary/20 transition-colors whitespace-nowrap"
-                    >
-                      Aplicar para todos
-                    </button>
-                  </>
-                )}
-              </div>
+              <p className="text-[10px] text-muted-foreground ml-2">Clique na linha para expandir e editar</p>
             </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
-                  <th className="text-left p-2 text-muted-foreground font-medium min-w-[170px]" rowSpan={2}>Sub-Produto</th>
-                  {MONTHS.map((m, i) => (
-                    <th
-                      key={m}
-                      colSpan={showGrowthPct ? 2 : 1}
-                      className={`text-center p-2 text-muted-foreground font-medium${showGrowthPct ? ' border-b border-border/30' : ''}${selectedYear === 2026 && i === 2 ? ' border-l-2 border-primary/40' : ''}`}
-                    >
-                      {m}
-                    </th>
+                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Sub-Produto</th>
+                  {activeYears.map(y => (
+                    <th key={y} className={`text-right p-3 text-muted-foreground font-medium min-w-[80px] ${y === selectedYear ? 'bg-primary/5' : ''}`}>{y}</th>
                   ))}
-                  <th className="text-right p-2 text-muted-foreground font-medium min-w-[60px]" rowSpan={showGrowthPct ? 2 : 1}>Total</th>
-                  {showGrowthPct && <th className="text-right p-2 text-muted-foreground font-medium min-w-[80px]" rowSpan={2}>Aplicar %</th>}
+                  <th className="text-right p-3 text-muted-foreground font-medium min-w-[80px]">Ticket</th>
                 </tr>
-                {showGrowthPct && (
-                <tr className="border-b border-border">
-                  {MONTHS.map((_, i) => (
-                    <React.Fragment key={i}>
-                      <th className={`text-right px-1 py-1 text-[10px] text-muted-foreground/70 font-medium min-w-[48px]${selectedYear === 2026 && i === 2 ? ' border-l-2 border-primary/40' : ''}`}>Nº</th>
-                      <th className="text-right px-1 py-1 text-[10px] text-muted-foreground/70 font-medium min-w-[48px]">%</th>
-                    </React.Fragment>
-                  ))}
-                </tr>
-                )}
               </thead>
               <tbody>
                 {CLIENTS_ROWS.map(group => (
                   <React.Fragment key={group.group}>
                     <tr className="bg-secondary/40 border-b border-border/50">
-                      <td colSpan={showGrowthPct ? 27 : 15} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
+                      <td colSpan={activeYears.length + 2} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
                         {group.group}
                       </td>
                     </tr>
                     {group.items.map(row => {
                       const rowKey = row.dataKey ?? row.label;
+                      const isExpanded = expandedProducts[rowKey] ?? false;
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                       const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
                       const monthly: number[] = row.dataKey
                         ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets)
                         : Array(12).fill(0);
-                      const totalYear = monthly.reduce((s, v) => s + v, 0);
+                      const ticketVal = row.dataKey ? data.tickets[row.dataKey as TicketKey] ?? 0 : 0;
 
                       return (
-                        <tr key={`${group.group}-${row.label}`} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                          <td className="p-2 pl-5 font-medium text-xs">{row.label}</td>
-                          {MONTHS.map((_, i) => {
-                            const hist = isHistorical(selectedYear, i);
-                            const cutoff = selectedYear === 2026 && i === 2;
-
-                            // Compute growth % for display
-                            let growthPct: string;
-                            if (hist) {
-                              const prev = i > 0 ? monthly[i - 1] : (() => {
-                                if (!row.dataKey || selectedYear === 2025) return 0;
-                                if (selectedYear === 2026) {
-                                  return Math.round(getMonthlyClients(row.dataKey, 2025, data.subProductClients)[11]);
-                                }
-                                return Math.round(getMonthlyClients(row.dataKey, (selectedYear - 1) as Year, data.subProductClients)[11]);
-                              })();
-                              growthPct = (!row.dataKey || prev === 0) ? '—' : (((monthly[i] / prev) - 1) * 100).toFixed(1) + '%';
-                            } else {
-                              growthPct = (growthArr[i] * 100).toFixed(1) + '%';
-                            }
-
-                            return (
-                              <React.Fragment key={i}>
-                                {/* Nº column */}
-                                <td className={`text-right px-1 py-1 tabular-nums text-xs${cutoff ? ' border-l-2 border-primary/40' : ''}${hist ? ' bg-secondary/30 text-muted-foreground' : ''}`}>
-                                  {editingClients && !hist && row.dataKey ? (
-                                    <input
-                                      type="number"
-                                      className="w-12 bg-transparent border border-primary/20 rounded px-1 py-0.5 text-right text-[11px] tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary focus:bg-secondary/50"
-                                      value={monthly[i]}
-                                      onChange={e => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
-                                    />
-                                  ) : (
-                                    monthly[i].toLocaleString('pt-BR')
-                                  )}
-                                </td>
-                                {/* % column (conditional) */}
-                                {showGrowthPct && (
-                                <td className={`text-right px-1 py-1 tabular-nums text-[10px]${hist ? ' bg-secondary/30 text-muted-foreground/60' : ' text-muted-foreground'}`}>
-                                  {editingClients && !hist && row.dataKey ? (
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      className="w-12 bg-transparent border border-primary/10 rounded px-1 py-0.5 text-right text-[10px] tabular-nums text-primary/80 outline-none focus:ring-1 focus:ring-primary focus:bg-secondary/50"
-                                      value={(growthArr[i] * 100).toFixed(1)}
-                                      onChange={e => handleGrowthChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
-                                    />
-                                  ) : (
-                                    <span>{growthPct}</span>
-                                  )}
-                                </td>
-                                )}
-                              </React.Fragment>
-                            );
-                          })}
-                          {/* Total column */}
-                          <td className="text-right px-2 py-1 tabular-nums text-xs font-semibold bg-primary/5">
-                            {totalYear.toLocaleString('pt-BR')}
-                          </td>
-                          {/* Apply % per row (conditional) */}
-                          {showGrowthPct && (
-                          <td className="text-right px-1 py-1">
-                            {editingClients && row.dataKey ? (
-                              <div className="flex items-center justify-end gap-1">
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="w-11 bg-secondary border border-border rounded px-1 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                  value={rowApplyPct[rowKey] ?? 6}
-                                  onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
-                                />
-                                <button
-                                  onClick={() => handleApplyRow(row.dataKey as SubProductKey, selectedYear)}
-                                  className="px-1.5 py-0.5 text-[9px] font-medium bg-secondary border border-border rounded hover:bg-secondary/80 transition-colors"
-                                  title="Aplicar % a esta linha"
-                                >
-                                  OK
-                                </button>
+                        <React.Fragment key={`${group.group}-${row.label}`}>
+                          {/* Collapsed row — shows annual totals per year */}
+                          <tr
+                            className={`border-b border-border/20 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}
+                            onClick={() => setExpandedProducts(p => ({ ...p, [rowKey]: !p[rowKey] }))}
+                          >
+                            <td className="p-3 pl-5 font-medium text-sm">
+                              <div className="flex items-center gap-2">
+                                {row.dataKey ? (
+                                  isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                ) : <span className="w-3.5" />}
+                                {row.label}
                               </div>
-                            ) : null}
-                          </td>
+                            </td>
+                            {activeYears.map(y => (
+                              <td key={y} className={`text-right p-3 tabular-nums text-sm ${y === selectedYear ? 'bg-primary/5 font-semibold' : ''}`}>
+                                {row.dataKey ? (data.subProductClients[row.dataKey as SubProductKey]?.[y] ?? 0).toLocaleString('pt-BR') : '—'}
+                              </td>
+                            ))}
+                            <td className="text-right p-3 tabular-nums text-sm text-muted-foreground">
+                              {ticketVal > 0 ? `R$ ${ticketVal.toLocaleString('pt-BR')}` : '—'}
+                            </td>
+                          </tr>
+
+                          {/* Expanded detail — monthly breakdown with inline edit */}
+                          {isExpanded && row.dataKey && (
+                            <tr className="border-b border-border/30">
+                              <td colSpan={activeYears.length + 2} className="px-5 py-4 bg-secondary/5">
+                                {/* Monthly clients grid */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs font-semibold text-muted-foreground">Clientes mensais — {selectedYear}</p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] text-muted-foreground">Crescimento:</span>
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                        value={rowApplyPct[rowKey] ?? 6}
+                                        onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                      />
+                                      <span className="text-[10px] text-muted-foreground">%</span>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
+                                        className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                      >
+                                        Aplicar
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-12 gap-1.5">
+                                    {MONTHS.map((m, i) => {
+                                      const hist = isHistorical(selectedYear, i);
+                                      return (
+                                        <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
+                                          <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
+                                          {hist ? (
+                                            <p className="text-xs tabular-nums font-medium">{monthly[i].toLocaleString('pt-BR')}</p>
+                                          ) : (
+                                            <input
+                                              type="number"
+                                              className="w-full bg-transparent text-center text-xs tabular-nums font-medium text-foreground outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors"
+                                              value={monthly[i]}
+                                              onClick={e => e.stopPropagation()}
+                                              onChange={e => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
+                                            />
+                                          )}
+                                          <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                                            {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
+                                          </p>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  {/* Ticket + summary */}
+                                  <div className="flex items-center gap-6 pt-2 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-muted-foreground">Ticket:</span>
+                                      <input
+                                        type="number"
+                                        className="w-24 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                        value={ticketVal}
+                                        onClick={e => e.stopPropagation()}
+                                        onChange={e => row.dataKey && updateTicket(row.dataKey as TicketKey, Number(e.target.value) || 0)}
+                                      />
+                                    </div>
+                                    <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
+                                    <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
+                                    <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * ticketVal)}</strong></span>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
                           )}
-                        </tr>
+                        </React.Fragment>
                       );
                     })}
                   </React.Fragment>
