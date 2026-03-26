@@ -1,95 +1,42 @@
 
-# Corrigir de vez a lógica de clientes mensais e ticket no Assumptions
 
-## O problema real
-O comportamento da sua captura está errado por 3 motivos combinados:
+# Ajustar ticket por mês e corrigir edição travada
 
-1. **2025 está sendo tratado como histórico**, mas a UI ainda deixa digitar nos cards mensais. Então você coloca `5` em março e a tela recalcula tudo a partir do histórico, gerando números incoerentes.
-2. **Os clientes históricos estão sendo derivados de `receita / ticket`**. Isso faz o passado mudar quando você altera o ticket, o que não pode acontecer.
-3. **A tela e o motor usam lógicas diferentes**:
-   - a tela usa `computeProjectedClients` com crescimento/churn
-   - o motor usa interpolação linear em `calculationsEngine.ts`
-   
-Resultado: o que você vê no grid não bate com o que impacta receita, MRR e KPIs.
+## Problemas
 
-## Ajuste proposto
+1. **Ticket por mês no card expandido**: Quando você expande um produto (ex: Serviços Especializados), o ticket exibido é um campo único flat. Você quer poder definir tickets diferentes por mês (ex: Abril = 1500, Maio = 2000). O toggle "Editar por mês" existe na seção separada de Ticket Médio (mais abaixo na página), mas não está integrado no card expandido do produto.
 
-### 1. Travar meses históricos de verdade
-Em `src/pages/Assumptions.tsx`:
-- tornar **somente leitura** os meses históricos:
-  - todo 2025
-  - jan-fev-mar de 2026
-- mostrar visual de bloqueado e remover edição nesses meses
-- impedir o caso da sua captura: março/2025 não poderá mais “aceitar” valor e bagunçar a projeção
+2. **Cadeado impede edição**: O card expandido mostra meses históricos com 🔒, mas os meses projetados (editáveis) também podem não estar respondendo porque o `handleClientChange` depende do estado `editing` via `updateModel` — se você não clicou em "Edit Assumptions" primeiro, o `updateModel` não faz nada visível porque atualiza `editState` em vez de `assumptions`.
 
-### 2. Parar de recalcular histórico com base no ticket
-Em `src/lib/monthlyData.ts`:
-- separar claramente:
-  - **histórico real** = vem dos dados históricos
-  - **projeção editável** = vem das premissas
-- o ticket continuará afetando **receita**, mas **não** mudará contagem histórica de clientes
+## Solução
 
-### 3. Unificar a lógica mensal entre tela e engine
-Criar/centralizar uma única função de cálculo mensal e usá-la em:
-- `src/pages/Assumptions.tsx`
-- `src/engine/calculationsEngine.ts`
+### A. Ticket mensal no card expandido do produto
+No card expandido de cada produto (onde hoje tem um único input "Ticket R$/mês"):
+- Substituir o input único por um grid de 12 meses (igual ao grid de clientes)
+- Meses históricos ficam read-only com 🔒
+- Meses projetados ficam editáveis
+- Cada alteração atualiza `monthlyTickets` no assumptions, que o engine já lê via `getTicketForMonth()`
+- O MRR Dez e resumo se recalculam automaticamente usando o ticket do mês correspondente
 
-Assim:
-- editar mês projetado altera o mês
-- isso altera a curva do ano
-- isso altera receita/MRR/KPIs do modelo de forma consistente
+### B. Remover dependência do botão "Edit Assumptions" para edição inline
+O card expandido do produto já usa `directUpdateClients` e `directUpdateTicket` que bypassam o edit mode. Mas o `handleClientChange` (chamado pelo `MonthlyClientInput`) usa `updateModel` que depende do `editing` flag.
 
-### 4. Fazer a edição mensal realmente persistir no modelo
-Hoje editar mês só tenta empurrar efeito via dezembro. Vou ajustar para:
-- ao editar um mês projetado, recalcular a série mensal correta
-- persistir o resultado usado pelo modelo
-- manter o card anual, total do ano e MRR coerentes com o que foi digitado
+**Correção**: Fazer `handleClientChange` usar `setAssumptions` diretamente (como `directUpdateClients` já faz), em vez de `updateModel`. Assim a edição mensal de clientes funciona sem precisar clicar "Edit Assumptions".
 
-### 5. Corrigir a semântica do ticket
-O campo continuará como **Ticket (R$/mês)**, mas com comportamento correto:
-- ticket mensal afeta receita mensal
-- não reescreve histórico de clientes
-- resumo “MRR Dez” passa a refletir exatamente a mesma base usada pelo engine
+### C. Atualizar o MRR Dez para usar ticket mensal
+O resumo "MRR Dez" hoje faz `monthly[11] * ticketVal` com ticket flat. Passar a usar o ticket de dezembro quando `monthlyTickets` estiver ativo.
 
-## Arquivos principais
-- `src/pages/Assumptions.tsx`
-- `src/lib/monthlyData.ts`
-- `src/engine/calculationsEngine.ts`
-- possivelmente `src/lib/financialData.ts` se eu precisar guardar override mensal explícito
+## Arquivos a alterar
+
+### `src/pages/Assumptions.tsx`
+1. **`handleClientChange`** (linha ~437): trocar `updateModel(...)` por `setAssumptions(prev => ...)` direto
+2. **Card expandido** (linhas ~810-825): substituir input flat de ticket por grid de 12 meses com inputs individuais, usando `monthlyTickets`
+3. **Resumo MRR Dez**: usar ticket de dezembro (do monthlyTickets ou flat)
+4. **`handleApplyRow` e `handleApplyAll`**: mesma correção — usar `setAssumptions` direto
 
 ## Resultado esperado
-Depois do ajuste:
-- março/2025 não ficará mais “editável errado”
-- meses projetados passarão a funcionar de verdade
-- mudar cliente mensal impactará anual, receita e KPIs
-- mudar ticket impactará receita/MRR, sem distorcer histórico
+- Expandir produto → ver 12 inputs de ticket (meses projetados editáveis, históricos travados)
+- Alterar ticket de um mês → MRR e receita daquele mês mudam
+- Editar clientes mensais funciona sem precisar clicar "Edit Assumptions"
+- Tudo reflete no engine automaticamente
 
-## Validação que vou fazer na implementação
-Vou considerar concluído só quando estes cenários passarem:
-
-1. **Reproduzir sua captura**
-   - abrir CAAS > Serviços Especializados
-   - selecionar 2025
-   - confirmar que março histórico está bloqueado e não gera distorção
-
-2. **Teste funcional de projeção**
-   - selecionar um ano projetado
-   - editar um mês
-   - validar mudança em:
-     - total do ano
-     - dezembro
-     - MRR
-     - KPIs/resumo
-
-3. **Teste do ticket**
-   - alterar ticket mensal
-   - confirmar que:
-     - receita muda
-     - MRR muda
-     - histórico de clientes não muda
-
-4. **Teste de consistência**
-   - conferir se o monthly grid e o engine retornam os mesmos números
-
-## Detalhes técnicos
-Se a inconsistência principal vier do engine linear vs. tela com churn/crescimento, a correção central será **usar a mesma função mensal nos dois lados**, em vez de continuar convertendo edição mensal apenas em target de dezembro.
