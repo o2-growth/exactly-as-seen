@@ -403,42 +403,21 @@ export default function Assumptions() {
   };
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
-    const monthlyChurn = getChurnMonthly(key, data);
-    const currentGrowthArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
-    const prevClients = computeProjectedClients(key, year, currentGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
-    const prevVal = monthIdx > 0 ? prevClients[monthIdx - 1] : (() => {
-      if (year === 2026) {
-        return Math.round(getMonthlyClients(key, 2026, data.subProductClients, data.tickets)[2]);
-      }
-      const prevYear = (year - 1) as Year;
-      return Math.round(getMonthlyClients(key, prevYear, data.subProductClients, data.tickets)[11]);
-    })();
+    // Direct override: store the value in monthlyClientOverrides
+    const currentOverrides = assumptions.monthlyClientOverrides ?? {};
+    const yearArr = currentOverrides[key as TicketKey]?.[year]
+      ? [...currentOverrides[key as TicketKey]![year]!]
+      : Array(12).fill(null);
+    yearArr[monthIdx] = newCount;
 
-    let backCalcGrowth = 0.06;
-    if (prevVal > 0) {
-      backCalcGrowth = (newCount / prevVal) - 1 + monthlyChurn;
-    }
-
-    // Build new growth array and compute resulting Dec target
-    const newGrowthArr = [...currentGrowthArr];
-    newGrowthArr[monthIdx] = backCalcGrowth;
-    const newMonthly = computeProjectedClients(key, year, newGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
-    const newDecTarget = newMonthly[11];
-
-    setGrowthRates(prev => {
-      const updated = { ...prev };
-      const yearRates = { ...updated[year] };
-      yearRates[key] = newGrowthArr;
-      updated[year] = yearRates;
-      return updated;
-    });
-
-    // Propagate December target directly (bypass edit mode)
     setAssumptions({
       ...assumptions,
-      subProductClients: {
-        ...assumptions.subProductClients,
-        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
+      monthlyClientOverrides: {
+        ...currentOverrides,
+        [key]: {
+          ...(currentOverrides[key as TicketKey] ?? {}),
+          [year]: yearArr,
+        },
       },
     });
   };
