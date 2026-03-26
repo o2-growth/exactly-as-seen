@@ -879,8 +879,8 @@ export default function Assumptions() {
                     if (i === 0) {
                       let prevBase: number;
                       if (selectedYear === 2025) prevBase = 0;
-                      else if (selectedYear === 2026) prevBase = Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11]);
-                      else prevBase = Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]);
+                      else if (selectedYear === 2026) prevBase = Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
+                      else prevBase = Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
                       return Math.max(0, val - prevBase);
                     }
                     return Math.max(0, val - monthly[i - 1]);
@@ -922,8 +922,8 @@ export default function Assumptions() {
                   const churnClients = monthly.map((val, i) => {
                     const prev = i === 0
                       ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11])
-                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]))
+                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
+                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
                       : monthly[i - 1];
                     return Math.round(prev * churnRate);
                   });
@@ -963,8 +963,8 @@ export default function Assumptions() {
                     for (let i = 0; i < 12; i++) {
                       const prev = i === 0
                         ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                          ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients)[11])
-                          : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients)[11]))
+                          ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
+                          : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
                         : monthly[i - 1];
                       totalNew[i] += Math.max(0, monthly[i] - prev);
                       totalChurn[i] += Math.round(prev * churnRate);
