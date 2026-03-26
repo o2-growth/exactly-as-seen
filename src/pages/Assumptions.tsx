@@ -433,14 +433,14 @@ export default function Assumptions() {
       return updated;
     });
 
-    // Propagate December target to global model so the engine recalculates
-    updateModel(prev => ({
-      ...prev,
+    // Propagate December target directly (bypass edit mode)
+    setAssumptions({
+      ...assumptions,
       subProductClients: {
-        ...prev.subProductClients,
-        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+        ...assumptions.subProductClients,
+        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
       },
-    }));
+    });
   };
 
   const handleApplyAll = () => {
@@ -471,14 +471,12 @@ export default function Assumptions() {
 
     setGrowthRates(newGrowthRates);
 
-    // Propagate all Dec targets
-    updateModel(prev => {
-      const newSPC = { ...prev.subProductClients };
-      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
-        newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
-      }
-      return { ...prev, subProductClients: newSPC };
-    });
+    // Propagate all Dec targets directly (bypass edit mode)
+    const newSPC = { ...assumptions.subProductClients };
+    for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+      newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+    }
+    setAssumptions({ ...assumptions, subProductClients: newSPC });
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
@@ -503,14 +501,14 @@ export default function Assumptions() {
       return updated;
     });
 
-    // Propagate Dec target
-    updateModel(prev => ({
-      ...prev,
+    // Propagate Dec target directly (bypass edit mode)
+    setAssumptions({
+      ...assumptions,
       subProductClients: {
-        ...prev.subProductClients,
-        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+        ...assumptions.subProductClients,
+        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
       },
-    }));
+    });
   };
 
   // Used by Marketing tab actual-data table
@@ -807,21 +805,66 @@ export default function Assumptions() {
                                     </div>
                                   </div>
 
-                                  {/* Ticket + summary */}
-                                  <div className="flex items-center gap-6 pt-1 text-xs">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground">Ticket (R$/mês):</span>
-                                      <input
-                                        type="number"
-                                        className="w-24 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                        value={ticketVal}
-                                        onClick={e => e.stopPropagation()}
-                                        onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
-                                      />
+                                  {/* Ticket mensal + summary */}
+                                  <div className="space-y-2 pt-1">
+                                    <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        const monthTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-card border border-border/50'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            {hist ? (
+                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-not-allowed">
+                                                {formatCurrencyFull(monthTicket)}
+                                              </span>
+                                            ) : (
+                                              <MonthlyClientInput
+                                                value={monthTicket}
+                                                className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
+                                                onCommit={v => {
+                                                  // Initialize monthly tickets if needed
+                                                  const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
+                                                  const yearArr = currentMonthlyTickets[prodKey]?.[selectedYear]
+                                                    ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
+                                                    : Array(12).fill(ticketVal);
+                                                  yearArr[i] = v;
+                                                  setAssumptions({
+                                                    ...assumptions,
+                                                    monthlyTickets: {
+                                                      ...assumptions.monthlyTickets,
+                                                      [prodKey]: {
+                                                        ...(assumptions.monthlyTickets?.[prodKey] ?? {}),
+                                                        [selectedYear]: yearArr,
+                                                      },
+                                                    },
+                                                  });
+                                                }}
+                                              />
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
-                                    <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
-                                    <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
-                                    <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * ticketVal)}</strong></span>
+                                    <div className="flex items-center gap-6 text-xs">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-muted-foreground">Ticket base (flat):</span>
+                                        <input
+                                          type="number"
+                                          className="w-24 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={ticketVal}
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
+                                        />
+                                      </div>
+                                      <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
+                                      <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
+                                      {(() => {
+                                        const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
+                                        return <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * decTicket)}</strong></span>;
+                                      })()}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
