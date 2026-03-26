@@ -645,65 +645,102 @@ export default function Assumptions() {
                           </tr>
 
                           {/* Expanded detail — monthly breakdown with inline edit */}
-                          {isExpanded && row.dataKey && (
+                          {isExpanded && row.dataKey && (() => {
+                            const prodKey = row.dataKey as SubProductKey;
+                            // Direct update functions — bypass lock/unlock, update assumptions directly
+                            const directUpdateClients = (yearToUpdate: Year, val: number) => {
+                              setAssumptions({
+                                ...assumptions,
+                                subProductClients: {
+                                  ...assumptions.subProductClients,
+                                  [prodKey]: { ...assumptions.subProductClients[prodKey], [yearToUpdate]: val },
+                                },
+                              });
+                            };
+                            const directUpdateTicket = (val: number) => {
+                              setAssumptions({
+                                ...assumptions,
+                                tickets: { ...assumptions.tickets, [prodKey]: val },
+                              });
+                            };
+                            return (
                             <tr className="border-b border-border/30">
                               <td colSpan={activeYears.length + 2} className="px-5 py-4 bg-secondary/5">
-                                {/* Monthly clients grid */}
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-xs font-semibold text-muted-foreground">Clientes mensais — {selectedYear}</p>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] text-muted-foreground">Crescimento:</span>
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                        value={rowApplyPct[rowKey] ?? 6}
-                                        onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
-                                      />
-                                      <span className="text-[10px] text-muted-foreground">%</span>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
-                                        className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
-                                      >
-                                        Aplicar
-                                      </button>
+                                <div className="space-y-4">
+                                  {/* Annual targets — editable per year */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (target fim de ano)</p>
+                                    <div className="grid grid-cols-6 gap-2">
+                                      {activeYears.map(y => (
+                                        <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
+                                          <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
+                                          <input
+                                            type="number"
+                                            className="w-full bg-transparent text-center text-sm tabular-nums font-bold text-foreground outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors"
+                                            value={assumptions.subProductClients[prodKey]?.[y] ?? 0}
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={e => directUpdateClients(y, Number(e.target.value) || 0)}
+                                          />
+                                        </div>
+                                      ))}
                                     </div>
                                   </div>
-                                  <div className="grid grid-cols-12 gap-1.5">
-                                    {MONTHS.map((m, i) => {
-                                      const hist = isHistorical(selectedYear, i);
-                                      return (
-                                        <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
-                                          <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                          {hist ? (
-                                            <p className="text-xs tabular-nums font-medium">{monthly[i].toLocaleString('pt-BR')}</p>
-                                          ) : (
+
+                                  {/* Monthly breakdown */}
+                                  <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-xs font-semibold text-muted-foreground">Clientes mensais — {selectedYear}</p>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-muted-foreground">Crescimento:</span>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={rowApplyPct[rowKey] ?? 6}
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                        />
+                                        <span className="text-[10px] text-muted-foreground">%</span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                        >
+                                          Aplicar
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
                                             <input
                                               type="number"
-                                              className="w-full bg-transparent text-center text-xs tabular-nums font-medium text-foreground outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors"
+                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
                                               value={monthly[i]}
                                               onClick={e => e.stopPropagation()}
                                               onChange={e => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(e.target.value) || 0)}
                                             />
-                                          )}
-                                          <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                                            {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
-                                          </p>
-                                        </div>
-                                      );
-                                    })}
+                                            <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                                              {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
+
                                   {/* Ticket + summary */}
-                                  <div className="flex items-center gap-6 pt-2 text-xs">
+                                  <div className="flex items-center gap-6 pt-1 text-xs">
                                     <div className="flex items-center gap-2">
-                                      <span className="text-muted-foreground">Ticket:</span>
+                                      <span className="text-muted-foreground">Ticket (R$/mês):</span>
                                       <input
                                         type="number"
                                         className="w-24 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
                                         value={ticketVal}
                                         onClick={e => e.stopPropagation()}
-                                        onChange={e => row.dataKey && updateTicket(row.dataKey as TicketKey, Number(e.target.value) || 0)}
+                                        onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
                                       />
                                     </div>
                                     <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
@@ -713,7 +750,8 @@ export default function Assumptions() {
                                 </div>
                               </td>
                             </tr>
-                          )}
+                            );
+                          })()}
                         </React.Fragment>
                       );
                     })}
