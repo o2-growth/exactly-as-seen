@@ -122,7 +122,7 @@ export function useAssumptionsPersistence() {
     }
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('assumptions')
         .eq('id', snapshotId)
