@@ -40,7 +40,7 @@ export function useAssumptionsPersistence() {
         return null;
       }
 
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('*')
         .order('updated_at', { ascending: false });
@@ -90,13 +90,13 @@ export function useAssumptionsPersistence() {
       }
 
       // Deactivate all existing for this user
-      await supabase
+      await (supabase as any)
         .from('assumptions_snapshots')
         .update({ is_active: false })
         .eq('user_id', user.id);
 
       // Upsert active snapshot
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await (supabase as any)
         .from('assumptions_snapshots')
         .insert({
           user_id: user.id,
@@ -122,7 +122,7 @@ export function useAssumptionsPersistence() {
     }
 
     try {
-      const { data, error: fetchError } = await supabase
+      const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('assumptions')
         .eq('id', snapshotId)
