@@ -326,7 +326,7 @@ export default function Assumptions() {
   };
 
   const updateSubProduct = (key: SubProductKey, year: Year, val: number) => {
-    setEditState(prev => ({
+    updateModel(prev => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
@@ -336,14 +336,14 @@ export default function Assumptions() {
   };
 
   const updateTicket = (key: TicketKey, val: number) => {
-    setEditState(prev => ({
+    updateModel(prev => ({
       ...prev,
       tickets: { ...prev.tickets, [key]: val },
     }));
   };
 
   const updateSalary = (role: string, val: number) => {
-    setEditState(prev => ({
+    updateModel(prev => ({
       ...prev,
       headcountSalaries: { ...prev.headcountSalaries, [role]: val },
     }));
@@ -357,6 +357,15 @@ export default function Assumptions() {
   };
 
   const data = editing ? editState : assumptions;
+
+  // Helper: update assumptions directly (when not in edit mode) or editState (when editing)
+  const updateModel = (updater: (prev: AssumptionsType) => AssumptionsType) => {
+    if (editing) {
+      setEditState(updater);
+    } else {
+      setAssumptions(updater(assumptions));
+    }
+  };
 
   // ─── Projection handlers ───
 
@@ -1104,7 +1113,7 @@ export default function Assumptions() {
                             step="0.5"
                             className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
                             value={data.churnCaas}
-                            onChange={e => setEditState(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))}
+                            onChange={e => updateModel(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))}
                           />
                         ) : (
                           <span className="text-muted-foreground">{data.churnCaas}%</span>
@@ -1127,7 +1136,7 @@ export default function Assumptions() {
                             step="0.5"
                             className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
                             value={data.churnSaas}
-                            onChange={e => setEditState(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))}
+                            onChange={e => updateModel(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))}
                           />
                         ) : (
                           <span className="text-muted-foreground">{data.churnSaas}%</span>
@@ -1157,7 +1166,7 @@ export default function Assumptions() {
                             step="0.5"
                             className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
                             value={data.churnBaas}
-                            onChange={e => setEditState(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))}
+                            onChange={e => updateModel(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))}
                           />
                         ) : (
                           <span className="text-muted-foreground">{data.churnBaas}%</span>
