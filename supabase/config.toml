@@ -1,0 +1,10 @@
+project_id = "nqpmyugsscvqsvjxdshd"
+
+[functions.explore-dre-db]
+verify_jwt = false
+
+[functions.fetch-dre-data]
+verify_jwt = false
+
+[functions.fetch-oxy-cashflow]
+verify_jwt = false
