@@ -1,56 +1,54 @@
 
 
-# Corrigir edição mensal de clientes (e ticket) — abordagem com overrides diretos
+# Corrigir edição mensal: stale closures + validação
 
-## Problema raiz
+## Diagnóstico
 
-O grid mensal de clientes usa duas camadas de cálculo que se anulam:
+Analisando o código, identifiquei **dois problemas reais**:
 
-1. `getMonthlyClients()` faz interpolação geométrica do target Dec → gera base mensal
-2. `computeProjectedClients()` aplica growth rates + churn sobre essa base
-3. Quando o usuário edita um mês, o código back-calcula growth rate E atualiza o target Dec
-4. Mas ao atualizar o Dec target, a interpolação geométrica muda TODOS os meses → o valor editado é sobrescrito
+### 1. Stale closure em `handleClientChange` e no ticket mensal
+Todas as funções de update direto usam `setAssumptions({...assumptions, ...})` capturando `assumptions` do closure. Se o React não re-renderizar entre chamadas, o `assumptions` fica desatualizado e a edição anterior é sobrescrita. Isso faz parecer que "nada acontece".
 
-É por isso que "não funciona" — o valor entra mas é imediatamente recalculado.
+**Correção**: trocar todas as chamadas por forma funcional `setAssumptions(prev => ({...prev, ...}))`.
 
-## Solução: overrides mensais diretos
+### 2. `directUpdateClients` e `directUpdateTicket` também usam closure stale
+Linhas 708-722: mesma pattern `setAssumptions({...assumptions, ...})`.
 
-Em vez de tentar converter edição mensal em growth rates + Dec target, vamos guardar os valores mensais editados diretamente (como já se faz com `monthlyTickets`).
+## Arquivos a alterar
 
-### 1. Adicionar `monthlyClientOverrides` ao tipo Assumptions
+### `src/pages/Assumptions.tsx`
 
-Em `src/lib/financialData.ts`:
+1. **`handleClientChange`** (linha 413-431): trocar por `setAssumptions(prev => ...)`
+2. **`handleApplyAll`** (linha 433-467): trocar `setAssumptions({...assumptions, ...})` por `setAssumptions(prev => ...)`
+3. **`handleApplyRow`** (linha 469-498): idem
+4. **`directUpdateClients`** (linha 708-716): trocar por `setAssumptions(prev => ...)`
+5. **`directUpdateTicket`** (linha 717-722): trocar por `setAssumptions(prev => ...)`
+6. **Ticket mensal `onCommit`** (linhas 813-830): trocar por `setAssumptions(prev => ...)`
+7. **Adicionar `console.log`** temporário no `handleClientChange` para confirmar que o override foi salvo, para debug
+
+### Exemplo da correção central:
 ```typescript
-monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, number[]>>>>;
+// ANTES (stale closure):
+setAssumptions({
+  ...assumptions,
+  monthlyClientOverrides: { ... },
+});
+
+// DEPOIS (sempre pega o valor mais recente):
+setAssumptions(prev => ({
+  ...prev,
+  monthlyClientOverrides: {
+    ...(prev.monthlyClientOverrides ?? {}),
+    [key]: {
+      ...((prev.monthlyClientOverrides ?? {})[key] ?? {}),
+      [year]: yearArr,
+    },
+  },
+}));
 ```
 
-Um array de 12 posições por produto/ano. Se existir, o mês usa o valor do override. Se não, usa a projeção geométrica normal.
-
-### 2. Atualizar `getMonthlyClients` para respeitar overrides
-
-Em `src/lib/monthlyData.ts`: aceitar parâmetro opcional `monthlyClientOverrides`. Se o produto/ano tiver override para o mês, usar esse valor. Senão, projeção normal.
-
-### 3. Simplificar `handleClientChange`
-
-Em `src/pages/Assumptions.tsx`: quando o usuário edita um mês, simplesmente gravar no `monthlyClientOverrides[key][year][monthIdx]` via `setAssumptions`. Remover toda a lógica de back-calculate growth rate + update Dec target.
-
-### 4. Atualizar o engine para usar os overrides
-
-Em `src/engine/calculationsEngine.ts`: passar `monthlyClientOverrides` para `getMonthlyClients` para que a receita mensal reflita os valores editados.
-
-### 5. Ticket mensal — já funciona via `monthlyTickets`, apenas garantir que o grid no card expandido está usando `setAssumptions` direto (não `updateModel`)
-
-## Arquivos
-
-- `src/lib/financialData.ts` — adicionar tipo `monthlyClientOverrides`
-- `src/lib/monthlyData.ts` — `getMonthlyClients` aceitar e usar overrides
-- `src/pages/Assumptions.tsx` — simplificar `handleClientChange`, usar overrides diretos
-- `src/engine/calculationsEngine.ts` — passar overrides ao calcular receita mensal
-
 ## Resultado esperado
-
-- Editar cliente no mês 5 → valor fica no mês 5, não é recalculado
-- Outros meses sem override continuam com projeção geométrica normal
-- Receita, MRR e KPIs refletem os valores editados
-- Meses históricos continuam travados (🔒)
+- Selecionar 2027+ → meses editáveis (sem 🔒)
+- Digitar valor e sair do campo → valor persiste e MRR/total atualizam
+- 2025 e jan-mar/2026 continuam travados (comportamento correto)
 
