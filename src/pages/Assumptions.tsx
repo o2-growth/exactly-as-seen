@@ -434,13 +434,13 @@ export default function Assumptions() {
     });
 
     // Propagate December target directly (bypass edit mode)
-    setAssumptions(prev => ({
-      ...prev,
+    setAssumptions({
+      ...assumptions,
       subProductClients: {
-        ...prev.subProductClients,
-        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+        ...assumptions.subProductClients,
+        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
       },
-    }));
+    });
   };
 
   const handleApplyAll = () => {
