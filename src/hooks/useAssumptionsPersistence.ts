@@ -90,7 +90,7 @@ export function useAssumptionsPersistence() {
       }
 
       // Deactivate all existing for this user
-      await supabase
+      await (supabase as any)
         .from('assumptions_snapshots')
         .update({ is_active: false })
         .eq('user_id', user.id);
