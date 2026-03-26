@@ -112,12 +112,6 @@ function getDecClients2025(bu: string, product: string): number {
 
 function getMonthlyClientCount(bu: string, product: string, month: number, year: number, assumptions: Assumptions): number {
   // month is 0-indexed (0=Jan, 11=Dec)
-  if (year === 2025) {
-    const arr = (clientsBase2025 as any)[bu]?.[product];
-    return arr ? arr[month] : 0;
-  }
-
-  // For years > 2025: interpolate from previous year-end to current year-end
   const keyMap: Record<string, string> = {
     'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
     'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
@@ -125,6 +119,21 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
     'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
   };
   const subKey = keyMap[`${bu}.${product}`];
+
+  // Check for monthly client overrides first
+  if (subKey) {
+    const override = assumptions.monthlyClientOverrides?.[subKey as TicketKey]?.[year as Year];
+    if (override && override[month] !== null && override[month] !== undefined) {
+      return override[month]!;
+    }
+  }
+
+  if (year === 2025) {
+    const arr = (clientsBase2025 as any)[bu]?.[product];
+    return arr ? arr[month] : 0;
+  }
+
+  // For years > 2025: interpolate from previous year-end to current year-end
   if (!subKey) return 0;
 
   const prevYear = (year - 1) as Year;

@@ -106,9 +106,19 @@ export function getMonthlyClients(
   };
   const ticket = ticketPrices?.[key] ?? STATIC_TICKET_FALLBACK[key];
 
+  // Helper: apply monthly client overrides on top of base result
+  const applyOverrides = (base: number[]): number[] => {
+    const overrides = monthlyClientOverrides?.[key]?.[year];
+    if (!overrides) return base;
+    return base.map((v, i) => {
+      const ov = overrides[i];
+      return (ov !== null && ov !== undefined) ? ov : v;
+    });
+  };
+
   if (year === 2025) {
     // Use actual client base data for 2025 — never derive from ticket
-    return [...SUB_PRODUCT_2025_DATA[key]];
+    return applyOverrides([...SUB_PRODUCT_2025_DATA[key]]);
   }
 
   if (year === 2026) {
@@ -122,7 +132,7 @@ export function getMonthlyClients(
     const prevDec = lastHistIdx >= 0 ? (hist[lastHistIdx] ?? 0) : SUB_PRODUCT_2025_DATA[key][11];
     const currentDec = subProductClients[key][year];
 
-    return hist.map((histVal, i) => {
+    const result = hist.map((histVal, i) => {
       if (histVal !== null) return histVal;
       // Projected month — geometric from prevDec
       const monthNum = i + 1; // 1-based
@@ -139,6 +149,7 @@ export function getMonthlyClients(
       }
       return Math.round(val * 100) / 100;
     });
+    return applyOverrides(result);
   }
 
   // For 2027+: geometric interpolation from Dec of previous year to Dec target of current year
@@ -158,7 +169,7 @@ export function getMonthlyClients(
     }
     months.push(Math.round(val * 100) / 100);
   }
-  return months;
+  return applyOverrides(months);
 }
 
 // ─── Monthly headcount computation ───
