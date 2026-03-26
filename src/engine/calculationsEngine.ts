@@ -118,7 +118,6 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
   }
 
   // For years > 2025: interpolate from previous year-end to current year-end
-  // Use assumptions subProductClients for end-of-year targets
   const keyMap: Record<string, string> = {
     'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
     'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',

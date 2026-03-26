@@ -785,13 +785,19 @@ export default function Assumptions() {
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
                                         return (
-                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                            <MonthlyClientInput
-                                              value={monthly[i]}
-                                              className={`w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors ${hist ? 'text-muted-foreground' : 'text-foreground'}`}
-                                              onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
-                                            />
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-card border border-border/50'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            {hist ? (
+                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-not-allowed" title="Período histórico — somente leitura">
+                                                {monthly[i].toLocaleString('pt-BR')}
+                                              </span>
+                                            ) : (
+                                              <MonthlyClientInput
+                                                value={monthly[i]}
+                                                className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
+                                                onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
+                                              />
+                                            )}
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                                               {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
                                             </p>
