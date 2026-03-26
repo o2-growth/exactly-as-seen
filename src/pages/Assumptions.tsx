@@ -407,7 +407,6 @@ export default function Assumptions() {
     const currentGrowthArr = growthRates[year]?.[key] ?? Array(12).fill(0.06);
     const prevClients = computeProjectedClients(key, year, currentGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
     const prevVal = monthIdx > 0 ? prevClients[monthIdx - 1] : (() => {
-      // prevVal of first projected month = last historical
       if (year === 2026) {
         return Math.round(getMonthlyClients(key, 2026, data.subProductClients, data.tickets)[2]);
       }
@@ -420,15 +419,28 @@ export default function Assumptions() {
       backCalcGrowth = (newCount / prevVal) - 1 + monthlyChurn;
     }
 
+    // Build new growth array and compute resulting Dec target
+    const newGrowthArr = [...currentGrowthArr];
+    newGrowthArr[monthIdx] = backCalcGrowth;
+    const newMonthly = computeProjectedClients(key, year, newGrowthArr, monthlyChurn, data.subProductClients, data.tickets);
+    const newDecTarget = newMonthly[11];
+
     setGrowthRates(prev => {
       const updated = { ...prev };
       const yearRates = { ...updated[year] };
-      const arr = [...(yearRates[key] ?? Array(12).fill(0.06))];
-      arr[monthIdx] = backCalcGrowth;
-      yearRates[key] = arr;
+      yearRates[key] = newGrowthArr;
       updated[year] = yearRates;
       return updated;
     });
+
+    // Propagate December target to global model so the engine recalculates
+    updateModel(prev => ({
+      ...prev,
+      subProductClients: {
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+      },
+    }));
   };
 
   const handleApplyAll = () => {
