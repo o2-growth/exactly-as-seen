@@ -921,7 +921,7 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churnRate = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churnRate, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                  const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                   const churnClients = monthly.map((val, i) => {
                     const prev = i === 0
                       ? (selectedYear === 2025 ? 0 : selectedYear === 2026
