@@ -111,7 +111,7 @@ export function VersionHistoryProvider({ children }: { children: React.ReactNode
     localStorage.setItem(STORAGE_KEY, JSON.stringify(versions));
   }, [versions]);
 
-  const currentVersion = versions.length > 0 ? versions[versions.length - 1].version : '1.0';
+  const currentVersion = versions.length > 0 ? versions[versions.length - 1].version : '1.1';
 
   const saveVersion = useCallback((note: string, assumptions: Assumptions, scenario: Scenario) => {
     const newVersion: VersionSnapshot = {
