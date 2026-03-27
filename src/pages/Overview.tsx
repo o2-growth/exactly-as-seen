@@ -235,29 +235,6 @@ export default function Overview() {
         </ResponsiveContainer>
       </div>
 
-      {/* Destaques */}
-      <div className="gradient-card p-5">
-        <h3 className="text-sm font-semibold mb-4">Destaques</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div className="bg-secondary/40 rounded-lg p-3">
-            <p className="text-muted-foreground">Ticket CaaS Assessoria</p>
-            <p className="font-bold text-foreground text-base">R$ {assumptions.tickets.caasAssessoria.toLocaleString('pt-BR')}</p>
-          </div>
-          <div className="bg-secondary/40 rounded-lg p-3">
-            <p className="text-muted-foreground">Ticket SaaS Oxy</p>
-            <p className="font-bold text-foreground text-base">R$ {assumptions.tickets.saasOxy.toLocaleString('pt-BR')}</p>
-          </div>
-          <div className="bg-secondary/40 rounded-lg p-3">
-            <p className="text-muted-foreground">Churn CaaS / SaaS</p>
-            <p className="font-bold text-foreground text-base">{assumptions.churnCaas}% / {assumptions.churnSaas}%</p>
-          </div>
-          <div className="bg-secondary/40 rounded-lg p-3">
-            <p className="text-muted-foreground">Headcount {kpiYear}</p>
-            <p className="font-bold text-foreground text-base">{totalHeadcount[kpiYear]?.toLocaleString('pt-BR') ?? '—'}</p>
-          </div>
-        </div>
-      </div>
-
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Revenue Growth */}
