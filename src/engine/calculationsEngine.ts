@@ -524,6 +524,23 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
   }
 }
 
+function calcularDeducoesPorSubproduto(
+  revenueBySubproduct: Record<string, number>,
+  assumptions: Assumptions
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+  let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  for (const key of ALL_SUBPRODUCT_KEYS) {
+    const fat = revenueBySubproduct[key] || 0;
+    if (fat <= 0) continue;
+    const cfg = getSubProductTaxRate(key, assumptions);
+    deducaoPIS += fat * (cfg.pis / 100);
+    deducaoCOFINS += fat * (cfg.cofins / 100);
+    deducaoISSQN += fat * (cfg.iss / 100);
+  }
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+}
+
+// Legacy wrapper for backward compatibility
 function calcularDeducoesPorBU(
   revenueByBU: Record<string, number>,
   buConfigs: BUTaxConfig[]
