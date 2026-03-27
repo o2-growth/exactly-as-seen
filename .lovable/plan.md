@@ -1,54 +1,29 @@
 
 
-# Corrigir edição mensal: stale closures + validação
+# Fix: edição de um mês alterando todos os outros
 
-## Diagnóstico
+## Problema
 
-Analisando o código, identifiquei **dois problemas reais**:
+Quando você edita um mês (ex: coloca 6 em Abril), TODOS os meses seguintes também ficam com ~6. Isso acontece porque a função `computeProjectedClients` usa uma lógica de crescimento sequencial: `prev * (1 + growth - churn)`. Quando o override muda `prev` para 6, os meses seguintes calculam a partir de 6.
 
-### 1. Stale closure em `handleClientChange` e no ticket mensal
-Todas as funções de update direto usam `setAssumptions({...assumptions, ...})` capturando `assumptions` do closure. Se o React não re-renderizar entre chamadas, o `assumptions` fica desatualizado e a edição anterior é sobrescrita. Isso faz parecer que "nada acontece".
+A interpolação geométrica correta (que distribui os valores entre a base e o target de dezembro) está em `getMonthlyClients` no `monthlyData.ts` — mas o grid da UI usa `computeProjectedClients` que sobrescreve essa lógica com growth rates.
 
-**Correção**: trocar todas as chamadas por forma funcional `setAssumptions(prev => ({...prev, ...}))`.
+## Solução
 
-### 2. `directUpdateClients` e `directUpdateTicket` também usam closure stale
-Linhas 708-722: mesma pattern `setAssumptions({...assumptions, ...})`.
-
-## Arquivos a alterar
+Eliminar `computeProjectedClients` do grid de exibição do card expandido. Usar diretamente `getMonthlyClients` (que já aplica overrides corretamente sobre a interpolação geométrica).
 
 ### `src/pages/Assumptions.tsx`
 
-1. **`handleClientChange`** (linha 413-431): trocar por `setAssumptions(prev => ...)`
-2. **`handleApplyAll`** (linha 433-467): trocar `setAssumptions({...assumptions, ...})` por `setAssumptions(prev => ...)`
-3. **`handleApplyRow`** (linha 469-498): idem
-4. **`directUpdateClients`** (linha 708-716): trocar por `setAssumptions(prev => ...)`
-5. **`directUpdateTicket`** (linha 717-722): trocar por `setAssumptions(prev => ...)`
-6. **Ticket mensal `onCommit`** (linhas 813-830): trocar por `setAssumptions(prev => ...)`
-7. **Adicionar `console.log`** temporário no `handleClientChange` para confirmar que o override foi salvo, para debug
+1. **Linha ~677**: trocar `computeProjectedClients(...)` por `getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))`
 
-### Exemplo da correção central:
-```typescript
-// ANTES (stale closure):
-setAssumptions({
-  ...assumptions,
-  monthlyClientOverrides: { ... },
-});
+2. **Linhas ~880, ~924, ~965** (seções de new clients, churn, totals): mesma troca — usar `getMonthlyClients` em vez de `computeProjectedClients`
 
-// DEPOIS (sempre pega o valor mais recente):
-setAssumptions(prev => ({
-  ...prev,
-  monthlyClientOverrides: {
-    ...(prev.monthlyClientOverrides ?? {}),
-    [key]: {
-      ...((prev.monthlyClientOverrides ?? {})[key] ?? {}),
-      [year]: yearArr,
-    },
-  },
-}));
-```
+3. **Linhas ~449, ~483** (`handleApplyAll` e `handleApplyRow`): estas usam `computeProjectedClients` para calcular o target de dezembro ao aplicar crescimento uniforme. Aqui faz sentido manter a lógica de crescimento, mas o resultado deve ser salvo como overrides mensais completos (12 meses) em vez de apenas atualizar o Dec target.
 
-## Resultado esperado
-- Selecionar 2027+ → meses editáveis (sem 🔒)
-- Digitar valor e sair do campo → valor persiste e MRR/total atualizam
-- 2025 e jan-mar/2026 continuam travados (comportamento correto)
+4. **Remover** ou deprecar `computeProjectedClients` se não for mais usada em nenhum lugar.
+
+### Resultado
+- Editar Abril para 6 → só Abril muda para 6
+- Os outros meses mantêm a interpolação geométrica normal do `getMonthlyClients`
+- `handleApplyRow` (botão "Aplicar" com %) continua funcionando — aplica crescimento uniforme salvando como overrides
 
