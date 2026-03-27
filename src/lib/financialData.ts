@@ -10,12 +10,18 @@ export interface SubProductClients {
   saasOxyGenio: Record<Year, number>;
   educationDonoCFO: Record<Year, number>;
   baas: Record<Year, number>;
+  taxAT: Record<Year, number>;
+  taxGPT: Record<Year, number>;
+  taxRCT: Record<Year, number>;
+  taxRT: Record<Year, number>;
+  taxDTC: Record<Year, number>;
 }
 
 export interface Assumptions {
   caasClients: Record<Year, number>;
   saasClients: Record<Year, number>;
   educationClients: Record<Year, number>;
+  taxClients: Record<Year, number>;
   subProductClients: SubProductClients;
   tickets: {
     caasAssessoria: number;
@@ -26,6 +32,11 @@ export interface Assumptions {
     saasOxyGenio: number;
     educationDonoCFO: number;
     baas: number;
+    taxAT: number;
+    taxGPT: number;
+    taxRCT: number;
+    taxRT: number;
+    taxDTC: number;
   };
   // Item 1: Monthly ticket overrides (per product, per year, 12 months)
   monthlyTickets?: Partial<Record<TicketKey, Partial<Record<Year, number[]>>>>;
@@ -86,6 +97,7 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   caasClients: { 2025: 167, 2026: 272, 2027: 768, 2028: 2136, 2029: 4171, 2030: 6472 },
   saasClients: { 2025: 226, 2026: 631, 2027: 2293, 2028: 7992, 2029: 19471, 2030: 37918 },
   educationClients: { 2025: 49, 2026: 145, 2027: 605, 2028: 2373, 2029: 5292, 2030: 9504 },
+  taxClients: { 2025: 11, 2026: 41, 2027: 110, 2028: 280, 2029: 570, 2030: 1010 },
   subProductClients: {
     caasAssessoria:  { 2025: 21, 2026: 78, 2027: 188, 2028: 525, 2029: 1127, 2030: 1886 },
     caasEnterprise:  { 2025: 65, 2026: 130, 2027: 315, 2028: 879, 2029: 1887, 2030: 3157 },
@@ -95,6 +107,11 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     saasOxyGenio:    { 2025: 47, 2026: 186, 2027: 539, 2028: 1824, 2029: 4061, 2030: 7849 },
     educationDonoCFO:{ 2025: 26, 2026: 101, 2027: 394, 2028: 1562, 2029: 3952, 2030: 7570 },
     baas:            { 2025: 0, 2026: 0, 2027: 960, 2028: 6840, 2029: 25264, 2030: 65340 },
+    taxAT:           { 2025: 5, 2026: 15, 2027: 40, 2028: 100, 2029: 200, 2030: 350 },
+    taxGPT:          { 2025: 2, 2026: 8, 2027: 20, 2028: 50, 2029: 100, 2030: 180 },
+    taxRCT:          { 2025: 3, 2026: 10, 2027: 25, 2028: 60, 2029: 120, 2030: 200 },
+    taxRT:           { 2025: 1, 2026: 5, 2027: 15, 2028: 40, 2029: 80, 2030: 150 },
+    taxDTC:          { 2025: 0, 2026: 3, 2027: 10, 2028: 30, 2029: 70, 2030: 130 },
   },
   tickets: {
     caasAssessoria: 2000,
@@ -105,6 +122,11 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     saasOxyGenio: 1997,
     educationDonoCFO: 397,
     baas: 229,
+    taxAT: 5000,
+    taxGPT: 3000,
+    taxRCT: 4000,
+    taxRT: 3500,
+    taxDTC: 2500,
   },
   churnCaas: 5,
   churnSaas: 5,
@@ -162,6 +184,11 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     saasOxyGenio: 8766,
     educationDonoCFO: 2046,
     baas: 2415,
+    taxAT: 5000,
+    taxGPT: 5000,
+    taxRCT: 5000,
+    taxRT: 5000,
+    taxDTC: 5000,
   },
   // Item 8: 15% Education/Expansão team rate
   eduExpansaoTeamRate: 0.15,
@@ -268,8 +295,8 @@ export function calculateProjections(
 
   for (const year of YEARS) {
     const clientRatio = (
-      (assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year]) /
-      (DEFAULT_ASSUMPTIONS.caasClients[year] + DEFAULT_ASSUMPTIONS.saasClients[year] + DEFAULT_ASSUMPTIONS.educationClients[year])
+      (assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year] + (assumptions.taxClients?.[year] ?? 0)) /
+      (DEFAULT_ASSUMPTIONS.caasClients[year] + DEFAULT_ASSUMPTIONS.saasClients[year] + DEFAULT_ASSUMPTIONS.educationClients[year] + (DEFAULT_ASSUMPTIONS.taxClients?.[year] ?? 0))
     );
 
     const revenueScale = clientRatio * multiplier;
@@ -280,7 +307,7 @@ export function calculateProjections(
     projections.ebitda[year] = Math.round(BASE_ANNUAL_DATA.ebitda[year] * revenueScale);
     projections.netIncome[year] = Math.round(BASE_ANNUAL_DATA.netIncome[year] * revenueScale);
     projections.operatingCashFlow[year] = Math.round(BASE_ANNUAL_DATA.operatingCashFlow[year] * revenueScale);
-    projections.totalClients[year] = assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year];
+    projections.totalClients[year] = assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year] + (assumptions.taxClients?.[year] ?? 0);
     projections.grossMargins[year] = GROSS_MARGINS[year];
     projections.netMargins[year] = NET_MARGINS[year];
   }
@@ -299,6 +326,11 @@ export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
   saasOxyGenio: 'Oxy + Gênio',
   educationDonoCFO: 'Dono CFO',
   baas: 'Oxy Hacker - Micro Franqueado',
+  taxAT: 'Assessoria Tributária',
+  taxGPT: 'Gestão Passivo Tributário',
+  taxRCT: 'Recuperação Crédito Tributário',
+  taxRT: 'Reforma Tributária',
+  taxDTC: 'Diagnóstico Tributário & Compliance',
 };
 
 // ─── HEADCOUNT (derived from namedEmployees2025) ───

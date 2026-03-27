@@ -28,6 +28,7 @@ export interface MonthlyPnL {
   saasRevenue: number;
   educationRevenue: number;
   baasRevenue: number;
+  taxRevenue: number;
   deductions: number;
   netRevenue: number;
   cogs: number;
@@ -56,6 +57,7 @@ export interface AnnualOutput {
   saasRevenue: number;
   educationRevenue: number;
   baasRevenue: number;
+  taxRevenue: number;
   deductions: number;
   netRevenue: number;
   cogs: number;
@@ -94,6 +96,7 @@ export interface AnnualOutput {
     saasOxy: number; saasOxyGenio: number; saasSetup: number;
     educationDonoCfo: number;
     baasAssinatura: number;
+    taxAT: number; taxGPT: number; taxRCT: number; taxRT: number; taxDTC: number;
   };
 }
 
@@ -117,6 +120,8 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
     'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
     'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio',
     'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
+    'tax.at': 'taxAT', 'tax.gpt': 'taxGPT', 'tax.rct': 'taxRCT',
+    'tax.rt': 'taxRT', 'tax.dtc': 'taxDTC',
   };
   const subKey = keyMap[`${bu}.${product}`];
 
@@ -184,7 +189,14 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const baas = getMonthlyClientCount('baas', 'assinatura', month, year, assumptions) * getTicketForMonth('baas', month, year, assumptions);
 
-  const grandTotal = (caasTotal + saasTotal + eduTotal + baas) * scenarioMult;
+  const taxAT  = getMonthlyClientCount('tax', 'at', month, year, assumptions) * getTicketForMonth('taxAT', month, year, assumptions);
+  const taxGPT = getMonthlyClientCount('tax', 'gpt', month, year, assumptions) * getTicketForMonth('taxGPT', month, year, assumptions);
+  const taxRCT = getMonthlyClientCount('tax', 'rct', month, year, assumptions) * getTicketForMonth('taxRCT', month, year, assumptions);
+  const taxRT  = getMonthlyClientCount('tax', 'rt', month, year, assumptions) * getTicketForMonth('taxRT', month, year, assumptions);
+  const taxDTC = getMonthlyClientCount('tax', 'dtc', month, year, assumptions) * getTicketForMonth('taxDTC', month, year, assumptions);
+  const taxTotal = taxAT + taxGPT + taxRCT + taxRT + taxDTC;
+
+  const grandTotal = (caasTotal + saasTotal + eduTotal + baas + taxTotal) * scenarioMult;
 
   return {
     caasAssessoria: caasAssessoria * scenarioMult,
@@ -200,6 +212,12 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
     educationDonoCfo: eduDonoCfo * scenarioMult,
     baas: baas * scenarioMult,
     baasAssinatura: baas * scenarioMult,
+    tax: taxTotal * scenarioMult,
+    taxAT: taxAT * scenarioMult,
+    taxGPT: taxGPT * scenarioMult,
+    taxRCT: taxRCT * scenarioMult,
+    taxRT: taxRT * scenarioMult,
+    taxDTC: taxDTC * scenarioMult,
     total: grandTotal,
   };
 }
@@ -212,6 +230,7 @@ function calcTotalClients(month: number, year: number, assumptions: Assumptions)
     ['saas', 'oxy'], ['saas', 'oxyGenio'],
     ['education', 'donoCfo'],
     ['baas', 'assinatura'],
+    ['tax', 'at'], ['tax', 'gpt'], ['tax', 'rct'], ['tax', 'rt'], ['tax', 'dtc'],
   ];
   return products.reduce((sum, [bu, prod]) => sum + getMonthlyClientCount(bu, prod, month, year, assumptions), 0);
 }
@@ -499,7 +518,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   const sMult = scenarioMultipliers[scenario.toLowerCase() as keyof typeof scenarioMultipliers] ?? scenarioMultipliers.base;
 
   const monthly: MonthlyPnL[] = [];
-  let annualGrossRevenue = 0, annualCaas = 0, annualSaas = 0, annualEdu = 0, annualBaas = 0;
+  let annualGrossRevenue = 0, annualCaas = 0, annualSaas = 0, annualEdu = 0, annualBaas = 0, annualTaxRev = 0;
   let annualDeductions = 0, annualNetRevenue = 0, annualCogs = 0, annualGrossProfit = 0;
   let annualCommissions = 0, annualMarketing = 0, annualCM = 0;
   let annualSGA = 0, annualHC = 0, annualCommercial = 0, annualOther = 0;
@@ -516,6 +535,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     caasAssessoria: 0, caasEnterprise: 0, caasCorporate: 0, caasSetup: 0,
     saasOxy: 0, saasOxyGenio: 0, saasSetup: 0,
     educationDonoCfo: 0, baasAssinatura: 0,
+    taxAT: 0, taxGPT: 0, taxRCT: 0, taxRT: 0, taxDTC: 0,
   };
   let lastClients = 0;
 
@@ -543,11 +563,17 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     revD.saasSetup += rev.saasSetup / 1000;
     revD.educationDonoCfo += rev.educationDonoCfo / 1000;
     revD.baasAssinatura += rev.baasAssinatura / 1000;
+    revD.taxAT += rev.taxAT / 1000;
+    revD.taxGPT += rev.taxGPT / 1000;
+    revD.taxRCT += rev.taxRCT / 1000;
+    revD.taxRT += rev.taxRT / 1000;
+    revD.taxDTC += rev.taxDTC / 1000;
 
     const caasRev = rev.caas / 1000;
     const saasRev = rev.saas / 1000;
     const eduRev = rev.education / 1000;
     const baasRev = rev.baas / 1000;
+    const taxRev = rev.tax / 1000;
 
     // Deductions (rate changes at 2027: Lucro Presumido → Lucro Real)
     // Deduções de vendas (ISS, COFINS, PIS) são obrigatórias — não zeradas pelo toggle de tax
@@ -691,6 +717,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     annualSaas += saasRev;
     annualEdu += eduRev;
     annualBaas += baasRev;
+    annualTaxRev += taxRev;
     annualDeductions += ded;
     annualNetRevenue += netRev;
     annualCogs += totalCogs;
@@ -722,7 +749,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
     monthly.push({
       grossRevenue: grossRev, caasRevenue: caasRev, saasRevenue: saasRev,
-      educationRevenue: eduRev, baasRevenue: baasRev,
+      educationRevenue: eduRev, baasRevenue: baasRev, taxRevenue: taxRev,
       deductions: ded, netRevenue: netRev, cogs: totalCogs, grossProfit: gp,
       commissions: totalComm, marketing: totalMkt, contributionMargin: cm,
       sga, headcount: totalHC, commercial, otherExpenses: other,
@@ -738,9 +765,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   // Ending receivables = annual gross revenue * weighted PMR / 365
   // All revenue accumulators (annualGrossRevenue, annualCaas, etc.) are already in R$ thousands.
   const pmr = assumptions.pmrConfig ?? { caas: 30, saas: 15, education: 30, baas: 0 };
-  const totalRevForPmr = annualCaas + annualSaas + annualEdu + annualBaas;
+  const totalRevForPmr = annualCaas + annualSaas + annualEdu + annualBaas + annualTaxRev;
   const weightedPmr = totalRevForPmr > 0
-    ? (annualCaas * pmr.caas + annualSaas * pmr.saas + annualEdu * pmr.education + annualBaas * pmr.baas) / totalRevForPmr
+    ? (annualCaas * pmr.caas + annualSaas * pmr.saas + annualEdu * pmr.education + annualBaas * pmr.baas + annualTaxRev * pmr.caas) / totalRevForPmr
     : 0;
   // annualGrossRevenue is in R$ thousands — no /1000 needed
   const endingReceivables = annualGrossRevenue * (weightedPmr / 365); // in R$ thousands
@@ -752,7 +779,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
   return {
     grossRevenue: r(annualGrossRevenue), caasRevenue: r(annualCaas), saasRevenue: r(annualSaas),
-    educationRevenue: r(annualEdu), baasRevenue: r(annualBaas),
+    educationRevenue: r(annualEdu), baasRevenue: r(annualBaas), taxRevenue: r(annualTaxRev),
     deductions: r(annualDeductions), netRevenue: r(annualNetRevenue),
     cogs: r(annualCogs), cogsDetail: { caas: r(cogsD.caas), customerService: r(cogsD.customerService), saas: r(cogsD.saas), education: r(cogsD.education), baas: r(cogsD.baas) },
     grossProfit: r(annualGrossProfit),
@@ -782,6 +809,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       caasCorporate: r(revD.caasCorporate), caasSetup: r(revD.caasSetup),
       saasOxy: r(revD.saasOxy), saasOxyGenio: r(revD.saasOxyGenio), saasSetup: r(revD.saasSetup),
       educationDonoCfo: r(revD.educationDonoCfo), baasAssinatura: r(revD.baasAssinatura),
+      taxAT: r(revD.taxAT), taxGPT: r(revD.taxGPT), taxRCT: r(revD.taxRCT),
+      taxRT: r(revD.taxRT), taxDTC: r(revD.taxDTC),
     },
   };
 }
@@ -1306,6 +1335,13 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   // BaaS revenue flows into Expansão
   const baasAn = a(y => y.baasRevenue), baasMo = mo(d => d.baasRevenue);
   const baAn = a(y => y.revenueDetail.baasAssinatura);
+  // Tax BU revenue
+  const taxBuAn = a(y => y.taxRevenue), taxBuMo = mo(d => d.taxRevenue);
+  const taxATAn = a(y => y.revenueDetail.taxAT);
+  const taxGPTAn = a(y => y.revenueDetail.taxGPT);
+  const taxRCTAn = a(y => y.revenueDetail.taxRCT);
+  const taxRTAn = a(y => y.revenueDetail.taxRT);
+  const taxDTCAn = a(y => y.revenueDetail.taxDTC);
   // Sub-revenue
   const assAn = a(y => y.revenueDetail.caasAssessoria);
   const entAn = a(y => y.revenueDetail.caasEnterprise);
@@ -1393,12 +1429,12 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.5.2', label: 'Franquia', annual: z, monthly: zMo() },
           { code: '1.5.3', label: 'Master Franquia', annual: z, monthly: zMo() },
         ]},
-        { code: '1.6', label: 'Tax', annual: z, monthly: zMo(), children: [
-          { code: '1.6.1', label: 'Assessoria Tributária', annual: z, monthly: zMo() },
-          { code: '1.6.2', label: 'Gestão Passivo Tributário', annual: z, monthly: zMo() },
-          { code: '1.6.3', label: 'Recuperação Crédito Tributário', annual: z, monthly: zMo() },
-          { code: '1.6.4', label: 'Reforma Tributária', annual: z, monthly: zMo() },
-          { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: z, monthly: zMo() },
+        { code: '1.6', label: 'Tax', annual: taxBuAn, monthly: taxBuMo, children: [
+          { code: '1.6.1', label: 'Assessoria Tributária', annual: taxATAn, monthly: allocMo(taxBuMo, taxATAn, taxBuAn) },
+          { code: '1.6.2', label: 'Gestão Passivo Tributário', annual: taxGPTAn, monthly: allocMo(taxBuMo, taxGPTAn, taxBuAn) },
+          { code: '1.6.3', label: 'Recuperação Crédito Tributário', annual: taxRCTAn, monthly: allocMo(taxBuMo, taxRCTAn, taxBuAn) },
+          { code: '1.6.4', label: 'Reforma Tributária', annual: taxRTAn, monthly: allocMo(taxBuMo, taxRTAn, taxBuAn) },
+          { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
           const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500 };

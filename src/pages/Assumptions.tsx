@@ -89,6 +89,16 @@ const CLIENTS_ROWS: ClientGroup[] = [
       { label: 'Master Franquia',                dataKey: null },
     ],
   },
+  {
+    group: 'Tax',
+    items: [
+      { label: 'Assessoria Tributária',              dataKey: 'taxAT' },
+      { label: 'Gestão Passivo Tributário',          dataKey: 'taxGPT' },
+      { label: 'Recuperação Crédito Tributário',     dataKey: 'taxRCT' },
+      { label: 'Reforma Tributária',                 dataKey: 'taxRT' },
+      { label: 'Diagnóstico Tributário & Compliance', dataKey: 'taxDTC' },
+    ],
+  },
 ];
 
 interface TicketRow {
@@ -139,6 +149,16 @@ const TICKETS_ROWS: TicketGroup[] = [
       { label: 'Master Franquia',                dataKey: null,   staticValue: 0 },
     ],
   },
+  {
+    group: 'Tax',
+    items: [
+      { label: 'Assessoria Tributária',              dataKey: 'taxAT',  staticValue: 5000 },
+      { label: 'Gestão Passivo Tributário',          dataKey: 'taxGPT', staticValue: 3000 },
+      { label: 'Recuperação Crédito Tributário',     dataKey: 'taxRCT', staticValue: 4000 },
+      { label: 'Reforma Tributária',                 dataKey: 'taxRT',  staticValue: 3500 },
+      { label: 'Diagnóstico Tributário & Compliance', dataKey: 'taxDTC', staticValue: 2500 },
+    ],
+  },
 ];
 
 function CellInput({ value, editing, onChange }: { value: number; editing: boolean; onChange: (v: number) => void }) {
@@ -175,6 +195,9 @@ function getChurnMonthly(key: SubProductKey, data: AssumptionsType): number {
   }
   if (key === 'baas') {
     return data.churnBaas / 100 / 12;
+  }
+  if (key === 'taxAT' || key === 'taxGPT' || key === 'taxRCT' || key === 'taxRT' || key === 'taxDTC') {
+    return 0;
   }
   return 0;
 }
@@ -631,6 +654,7 @@ export default function Assumptions() {
               SaaS: model.years[y].saasRevenue,
               Education: model.years[y].educationRevenue,
               Expansão: model.years[y].baasRevenue,
+              Tax: model.years[y].taxRevenue,
             }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
@@ -641,6 +665,7 @@ export default function Assumptions() {
               <Bar dataKey="SaaS" stackId="a" fill="hsl(210, 70%, 55%)" />
               <Bar dataKey="Education" stackId="a" fill="hsl(150, 50%, 50%)" />
               <Bar dataKey="Expansão" stackId="a" fill="hsl(40, 70%, 55%)" />
+              <Bar dataKey="Tax" stackId="a" fill="hsl(280, 60%, 55%)" />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -653,6 +678,7 @@ export default function Assumptions() {
               CaaS: data.caasClients[y],
               SaaS: data.saasClients[y],
               Education: data.educationClients[y],
+              Tax: data.taxClients[y],
             }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
@@ -662,6 +688,7 @@ export default function Assumptions() {
               <Line type="monotone" dataKey="CaaS" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="SaaS" stroke="hsl(210, 70%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="Education" stroke="hsl(150, 50%, 50%)" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Tax" stroke="hsl(280, 60%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>

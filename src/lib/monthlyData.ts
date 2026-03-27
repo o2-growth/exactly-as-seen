@@ -70,6 +70,11 @@ const SUB_PRODUCT_2025_DATA: Record<SubProductKey, number[]> = {
   saasOxyGenio:     clientsBase2025.saas.oxyGenio,
   educationDonoCFO: clientsBase2025.education.donoCfo,
   baas:             clientsBase2025.baas.assinatura,
+  taxAT:            clientsBase2025.tax.at,
+  taxGPT:           clientsBase2025.tax.gpt,
+  taxRCT:           clientsBase2025.tax.rct,
+  taxRT:            clientsBase2025.tax.rt,
+  taxDTC:           clientsBase2025.tax.dtc,
 };
 
 /**
@@ -103,6 +108,11 @@ export function getMonthlyClients(
     saasOxyGenio:     1997,
     educationDonoCFO: 3997,
     baas:             229,
+    taxAT:            5000,
+    taxGPT:           3000,
+    taxRCT:           4000,
+    taxRT:            3500,
+    taxDTC:           2500,
   };
   const ticket = ticketPrices?.[key] ?? STATIC_TICKET_FALLBACK[key];
 
