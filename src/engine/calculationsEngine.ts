@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
   clientsBase2025, avgTicket, churnAnnual, salesDeductions, salesDeductionsByYear,
