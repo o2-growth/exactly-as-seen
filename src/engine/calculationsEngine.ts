@@ -1523,47 +1523,30 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS ~avg across BUs
-          // Use fixed proportions: PIS / (PIS+COFINS+ISS_avg), etc.
-          const pisPct = 0.0065;
-          const cofinsPct = 0.03;
-          // Average ISS weighted — approximate with sum of rates
-          const issAvg = 0.04; // ~weighted average across CaaS(5%), SaaS(2.9%), Setup(2.9%)
-          const totalPct = pisPct + cofinsPct + issAvg;
-          const proportionalItems: { code: string; label: string; proportion: number }[] = [
-            { code: '2.03', label: 'ISS', proportion: issAvg / totalPct },
-            { code: '2.04', label: 'PIS', proportion: pisPct / totalPct },
-            { code: '2.05', label: 'COFINS', proportion: cofinsPct / totalPct },
-          ];
-          const proportionalNodes = proportionalItems.map(sd => {
-            const ann = {} as Record<Year, number>;
-            for (const y of YEARS) {
-              ann[y] = Math.round(dedAn[y] * sd.proportion);
-            }
-            return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
+          const ddA = (field: keyof AnnualOutput['dedDetail']) => a(y => y.dedDetail[field]);
+          const ddM = (field: keyof AnnualOutput['dedDetail']) => mo((_, yi) => {
+            // Allocate monthly proportionally from annual detail
+            const annDed = outputs[yi].dedDetail[field];
+            const annTotal = outputs[yi].deductions;
+            const monthlyDed = outputs[yi].monthlyData.map(md => annTotal !== 0 ? md.deductions * (annDed / annTotal) : 0);
+            return monthlyDed;
           });
-          // Zero sub-items (structural placeholders)
-          const zeroItems: PnlNode[] = [
-            { code: '2.01', label: 'CSLL (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.02', label: 'PIS (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.06', label: 'ICMS', annual: z, monthly: zMo() },
-            { code: '2.07', label: 'IRRF (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.08', label: 'COFINS (retido na fonte)', annual: z, monthly: zMo() },
+          // Helper to build a deduction node
+          const dedNode = (code: string, label: string, field: keyof AnnualOutput['dedDetail']): PnlNode => {
+            const ann = ddA(field);
+            return { code, label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
+          };
+          return [
+            dedNode('2.01', 'CSLL (retido na fonte)', 'csllRetido'),
+            dedNode('2.02', 'PIS (retido na fonte)', 'pisRetido'),
+            dedNode('2.03', 'ISS', 'iss'),
+            dedNode('2.04', 'PIS', 'pis'),
+            dedNode('2.05', 'COFINS', 'cofins'),
+            dedNode('2.06', 'ICMS', 'icms'),
+            dedNode('2.07', 'IRRF (retido na fonte)', 'irrfRetido'),
+            dedNode('2.08', 'COFINS (retido na fonte)', 'cofinsRetido'),
             { code: '2.09', label: 'Devoluções – Reembolso ao Cliente', annual: z, monthly: zMo() },
             { code: '2.10', label: 'Devoluções – Cancelamento/Desistência de Venda', annual: z, monthly: zMo() },
-          ];
-          // Order: CSLL retido, ISS, PIS retido, PIS, COFINS, ICMS, IRRF retido, COFINS retido, Devoluções...
-          return [
-            zeroItems[0],           // CSLL (retido na fonte)
-            proportionalNodes[0],   // ISS
-            zeroItems[1],           // PIS (retido na fonte)
-            proportionalNodes[1],   // PIS
-            proportionalNodes[2],   // COFINS
-            zeroItems[2],           // ICMS
-            zeroItems[3],           // IRRF (retido na fonte)
-            zeroItems[4],           // COFINS (retido na fonte)
-            zeroItems[5],           // Devoluções – Reembolso ao Cliente
-            zeroItems[6],           // Devoluções – Cancelamento/Desistência de Venda
           ];
         })() },
       ],
