@@ -1303,122 +1303,139 @@ export default function Assumptions() {
             </div>
           </div>
 
-          {/* Matriz completa por Subproduto */}
-          <div className="gradient-card p-5 space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Scale className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Lucro Presumido — Alíquotas por Subproduto</h3>
-            </div>
-            <div className="overflow-x-auto">
-              {(() => {
-                const TAX_GROUPS: { label: string; keys: FinTicketKey[] }[] = [
-                  { label: 'CaaS', keys: CAAS_KEYS as FinTicketKey[] },
-                  { label: 'SaaS', keys: SAAS_KEYS as FinTicketKey[] },
-                  { label: 'Education', keys: EDUCATION_KEYS as FinTicketKey[] },
-                  { label: 'Expansão', keys: EXPANSAO_KEYS as FinTicketKey[] },
-                  { label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
-                ];
-                const TAX_ROWS = ['PIS (%)', 'COFINS (%)', 'ISS (%)', 'IRPJ efetivo (%)', 'CSLL efetivo (%)', 'TOTAL efetivo (%)'];
+          {/* Matriz por Categoria */}
+          {(() => {
+            const TAX_CATEGORIES: { id: string; label: string; keys: FinTicketKey[] }[] = [
+              { id: 'caas', label: 'CaaS', keys: CAAS_KEYS as FinTicketKey[] },
+              { id: 'saas', label: 'SaaS', keys: SAAS_KEYS as FinTicketKey[] },
+              { id: 'education', label: 'Education', keys: EDUCATION_KEYS as FinTicketKey[] },
+              { id: 'expansao', label: 'Expansão', keys: EXPANSAO_KEYS as FinTicketKey[] },
+              { id: 'tax', label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
+            ];
+            const TAX_ROWS = ['PIS (%)', 'COFINS (%)', 'ISS (%)', 'IRPJ efetivo (%)', 'CSLL efetivo (%)', 'TOTAL efetivo (%)'];
 
-                const getConfig = (key: FinTicketKey): SubProductTaxConfig => {
-                  return getSubProductTaxRate(key, data as AssumptionsType);
-                };
+            const fullLabels: Record<string, string> = {
+              caasAssessoria: 'Serviços Especializados', caasEnterprise: 'Enterprise', caasCorporate: 'Corporate', caasParceiros: 'Parceiros', caasSetup: 'BPO Financeiro',
+              saasOxy: 'Oxy', saasOxyGenio: 'Oxy+Gênio', saasSetup: 'Setup', saasParceiros: 'Parceiros', saasOxyGenioEsp: 'Oxy+Gênio+Especialista',
+              educationDonoCFO: 'Dono CFO', educationEN: 'Eng. Negócios', educationFR: 'Financeiro Raiz', educationFSP: 'FSP',
+              baas: 'Oxy Hacker', baasFranquia: 'Franquia', baasMasterFranquia: 'Master Franquia',
+              taxAT: 'AT', taxGPT: 'GPT', taxRCT: 'RCT', taxRT: 'RT', taxDTC: 'DTC',
+            };
 
-                const updateSubProductTax = (key: FinTicketKey, field: keyof SubProductTaxConfig, val: number) => {
-                  const current = getConfig(key);
-                  const updated = { ...current, [field]: val };
-                  const rates = { ...(data.subProductTaxRates ?? {}), [key]: updated };
-                  if (editing) {
-                    setEditState(prev => ({ ...prev, subProductTaxRates: rates }));
-                  } else {
-                    setAssumptions({ ...assumptions, subProductTaxRates: rates } as AssumptionsType);
-                  }
-                };
+            const getConfig = (key: FinTicketKey): SubProductTaxConfig => {
+              return getSubProductTaxRate(key, data as AssumptionsType);
+            };
 
-                const shortLabels: Record<string, string> = {
-                  caasAssessoria: 'Serv.Esp', caasEnterprise: 'Enterpr', caasCorporate: 'Corp', caasParceiros: 'Parc', caasSetup: 'BPO Fin',
-                  saasOxy: 'Oxy', saasOxyGenio: 'Oxy+G', saasSetup: 'Setup', saasParceiros: 'Parc', saasOxyGenioEsp: 'Oxy+G+E',
-                  educationDonoCFO: 'DonoCFO', educationEN: 'EN', educationFR: 'FR', educationFSP: 'FSP',
-                  baas: 'OxyHack', baasFranquia: 'Franq', baasMasterFranquia: 'MFranq',
-                  taxAT: 'AT', taxGPT: 'GPT', taxRCT: 'RCT', taxRT: 'RT', taxDTC: 'DTC',
-                };
+            const updateSubProductTax = (key: FinTicketKey, field: keyof SubProductTaxConfig, val: number) => {
+              const current = getConfig(key);
+              const updated = { ...current, [field]: val };
+              const rates = { ...(data.subProductTaxRates ?? {}), [key]: updated };
+              if (editing) {
+                setEditState(prev => ({ ...prev, subProductTaxRates: rates }));
+              } else {
+                setAssumptions({ ...assumptions, subProductTaxRates: rates } as AssumptionsType);
+              }
+            };
 
-                return (
-                  <table className="text-[11px] border-collapse min-w-[900px]">
-                    <thead>
-                      {/* Group header row */}
-                      <tr className="border-b border-border/50">
-                        <th className="text-left py-1.5 px-2 font-medium text-muted-foreground sticky left-0 bg-card z-10 min-w-[120px]">Dedução</th>
-                        {TAX_GROUPS.map(g => (
-                          <th key={g.label} colSpan={g.keys.length} className="text-center py-1.5 px-1 font-semibold text-primary border-l border-border/30">
-                            {g.label}
-                          </th>
-                        ))}
-                      </tr>
-                      {/* Subproduct header row */}
-                      <tr className="border-b border-border/50">
-                        <th className="sticky left-0 bg-card z-10" />
-                        {TAX_GROUPS.map(g => g.keys.map((k, ki) => (
-                          <th key={k} className={`text-center py-1 px-1 font-medium text-muted-foreground whitespace-nowrap ${ki === 0 ? 'border-l border-border/30' : ''}`}>
-                            {shortLabels[k] ?? k}
-                          </th>
-                        )))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {TAX_ROWS.map((rowLabel, ri) => {
-                        const isEditable = ri < 3; // PIS, COFINS, ISS
-                        const isTotal = ri === 5;
-                        return (
-                          <tr key={rowLabel} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
-                            <td className={`py-1.5 px-2 font-medium sticky left-0 bg-card z-10 ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                              {rowLabel}
-                            </td>
-                            {TAX_GROUPS.map(g => g.keys.map((k, ki) => {
-                              const cfg = getConfig(k);
-                              const baseP = cfg.tipoReceita === 'servico' ? 0.32 : 0.08;
-                              const csllBase = cfg.tipoReceita === 'servico' ? 0.32 : 0.12;
-                              let cellValue: number;
-                              switch (ri) {
-                                case 0: cellValue = cfg.pis; break;
-                                case 1: cellValue = cfg.cofins; break;
-                                case 2: cellValue = cfg.iss; break;
-                                case 3: cellValue = baseP * 0.15 * 100; break;
-                                case 4: cellValue = csllBase * 0.09 * 100; break;
-                                default: cellValue = cfg.pis + cfg.cofins + cfg.iss + (baseP * 0.15 * 100) + (csllBase * 0.09 * 100); break;
-                              }
+            return (
+              <div className="gradient-card p-5 space-y-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Scale className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold">Lucro Presumido — Alíquotas por Subproduto</h3>
+                </div>
 
-                              if (isEditable) {
-                                const field: keyof SubProductTaxConfig = ri === 0 ? 'pis' : ri === 1 ? 'cofins' : 'iss';
+                {/* Category filter buttons */}
+                <div className="flex flex-wrap gap-2">
+                  {TAX_CATEGORIES.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setActiveTaxCategory(prev => prev === cat.id ? '' : cat.id)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                        activeTaxCategory === cat.id
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-secondary text-secondary-foreground hover:bg-accent'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtered tables per active category (or all) */}
+                {TAX_CATEGORIES
+                  .filter(cat => !activeTaxCategory || activeTaxCategory === cat.id)
+                  .map(cat => (
+                  <div key={cat.id} className="space-y-2">
+                    {!activeTaxCategory && (
+                      <h4 className="text-xs font-semibold text-primary mt-2">{cat.label}</h4>
+                    )}
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-border/50">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground min-w-[140px]">Dedução</th>
+                          {cat.keys.map(k => (
+                            <th key={k} className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">
+                              {fullLabels[k] ?? k}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TAX_ROWS.map((rowLabel, ri) => {
+                          const isEditable = ri < 3;
+                          const isTotal = ri === 5;
+                          return (
+                            <tr key={rowLabel} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
+                              <td className={`py-1.5 px-3 font-medium ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                                {rowLabel}
+                              </td>
+                              {cat.keys.map(k => {
+                                const cfg = getConfig(k);
+                                const baseP = cfg.tipoReceita === 'servico' ? 0.32 : 0.08;
+                                const csllBase = cfg.tipoReceita === 'servico' ? 0.32 : 0.12;
+                                let cellValue: number;
+                                switch (ri) {
+                                  case 0: cellValue = cfg.pis; break;
+                                  case 1: cellValue = cfg.cofins; break;
+                                  case 2: cellValue = cfg.iss; break;
+                                  case 3: cellValue = baseP * 0.15 * 100; break;
+                                  case 4: cellValue = csllBase * 0.09 * 100; break;
+                                  default: cellValue = cfg.pis + cfg.cofins + cfg.iss + (baseP * 0.15 * 100) + (csllBase * 0.09 * 100); break;
+                                }
+
+                                if (isEditable) {
+                                  const field: keyof SubProductTaxConfig = ri === 0 ? 'pis' : ri === 1 ? 'cofins' : 'iss';
+                                  return (
+                                    <td key={k} className="py-1 px-1 text-center">
+                                      <input
+                                        type="number"
+                                        step="0.1"
+                                        min="0"
+                                        max="20"
+                                        className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                        value={cellValue}
+                                        onChange={e => updateSubProductTax(k, field, Number(e.target.value) || 0)}
+                                      />
+                                    </td>
+                                  );
+                                }
+
                                 return (
-                                  <td key={k} className={`py-1 px-0.5 text-center ${ki === 0 ? 'border-l border-border/30' : ''}`}>
-                                    <input
-                                      type="number"
-                                      step="0.1"
-                                      min="0"
-                                      max="20"
-                                      className="w-12 bg-secondary border border-border rounded px-1 py-0.5 text-center text-[11px] tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                      value={cellValue}
-                                      onChange={e => updateSubProductTax(k, field, Number(e.target.value) || 0)}
-                                    />
+                                  <td key={k} className={`py-1.5 px-2 text-center tabular-nums ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                                    {cellValue.toFixed(2).replace('.', ',')}%
                                   </td>
                                 );
-                              }
-
-                              return (
-                                <td key={k} className={`py-1.5 px-1 text-center tabular-nums ${ki === 0 ? 'border-l border-border/30' : ''} ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                                  {cellValue.toFixed(2).replace('.', ',')}%
-                                </td>
-                              );
-                            }))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                );
-              })()}
-            </div>
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
             <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
               <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0. Base presumida: 32% para serviços.</span>
