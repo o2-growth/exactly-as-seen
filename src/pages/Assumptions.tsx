@@ -1289,7 +1289,24 @@ export default function Assumptions() {
               { id: 'expansao', label: 'Expansão', keys: EXPANSAO_KEYS as FinTicketKey[] },
               { id: 'tax', label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
             ];
-            const TAX_ROWS = ['PIS (%)', 'COFINS (%)', 'ISS (%)', 'IRPJ efetivo (%)', 'CSLL efetivo (%)', 'TOTAL efetivo (%)'];
+            // Each row: { label, field (if editable), computed (if calculated) }
+            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
+              { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
+              { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
+              { label: '2.03  ISS (%)', field: 'iss' },
+              { label: '2.04  PIS (%)', field: 'pis' },
+              { label: '2.05  COFINS (%)', field: 'cofins' },
+              { label: '2.06  ICMS (%)', field: 'icms' },
+              { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
+              { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
+              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100 },
+              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100 },
+              { label: 'TOTAL efetivo (%)', computed: (cfg) => {
+                const irpj = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100;
+                const csll = (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100;
+                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
+              }, isTotal: true },
+            ];
 
             const fullLabels: Record<string, string> = {
               caasAssessoria: 'Serviços Especializados', caasEnterprise: 'Enterprise', caasCorporate: 'Corporate', caasParceiros: 'Parceiros', caasSetup: 'BPO Financeiro',
@@ -1358,30 +1375,19 @@ export default function Assumptions() {
                         </tr>
                       </thead>
                       <tbody>
-                        {TAX_ROWS.map((rowLabel, ri) => {
-                          const isEditable = ri < 3;
-                          const isTotal = ri === 5;
+                        {TAX_ROW_DEFS.map((rowDef) => {
+                          const isEditable = !!rowDef.field;
+                          const isTotal = !!rowDef.isTotal;
                           return (
-                            <tr key={rowLabel} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
-                              <td className={`py-1.5 px-3 font-medium ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                                {rowLabel}
+                            <tr key={rowDef.label} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
+                              <td className={`py-1.5 px-3 font-medium whitespace-nowrap ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                                {rowDef.label}
                               </td>
                               {cat.keys.map(k => {
                                 const cfg = getConfig(k);
-                                const baseP = cfg.tipoReceita === 'servico' ? 0.32 : 0.08;
-                                const csllBase = cfg.tipoReceita === 'servico' ? 0.32 : 0.12;
-                                let cellValue: number;
-                                switch (ri) {
-                                  case 0: cellValue = cfg.pis; break;
-                                  case 1: cellValue = cfg.cofins; break;
-                                  case 2: cellValue = cfg.iss; break;
-                                  case 3: cellValue = baseP * 0.15 * 100; break;
-                                  case 4: cellValue = csllBase * 0.09 * 100; break;
-                                  default: cellValue = cfg.pis + cfg.cofins + cfg.iss + (baseP * 0.15 * 100) + (csllBase * 0.09 * 100); break;
-                                }
 
-                                if (isEditable) {
-                                  const field: keyof SubProductTaxConfig = ri === 0 ? 'pis' : ri === 1 ? 'cofins' : 'iss';
+                                if (isEditable && rowDef.field) {
+                                  const cellValue = cfg[rowDef.field] as number;
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
                                       <input
@@ -1391,12 +1397,13 @@ export default function Assumptions() {
                                         max="20"
                                         className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
                                         value={cellValue}
-                                        onChange={e => updateSubProductTax(k, field, Number(e.target.value) || 0)}
+                                        onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
                                       />
                                     </td>
                                   );
                                 }
 
+                                const cellValue = rowDef.computed!(cfg);
                                 return (
                                   <td key={k} className={`py-1.5 px-2 text-center tabular-nums ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
                                     {cellValue.toFixed(2).replace('.', ',')}%

@@ -59,6 +59,7 @@ export interface AnnualOutput {
   baasRevenue: number;
   taxRevenue: number;
   deductions: number;
+  dedDetail: { pis: number; cofins: number; iss: number; csllRetido: number; pisRetido: number; icms: number; irrfRetido: number; cofinsRetido: number };
   netRevenue: number;
   cogs: number;
   cogsDetail: { caas: number; customerService: number; saas: number; education: number; baas: number };
@@ -527,8 +528,9 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
 function calcularDeducoesPorSubproduto(
   revenueBySubproduct: Record<string, number>,
   assumptions: Assumptions
-): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducaoCsllRetido: number; deducaoPisRetido: number; deducaoICMS: number; deducaoIrrfRetido: number; deducaoCofinsRetido: number; deducoesTotal: number } {
   let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  let deducaoCsllRetido = 0, deducaoPisRetido = 0, deducaoICMS = 0, deducaoIrrfRetido = 0, deducaoCofinsRetido = 0;
   for (const key of ALL_SUBPRODUCT_KEYS) {
     const fat = revenueBySubproduct[key] || 0;
     if (fat <= 0) continue;
@@ -536,8 +538,14 @@ function calcularDeducoesPorSubproduto(
     deducaoPIS += fat * (cfg.pis / 100);
     deducaoCOFINS += fat * (cfg.cofins / 100);
     deducaoISSQN += fat * (cfg.iss / 100);
+    deducaoCsllRetido += fat * (cfg.csllRetido / 100);
+    deducaoPisRetido += fat * (cfg.pisRetido / 100);
+    deducaoICMS += fat * (cfg.icms / 100);
+    deducaoIrrfRetido += fat * (cfg.irrfRetido / 100);
+    deducaoCofinsRetido += fat * (cfg.cofinsRetido / 100);
   }
-  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+  const deducoesTotal = deducaoPIS + deducaoCOFINS + deducaoISSQN + deducaoCsllRetido + deducaoPisRetido + deducaoICMS + deducaoIrrfRetido + deducaoCofinsRetido;
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducaoCsllRetido, deducaoPisRetido, deducaoICMS, deducaoIrrfRetido, deducaoCofinsRetido, deducoesTotal };
 }
 
 // Legacy wrapper for backward compatibility
@@ -574,6 +582,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
   let taxD = { irpj: 0, csll: 0 };
   let debtD = { loans: 0, suppliers: 0 };
+  let dedD = { pis: 0, cofins: 0, iss: 0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0 };
   let capexD = { software: 0, realestate: 0 };
   let revD = {
     caasAssessoria: 0, caasEnterprise: 0, caasCorporate: 0, caasSetup: 0,
@@ -816,6 +825,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
     taxD.irpj += irpj; taxD.csll += csll;
+    dedD.pis += dedResult.deducaoPIS; dedD.cofins += dedResult.deducaoCOFINS; dedD.iss += dedResult.deducaoISSQN;
+    dedD.csllRetido += dedResult.deducaoCsllRetido; dedD.pisRetido += dedResult.deducaoPisRetido;
+    dedD.icms += dedResult.deducaoICMS; dedD.irrfRetido += dedResult.deducaoIrrfRetido; dedD.cofinsRetido += dedResult.deducaoCofinsRetido;
     debtD.loans += debt.loans; debtD.suppliers += debt.suppliers;
     capexD.software += capex.software; capexD.realestate += capex.realestate;
     lastClients = totalClientsM;
@@ -854,6 +866,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     grossRevenue: r(annualGrossRevenue), caasRevenue: r(annualCaas), saasRevenue: r(annualSaas),
     educationRevenue: r(annualEdu), baasRevenue: r(annualBaas), taxRevenue: r(annualTaxRev),
     deductions: r(annualDeductions), netRevenue: r(annualNetRevenue),
+    dedDetail: { pis: r(dedD.pis), cofins: r(dedD.cofins), iss: r(dedD.iss), csllRetido: r(dedD.csllRetido), pisRetido: r(dedD.pisRetido), icms: r(dedD.icms), irrfRetido: r(dedD.irrfRetido), cofinsRetido: r(dedD.cofinsRetido) },
     cogs: r(annualCogs), cogsDetail: { caas: r(cogsD.caas), customerService: r(cogsD.customerService), saas: r(cogsD.saas), education: r(cogsD.education), baas: r(cogsD.baas) },
     grossProfit: r(annualGrossProfit),
     grossMarginPct: annualNetRevenue !== 0 ? Number(((annualGrossProfit / annualNetRevenue) * 100).toFixed(1)) : 0,
@@ -1510,47 +1523,22 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS ~avg across BUs
-          // Use fixed proportions: PIS / (PIS+COFINS+ISS_avg), etc.
-          const pisPct = 0.0065;
-          const cofinsPct = 0.03;
-          // Average ISS weighted — approximate with sum of rates
-          const issAvg = 0.04; // ~weighted average across CaaS(5%), SaaS(2.9%), Setup(2.9%)
-          const totalPct = pisPct + cofinsPct + issAvg;
-          const proportionalItems: { code: string; label: string; proportion: number }[] = [
-            { code: '2.03', label: 'ISS', proportion: issAvg / totalPct },
-            { code: '2.04', label: 'PIS', proportion: pisPct / totalPct },
-            { code: '2.05', label: 'COFINS', proportion: cofinsPct / totalPct },
-          ];
-          const proportionalNodes = proportionalItems.map(sd => {
-            const ann = {} as Record<Year, number>;
-            for (const y of YEARS) {
-              ann[y] = Math.round(dedAn[y] * sd.proportion);
-            }
-            return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
-          });
-          // Zero sub-items (structural placeholders)
-          const zeroItems: PnlNode[] = [
-            { code: '2.01', label: 'CSLL (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.02', label: 'PIS (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.06', label: 'ICMS', annual: z, monthly: zMo() },
-            { code: '2.07', label: 'IRRF (retido na fonte)', annual: z, monthly: zMo() },
-            { code: '2.08', label: 'COFINS (retido na fonte)', annual: z, monthly: zMo() },
+          const ddA = (field: keyof AnnualOutput['dedDetail']) => a(y => y.dedDetail[field]);
+          const dedNode = (code: string, label: string, field: keyof AnnualOutput['dedDetail']): PnlNode => {
+            const ann = ddA(field);
+            return { code, label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
+          };
+          return [
+            dedNode('2.01', 'CSLL (retido na fonte)', 'csllRetido'),
+            dedNode('2.02', 'PIS (retido na fonte)', 'pisRetido'),
+            dedNode('2.03', 'ISS', 'iss'),
+            dedNode('2.04', 'PIS', 'pis'),
+            dedNode('2.05', 'COFINS', 'cofins'),
+            dedNode('2.06', 'ICMS', 'icms'),
+            dedNode('2.07', 'IRRF (retido na fonte)', 'irrfRetido'),
+            dedNode('2.08', 'COFINS (retido na fonte)', 'cofinsRetido'),
             { code: '2.09', label: 'Devoluções – Reembolso ao Cliente', annual: z, monthly: zMo() },
             { code: '2.10', label: 'Devoluções – Cancelamento/Desistência de Venda', annual: z, monthly: zMo() },
-          ];
-          // Order: CSLL retido, ISS, PIS retido, PIS, COFINS, ICMS, IRRF retido, COFINS retido, Devoluções...
-          return [
-            zeroItems[0],           // CSLL (retido na fonte)
-            proportionalNodes[0],   // ISS
-            zeroItems[1],           // PIS (retido na fonte)
-            proportionalNodes[1],   // PIS
-            proportionalNodes[2],   // COFINS
-            zeroItems[2],           // ICMS
-            zeroItems[3],           // IRRF (retido na fonte)
-            zeroItems[4],           // COFINS (retido na fonte)
-            zeroItems[5],           // Devoluções – Reembolso ao Cliente
-            zeroItems[6],           // Devoluções – Cancelamento/Desistência de Venda
           ];
         })() },
       ],
