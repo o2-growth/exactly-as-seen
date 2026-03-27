@@ -1,29 +1,45 @@
 
 
-# Fix: edição de um mês alterando todos os outros
+# Fix: yearly target not syncing with monthly overrides
 
-## Problema
+## Problem
 
-Quando você edita um mês (ex: coloca 6 em Abril), TODOS os meses seguintes também ficam com ~6. Isso acontece porque a função `computeProjectedClients` usa uma lógica de crescimento sequencial: `prev * (1 + growth - churn)`. Quando o override muda `prev` para 6, os meses seguintes calculam a partir de 6.
+The "Clientes por ano (target fim de ano)" box shows `subProductClients[key][2026] = 5`, but the monthly grid shows values growing from 5 to 15. This happens because:
 
-A interpolação geométrica correta (que distribui os valores entre a base e o target de dezembro) está em `getMonthlyClients` no `monthlyData.ts` — mas o grid da UI usa `computeProjectedClients` que sobrescreve essa lógica com growth rates.
+- `handleApplyRow` (the "Aplicar" button) correctly updates both `monthlyClientOverrides` AND `subProductClients[key][year]` to the new Dec value
+- But `handleClientChange` (individual month edits) only updates `monthlyClientOverrides` — it does NOT sync the Dec target back
 
-## Solução
+So the yearly target box gets out of sync with the actual monthly values.
 
-Eliminar `computeProjectedClients` do grid de exibição do card expandido. Usar diretamente `getMonthlyClients` (que já aplica overrides corretamente sobre a interpolação geométrica).
+## Solution
 
-### `src/pages/Assumptions.tsx`
+### `src/pages/Assumptions.tsx` — `handleClientChange`
 
-1. **Linha ~677**: trocar `computeProjectedClients(...)` por `getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))`
+After setting the override, also update `subProductClients[key][year]` to reflect the December value (month index 11). If the edited month IS December, use the new value directly. Otherwise, compute December from the current overrides + geometric base.
 
-2. **Linhas ~880, ~924, ~965** (seções de new clients, churn, totals): mesma troca — usar `getMonthlyClients` em vez de `computeProjectedClients`
+```typescript
+const handleClientChange = (key, year, monthIdx, newCount) => {
+  // ... existing override logic ...
+  
+  // Sync Dec target: if month 11 was edited, use that value directly
+  // Otherwise, get Dec value from overrides or keep existing
+  const decValue = monthIdx === 11 
+    ? newCount 
+    : (yearArr[11] !== null ? yearArr[11] : prev.subProductClients[key][year]);
+  
+  setAssumptions(prev => ({
+    ...prev,
+    subProductClients: {
+      ...prev.subProductClients,
+      [key]: { ...prev.subProductClients[key], [year]: decValue },
+    },
+    monthlyClientOverrides: { ... },
+  }));
+};
+```
 
-3. **Linhas ~449, ~483** (`handleApplyAll` e `handleApplyRow`): estas usam `computeProjectedClients` para calcular o target de dezembro ao aplicar crescimento uniforme. Aqui faz sentido manter a lógica de crescimento, mas o resultado deve ser salvo como overrides mensais completos (12 meses) em vez de apenas atualizar o Dec target.
+This ensures the yearly target box always reflects the December value, whether set by individual edit or by "Aplicar".
 
-4. **Remover** ou deprecar `computeProjectedClients` se não for mais usada em nenhum lugar.
-
-### Resultado
-- Editar Abril para 6 → só Abril muda para 6
-- Os outros meses mantêm a interpolação geométrica normal do `getMonthlyClients`
-- `handleApplyRow` (botão "Aplicar" com %) continua funcionando — aplica crescimento uniforme salvando como overrides
+### Files to change
+- `src/pages/Assumptions.tsx` — update `handleClientChange` to sync Dec target
 
