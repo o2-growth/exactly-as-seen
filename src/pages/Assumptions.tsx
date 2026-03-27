@@ -118,7 +118,7 @@ const TICKETS_ROWS: TicketGroup[] = [
       { label: 'Serviços Especializados', dataKey: 'caasAssessoria', staticValue: 25000 },
       { label: 'Enterprise',              dataKey: 'caasEnterprise',  staticValue: 6209 },
       { label: 'Corporate',               dataKey: 'caasCorporate',   staticValue: 13573 },
-      { label: 'Parceiros',               dataKey: null,              staticValue: 0 },
+      { label: 'Parceiros',               dataKey: 'caasParceiros',   staticValue: 0 },
       { label: 'BPO Financeiro',          dataKey: 'caasSetup',       staticValue: 15000 },
     ],
   },
@@ -127,26 +127,26 @@ const TICKETS_ROWS: TicketGroup[] = [
     items: [
       { label: 'Oxy',                         dataKey: 'saasOxy',      staticValue: 1297 },
       { label: 'Oxy + Gênio',                 dataKey: 'saasOxyGenio', staticValue: 1997 },
-      { label: 'Setup',                        dataKey: null,           staticValue: 15000 },
-      { label: 'Parceiros',                    dataKey: null,           staticValue: 0 },
-      { label: 'Oxy + Gênio + Especialista',  dataKey: null,           staticValue: 0 },
+      { label: 'Setup',                        dataKey: 'saasSetup',    staticValue: 15000 },
+      { label: 'Parceiros',                    dataKey: 'saasParceiros', staticValue: 0 },
+      { label: 'Oxy + Gênio + Especialista',  dataKey: 'saasOxyGenioEsp', staticValue: 0 },
     ],
   },
   {
     group: 'Education',
     items: [
       { label: 'Dono CFO',                dataKey: 'educationDonoCFO', staticValue: 3997 },
-      { label: 'Engenheiro de Negócios',   dataKey: null, staticValue: 3997 },
-      { label: 'Financeiro Raiz',          dataKey: null, staticValue: 3997 },
-      { label: 'Finance Sales Program',    dataKey: null, staticValue: 497 },
+      { label: 'Engenheiro de Negócios',   dataKey: 'educationEN', staticValue: 7500 },
+      { label: 'Financeiro Raiz',          dataKey: 'educationFR', staticValue: 2997 },
+      { label: 'Finance Sales Program',    dataKey: 'educationFSP', staticValue: 497 },
     ],
   },
   {
     group: 'Expansão',
     items: [
       { label: 'Oxy Hacker', dataKey: 'baas', staticValue: 229 },
-      { label: 'Franquia',                       dataKey: null,   staticValue: 0 },
-      { label: 'Master Franquia',                dataKey: null,   staticValue: 0 },
+      { label: 'Franquia',                       dataKey: 'baasFranquia',   staticValue: 0 },
+      { label: 'Master Franquia',                dataKey: 'baasMasterFranquia',   staticValue: 0 },
     ],
   },
   {
