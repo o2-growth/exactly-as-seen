@@ -49,7 +49,27 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     if (hasLoaded.current) return;
     hasLoaded.current = true;
     loadSnapshots().then(saved => {
-      if (saved) setAssumptions(saved);
+      if (saved) {
+        // One-time fix: restore accidentally changed caasAssessoria values
+        const fixed = { ...saved };
+        let needsFix = false;
+        if (fixed.subProductClients?.caasAssessoria?.[2025] === 5) {
+          fixed.subProductClients.caasAssessoria[2025] = 21;
+          needsFix = true;
+        }
+        if (fixed.subProductClients?.caasAssessoria?.[2026] === 19) {
+          fixed.subProductClients.caasAssessoria[2026] = 78;
+          needsFix = true;
+        }
+        if (needsFix && fixed.monthlyClientOverrides?.caasAssessoria) {
+          delete fixed.monthlyClientOverrides.caasAssessoria[2025];
+          delete fixed.monthlyClientOverrides.caasAssessoria[2026];
+        }
+        if (needsFix) {
+          localStorage.removeItem('o2_assumptions');
+        }
+        setAssumptions(fixed);
+      }
     });
   }, [loadSnapshots]);
 
