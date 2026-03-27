@@ -278,6 +278,7 @@ export default function Assumptions() {
   const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>({});
   const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>({});
   const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>({});
+  const [activeTaxCategory, setActiveTaxCategory] = useState<string>('caas');
   const [opExpandedGroups, setOpExpandedGroups] = useState<Record<string, boolean>>({
     custos: false,
     despesas: false,
