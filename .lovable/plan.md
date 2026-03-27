@@ -1,24 +1,52 @@
 
+# Fix: produção continua sem backend apesar do preview funcionar
 
-# Diagnóstico: "Configuração ausente" no preview
+## O que revisei
+Encontrei um ponto importante: o app já não importa mais o client gerado diretamente. Hoje o gargalo real ficou concentrado em `src/lib/supabase-safe.ts`.
 
-## O que está acontecendo
+Também confirmei que:
+- o preview usa outra camada/ambiente e por isso pode funcionar normalmente
+- a versão publicada continua dependendo de `import.meta.env.VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e `VITE_SUPABASE_PROJECT_ID`
+- se essas variáveis não forem injetadas no build live, `hasBackendConfig()` retorna `false` e o app mostra “Configuração ausente”
 
-A boa notícia: o app **não quebra mais** com `supabaseUrl is required`. O wrapper seguro está funcionando — em vez de tela branca, ele mostra a mensagem de fallback.
+Ou seja: o wrapper evitou a tela branca, mas ainda depende 100% de variáveis de build no ambiente publicado.
 
-A mensagem "Configuração ausente" aparece porque `hasBackendConfig()` retorna `false`, ou seja, as variáveis `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` não estão sendo encontradas no momento do carregamento.
+## Plano de correção
 
-## Causa provável
+### 1) Tornar `supabase-safe.ts` independente do build live
+Ajustar `src/lib/supabase-safe.ts` para usar esta ordem:
+1. tentar `import.meta.env`
+2. se faltar, usar um fallback público do projeto já conhecido pelo app
+3. só mostrar “Configuração ausente” se ambos falharem
 
-Isso geralmente acontece após um restart do dev server ou quando o Hot Module Replacement (HMR) perde sincronização. O session replay mostra que o preview estava funcionando momentos antes (gráficos e tooltips renderizando normalmente).
+Isso elimina a dependência do publish injetar as variáveis corretamente.
 
-## Solução
+### 2) Cobrir também o `projectId`
+Hoje `useOxyCashFlow` depende de `getProjectId()`.
+Vou garantir que `getProjectId()` também tenha fallback, para esse hook continuar funcionando em produção.
 
-1. **Recarregue o preview** — clique no botão de refresh no painel de preview (não no navegador)
-2. **Para produção** — clique em **Publish → Update** novamente para forçar um novo build com as variáveis injetadas
-3. Se a produção continuar com o erro após republicar, pode ser um problema temporário de sincronização da plataforma — aguarde 1-2 minutos e tente novamente
+### 3) Manter o comportamento atual do app
+Não vou mexer no fluxo de autenticação nem no banco.
+Os arquivos já migrados para o wrapper seguro continuam iguais:
+- `ProtectedRoute`
+- `Auth`
+- `ResetPassword`
+- `useDreData`
+- `useAssumptionsPersistence`
+- `useOxyCashFlow`
 
-## Nenhuma mudança de código necessária
+A mudança fica centralizada no wrapper.
 
-O código está correto. Nenhum arquivo importa o client gerado diretamente. O wrapper seguro está ativo e funcionando como esperado.
+### 4) Validar a mensagem de erro
+Se ainda houver falha depois disso, a mensagem exibida passará a significar problema real de configuração/fallback inválido, e não mais apenas ausência de env no deploy.
 
+## Arquivo a alterar
+- `src/lib/supabase-safe.ts`
+
+## Resultado esperado
+- preview continua funcionando
+- produção deixa de depender das variáveis `VITE_*` para acessar o backend
+- o link publicado volta a abrir normalmente mesmo quando o build live não recebe essas envs
+
+## Detalhe técnico
+Pelo estado atual do código, este não é mais um problema espalhado pela aplicação. É um problema de resolução de configuração em um único ponto central. O conserto correto agora é adicionar fallback explícito no wrapper em vez de continuar tratando como “problema de republicação”.
