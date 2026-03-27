@@ -184,6 +184,8 @@ function isHistorical(year: Year, monthIdx: number): boolean {
 }
 
 function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  // N/A — no churn for this product
+  if (data.churnNotApplicable?.[key]) return 0;
   // Check for per-product override first
   if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
     return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
@@ -1045,73 +1047,105 @@ export default function Assumptions() {
                                   <div className="space-y-2 pt-1">
                                     <div className="flex items-center gap-4">
                                       <p className="text-xs font-semibold text-negative">Churn (clientes/mês) — {selectedYear}</p>
-                                      <div className="ml-auto flex items-center gap-2">
-                                        <span className="text-[10px] text-muted-foreground">Taxa de churn:</span>
-                                        <input
-                                          type="number"
-                                          step="0.5"
-                                          className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={rowChurnPct[prodKey] ?? (() => {
-                                            const rate = getChurnMonthly(prodKey, data, selectedYear);
-                                            return Math.round(rate * 12 * 100 * 10) / 10;
-                                          })()}
-                                          onClick={e => e.stopPropagation()}
-                                          onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
-                                        />
-                                        <span className="text-[10px] text-muted-foreground">% a.a.</span>
-                                        <button
-                                          className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            const pct = rowChurnPct[prodKey] ?? (() => {
+                                      <button
+                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          setAssumptions(prev => ({
+                                            ...prev,
+                                            churnNotApplicable: {
+                                              ...(prev.churnNotApplicable ?? {}),
+                                              [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
+                                            },
+                                          }));
+                                        }}
+                                      >
+                                        N/A
+                                      </button>
+                                      {!data.churnNotApplicable?.[prodKey] && (
+                                        <div className="ml-auto flex items-center gap-2">
+                                          <span className="text-[10px] text-muted-foreground">Taxa de churn:</span>
+                                          <input
+                                            type="number"
+                                            step="0.5"
+                                            className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                            value={rowChurnPct[prodKey] ?? (() => {
                                               const rate = getChurnMonthly(prodKey, data, selectedYear);
                                               return Math.round(rate * 12 * 100 * 10) / 10;
-                                            })();
-                                            setAssumptions(prev => ({
-                                              ...prev,
-                                              monthlyChurnRates: {
-                                                ...(prev.monthlyChurnRates ?? {}),
-                                                [prodKey]: {
-                                                  ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
-                                                  [selectedYear]: pct,
+                                            })()}
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
+                                          />
+                                          <span className="text-[10px] text-muted-foreground">% a.a.</span>
+                                          <button
+                                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              const pct = rowChurnPct[prodKey] ?? (() => {
+                                                const rate = getChurnMonthly(prodKey, data, selectedYear);
+                                                return Math.round(rate * 12 * 100 * 10) / 10;
+                                              })();
+                                              setAssumptions(prev => ({
+                                                ...prev,
+                                                monthlyChurnRates: {
+                                                  ...(prev.monthlyChurnRates ?? {}),
+                                                  [prodKey]: {
+                                                    ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
+                                                    [selectedYear]: pct,
+                                                  },
                                                 },
-                                              },
-                                            }));
-                                          }}
-                                        >
-                                          Aplicar
-                                        </button>
-                                      </div>
+                                              }));
+                                            }}
+                                          >
+                                            Aplicar
+                                          </button>
+                                        </div>
+                                      )}
                                     </div>
-                                    <div className="grid grid-cols-12 gap-1.5">
-                                      {MONTHS.map((m, i) => {
-                                        const hist = isHistorical(selectedYear, i);
-                                        const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                        const prev = i === 0
-                                          ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
-                                          : monthly[i - 1];
-                                        const churnVal = Math.round(prev * churnRate);
-                                        return (
-                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
-                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
-                                              {churnVal || '—'}
-                                            </span>
+                                    {data.churnNotApplicable?.[prodKey] ? (
+                                      <div className="grid grid-cols-12 gap-1.5">
+                                        {MONTHS.map((m) => (
+                                          <div key={m} className="text-center space-y-1 p-1.5 rounded bg-muted/30">
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
+                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground">N/A</span>
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                    <div className="flex items-center gap-6 text-xs">
-                                      {(() => {
-                                        const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                        const totalChurn = MONTHS.reduce((sum, _, i) => {
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-12 gap-1.5">
+                                        {MONTHS.map((m, i) => {
+                                          const hist = isHistorical(selectedYear, i);
+                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
                                           const prev = i === 0
                                             ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
                                             : monthly[i - 1];
-                                          return sum + Math.round(prev * churnRate);
-                                        }, 0);
-                                        return <span className="text-negative">Total ano: <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos</span>;
-                                      })()}
+                                          const churnVal = Math.round(prev * churnRate);
+                                          return (
+                                            <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
+                                              <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
+                                                {churnVal || '—'}
+                                              </span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-6 text-xs">
+                                      {data.churnNotApplicable?.[prodKey] ? (
+                                        <span className="text-muted-foreground italic">Não se aplica</span>
+                                      ) : (
+                                        (() => {
+                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
+                                          const totalChurn = MONTHS.reduce((sum, _, i) => {
+                                            const prev = i === 0
+                                              ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                              : monthly[i - 1];
+                                            return sum + Math.round(prev * churnRate);
+                                          }, 0);
+                                          return <span className="text-negative">Total ano: <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos</span>;
+                                        })()
+                                      )}
                                     </div>
                                   </div>
                                 </div>
