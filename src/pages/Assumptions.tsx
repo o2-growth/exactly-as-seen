@@ -774,14 +774,14 @@ export default function Assumptions() {
                   {activeYears.map(y => (
                     <th key={y} className={`text-right p-3 text-muted-foreground font-medium min-w-[80px] ${y === selectedYear ? 'bg-primary/5' : ''}`}>{y}</th>
                   ))}
-                  <th className="text-right p-3 text-muted-foreground font-medium min-w-[80px]">Ticket</th>
+                  
                 </tr>
               </thead>
               <tbody>
                 {CLIENTS_ROWS.map(group => (
                   <React.Fragment key={group.group}>
                     <tr className="bg-secondary/40 border-b border-border/50">
-                      <td colSpan={activeYears.length + 2} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
+                      <td colSpan={activeYears.length + 1} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
                         {group.group}
                       </td>
                     </tr>
@@ -814,9 +814,6 @@ export default function Assumptions() {
                                 {row.dataKey ? (data.subProductClients[row.dataKey as SubProductKey]?.[y] ?? 0).toLocaleString('pt-BR') : '—'}
                               </td>
                             ))}
-                            <td className="text-right p-3 tabular-nums text-sm text-muted-foreground">
-                              {ticketVal > 0 ? `R$ ${ticketVal.toLocaleString('pt-BR')}` : '—'}
-                            </td>
                           </tr>
 
                           {/* Expanded detail — monthly breakdown with inline edit */}
