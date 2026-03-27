@@ -499,10 +499,21 @@ export default function Assumptions() {
       if (!isHistorical(year, m)) arr[m] = rate;
     }
 
-    // Compute Dec target
-    const monthlyChurn = getChurnMonthly(key, data);
-    const newMonthly = computeProjectedClients(key, year, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-    const newDecTarget = newMonthly[11];
+    // Build sequential projection with growth rates and save as full overrides
+    const base = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    const churnRate = getChurnMonthly(key, data);
+    let prev = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+    const projected: (number | null)[] = Array(12).fill(null);
+    for (let m = 0; m < 12; m++) {
+      if (isHistorical(year, m)) {
+        prev = Math.round(base[m]);
+      } else {
+        const next = Math.max(0, Math.round(prev * (1 + arr[m] - churnRate)));
+        projected[m] = next;
+        prev = next;
+      }
+    }
+    const newDecTarget = projected[11] ?? Math.round(base[11]);
 
     setGrowthRates(prev => {
       const updated = { ...prev };
@@ -512,12 +523,18 @@ export default function Assumptions() {
       return updated;
     });
 
-    // Propagate Dec target directly (bypass edit mode)
     setAssumptions(prev => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
         [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
+      },
+      monthlyClientOverrides: {
+        ...(prev.monthlyClientOverrides ?? {}),
+        [key]: {
+          ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
+          [year]: projected,
+        },
       },
     }));
   };
