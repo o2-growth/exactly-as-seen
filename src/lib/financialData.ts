@@ -126,10 +126,15 @@ export interface BUTaxConfig {
 }
 
 export interface SubProductTaxConfig {
-  pis: number;       // default 0.65
-  cofins: number;    // default 3.0
-  iss: number;       // default 5.0 (CaaS) ou 2.9 (demais)
-  tipoReceita: string; // 'servico' (default)
+  pis: number;              // 2.04 PIS — default 0.65
+  cofins: number;           // 2.05 COFINS — default 3.0
+  iss: number;              // 2.03 ISS — default 5.0 (CaaS) ou 2.9 (demais)
+  csllRetido: number;       // 2.01 CSLL (retido na fonte) — default 0
+  pisRetido: number;        // 2.02 PIS (retido na fonte) — default 0
+  icms: number;             // 2.06 ICMS — default 0
+  irrfRetido: number;       // 2.07 IRRF (retido na fonte) — default 0
+  cofinsRetido: number;     // 2.08 COFINS (retido na fonte) — default 0
+  tipoReceita: string;      // 'servico' (default)
 }
 
 /** All TicketKey values grouped by product category */
