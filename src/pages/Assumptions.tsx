@@ -58,7 +58,7 @@ const CLIENTS_ROWS: ClientGroup[] = [
       { label: 'Serviços Especializados', dataKey: 'caasAssessoria' },
       { label: 'Enterprise',              dataKey: 'caasEnterprise' },
       { label: 'Corporate',               dataKey: 'caasCorporate' },
-      { label: 'Parceiros',               dataKey: null },
+      { label: 'Parceiros',               dataKey: 'caasParceiros' },
       { label: 'BPO Financeiro',          dataKey: 'caasSetup' },
     ],
   },
@@ -67,26 +67,26 @@ const CLIENTS_ROWS: ClientGroup[] = [
     items: [
       { label: 'Oxy',                         dataKey: 'saasOxy' },
       { label: 'Oxy + Gênio',                 dataKey: 'saasOxyGenio' },
-      { label: 'Setup',                        dataKey: null },
-      { label: 'Parceiros',                    dataKey: null },
-      { label: 'Oxy + Gênio + Especialista',  dataKey: null },
+      { label: 'Setup',                        dataKey: 'saasSetup' },
+      { label: 'Parceiros',                    dataKey: 'saasParceiros' },
+      { label: 'Oxy + Gênio + Especialista',  dataKey: 'saasOxyGenioEsp' },
     ],
   },
   {
     group: 'Education',
     items: [
       { label: 'Dono CFO',                dataKey: 'educationDonoCFO' },
-      { label: 'Engenheiro de Negócios',   dataKey: null },
-      { label: 'Financeiro Raiz',          dataKey: null },
-      { label: 'Finance Sales Program',    dataKey: null },
+      { label: 'Engenheiro de Negócios',   dataKey: 'educationEN' },
+      { label: 'Financeiro Raiz',          dataKey: 'educationFR' },
+      { label: 'Finance Sales Program',    dataKey: 'educationFSP' },
     ],
   },
   {
     group: 'Expansão',
     items: [
       { label: 'Oxy Hacker', dataKey: 'baas' },
-      { label: 'Franquia',                       dataKey: null },
-      { label: 'Master Franquia',                dataKey: null },
+      { label: 'Franquia',                       dataKey: 'baasFranquia' },
+      { label: 'Master Franquia',                dataKey: 'baasMasterFranquia' },
     ],
   },
   {
