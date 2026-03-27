@@ -98,7 +98,7 @@ export function VersionHistoryProvider({ children }: { children: React.ReactNode
     // Initial version
     return [{
       id: 'v1-initial',
-      version: '1.0',
+      version: '1.1',
       timestamp: '2025-03-05T00:00:00.000Z',
       note: 'Modelo base (5 de Março 2025)',
       assumptions: DEFAULT_ASSUMPTIONS,
