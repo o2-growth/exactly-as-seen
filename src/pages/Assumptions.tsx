@@ -843,6 +843,20 @@ export default function Assumptions() {
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
                                                   yearArr[i] = v;
+                                                  // Geometric interpolation for subsequent months
+                                                  if (i < 11) {
+                                                    const decTicket = yearArr[11];
+                                                    const remainingSteps = 11 - i;
+                                                    for (let j = i + 1; j <= 10; j++) {
+                                                      const step = j - i;
+                                                      if (v > 0 && decTicket > 0) {
+                                                        yearArr[j] = Math.round(v * Math.pow(decTicket / v, step / remainingSteps) * 100) / 100;
+                                                      } else {
+                                                        yearArr[j] = decTicket;
+                                                      }
+                                                    }
+                                                    yearArr[11] = decTicket;
+                                                  }
                                                   setAssumptions(prev => ({
                                                     ...prev,
                                                     monthlyTickets: {
