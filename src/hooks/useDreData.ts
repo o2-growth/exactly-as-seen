@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { hasBackendConfig, getBackendClient } from '@/lib/supabase-safe';
 import { PnlNode } from '@/lib/pnlData';
 import { Year, YEARS } from '@/lib/financialData';
 
@@ -33,7 +33,6 @@ function convertNode(raw: RawPnlNode): PnlNode {
 
   for (const y of YEARS) {
     const key = String(y);
-    // DB values are in R$, P&L displays in R$ mil (thousands)
     annual[y] = raw.annual[key] != null ? raw.annual[key] / 1000 : 0;
 
     if (raw.monthly && raw.monthly[key]) {
@@ -86,11 +85,18 @@ export function useDreData() {
   const [dreYears, setDreYears] = useState<number[]>([]);
 
   useEffect(() => {
+    if (!hasBackendConfig()) {
+      setError('Backend não configurado');
+      setLoading(false);
+      return;
+    }
+
     async function fetchData() {
       try {
         setLoading(true);
         setError(null);
 
+        const supabase = getBackendClient();
         const { data, error: fnError } = await supabase.functions.invoke('fetch-dre-data');
 
         if (fnError) throw new Error(fnError.message);
