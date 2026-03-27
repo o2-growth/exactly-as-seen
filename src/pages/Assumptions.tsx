@@ -575,7 +575,10 @@ export default function Assumptions() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-xl md:text-2xl font-bold text-primary">Assumptions</h2>
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-primary">Assumptions</h2>
+          <p className="text-xs text-muted-foreground mt-1">Premissas da modelagem financeira. Os valores definidos aqui alimentam o P&L projetado, Cash Flow e demais demonstrações.</p>
+        </div>
         <div className="flex items-center gap-2">
           {editing ? (
             <>
