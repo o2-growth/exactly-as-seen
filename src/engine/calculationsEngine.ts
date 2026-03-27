@@ -7,9 +7,9 @@
 import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
-  clientsBase2025, avgTicket, churnAnnual, salesDeductions, salesDeductionsByYear,
+  clientsBase2025, avgTicket, churnAnnual,
   cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
-  commercialExpenses2025, taxRates, revenueTaxes, debtSchedule,
+  commercialExpenses2025, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
   salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
   financialItems2025, outrosExpenses2025,
