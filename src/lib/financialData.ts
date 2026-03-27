@@ -263,6 +263,12 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   },
   // Editable Selic monthly rate (default 1.17%)
   selicMonthly: 0.0117,
+  // Lucro Presumido — tax config per BU
+  buTaxConfigs: [
+    { buKey: 'caas',  tipoReceita: 'servico', aliquotaIss: 5 },
+    { buKey: 'saas',  tipoReceita: 'servico', aliquotaIss: 2.9 },
+    { buKey: 'setup', tipoReceita: 'servico', aliquotaIss: 2.9 },
+  ],
 };
 
 // Base annual data (R$ thousands)
