@@ -84,7 +84,7 @@ const CLIENTS_ROWS: ClientGroup[] = [
   {
     group: 'Expansão',
     items: [
-      { label: 'Oxy Hacker - Micro Franqueado', dataKey: 'baas' },
+      { label: 'Assinatura', dataKey: 'baas' },
       { label: 'Franquia',                       dataKey: null },
       { label: 'Master Franquia',                dataKey: null },
     ],
@@ -144,7 +144,7 @@ const TICKETS_ROWS: TicketGroup[] = [
   {
     group: 'Expansão',
     items: [
-      { label: 'Oxy Hacker - Micro Franqueado', dataKey: 'baas', staticValue: 229 },
+      { label: 'Assinatura', dataKey: 'baas', staticValue: 229 },
       { label: 'Franquia',                       dataKey: null,   staticValue: 0 },
       { label: 'Master Franquia',                dataKey: null,   staticValue: 0 },
     ],
@@ -1230,6 +1230,22 @@ export default function Assumptions() {
           {/* ── Section 3: Finance KPI ── */}
           <div className="gradient-card p-5">
             <h3 className="text-sm font-semibold mb-4">Finance KPI</h3>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground font-medium">Selic Mensal (%):</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                  value={((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}
+                  onChange={e => {
+                    const v = (Number(e.target.value) || 0) / 100;
+                    updateModel(prev => ({ ...prev, selicMonthly: v }));
+                  }}
+                />
+                <span className="text-[10px] text-muted-foreground">({((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}% a.m. = {((Math.pow(1 + (data.selicMonthly ?? 0.0117), 12) - 1) * 100).toFixed(1)}% a.a.)</span>
+              </div>
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
@@ -1243,8 +1259,7 @@ export default function Assumptions() {
                 <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="p-3 font-medium">Selic Mensal</td>
                   {MONTHS.map((_, i) => {
-                    const annualSelic = selicRates[selectedYear] ?? 0.15;
-                    const monthlyPct = ((Math.pow(1 + annualSelic, 1 / 12) - 1) * 100);
+                    const monthlyPct = ((data.selicMonthly ?? 0.0117) * 100);
                     return (
                       <td key={i} className="text-right p-3 tabular-nums text-xs">
                         {monthlyPct.toFixed(3)}%
@@ -2096,7 +2111,6 @@ export default function Assumptions() {
 
           {/* Item 7: Squad Operação Config */}
           <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">Squad Operação — Estrutura de Custo</h3>
             {(() => {
               const rawSq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
               const defaults = DEFAULT_ASSUMPTIONS.squadConfig!;
@@ -2146,38 +2160,30 @@ export default function Assumptions() {
 
               return (
                 <>
-                  {/* 3 sections side by side */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Squad CFO */}
+                  {/* 2 sections side by side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Squad CaaS */}
                     <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Squad CFO</p>
-                      <p className="text-[10px] text-muted-foreground">1 CFO + {sq.cfoAnalistasPerSquad} analistas = {formatCurrencyFull(cfoSquadCost)}/mês por squad</p>
-                      <p className="text-[10px] text-muted-foreground">Cada squad aguenta {sq.cfoClientsPerSquad} clientes CaaS</p>
+                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">SQUAD CAAS</p>
+                      <p className="text-[10px] text-muted-foreground">1 Diretor + 1 CFO + 1 FP&A Analista por squad, cada squad aguenta {sq.cfoClientsPerSquad} clientes CaaS</p>
+                      <p className="text-[10px] text-muted-foreground">Custo squad: {formatCurrencyFull(cfoSquadCost)}/mês | CS: 1 a cada {sq.csPerClients} clientes @ {formatCurrencyFull(sq.csSalary)}/mês</p>
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
+                          <label className="text-[9px] text-muted-foreground">Diretor (R$/mês)</label>
                           <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Analista (R$/mês)</label>
+                          <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
                           <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Analistas/squad</label>
+                          <label className="text-[9px] text-muted-foreground">CFO + FP&A / squad</label>
                           <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Clientes/squad</label>
+                          <label className="text-[9px] text-muted-foreground">Clientes CaaS/squad</label>
                           <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
                         </div>
-                      </div>
-                    </div>
-
-                    {/* CS */}
-                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Customer Success</p>
-                      <p className="text-[10px] text-muted-foreground">1 CS a cada {sq.csPerClients} clientes @ {formatCurrencyFull(sq.csSalary)}/mês</p>
-                      <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
                           <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
@@ -2191,7 +2197,7 @@ export default function Assumptions() {
 
                     {/* Squad Setup SaaS */}
                     <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Squad Setup SaaS</p>
+                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">SQUAD SETUP SAAS</p>
                       <p className="text-[10px] text-muted-foreground">1 analista + {sq.setupImplPerSquad} impl = {formatCurrencyFull(setupSquadCost)}/mês por squad</p>
                       <p className="text-[10px] text-muted-foreground">Cada squad aguenta {sq.setupSetupsPerSquad} setups/mês. Líder cuida de {sq.setupSquadsPerLider} squads.</p>
                       <div className="grid grid-cols-2 gap-2 pt-1">
@@ -2273,158 +2279,6 @@ export default function Assumptions() {
             })()}
           </div>
 
-          {/* Section 2: Colaboradores Nomeados */}
-          {(() => {
-            const isHistCell = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-            const cutoff = (i: number) => selectedYear === 2026 && i === 2;
-            const yearMonths = MONTHS.map((_, i) => `${selectedYear}-${String(i + 1).padStart(2, '0')}`);
-
-            // Group employees by BU (use hcEmployees state)
-            const buOrder = ['CaaS', 'SaaS', 'Customer Success', 'Tech', 'Management', 'Commercial & Sales', 'Marketing', 'Administrative', 'Education'];
-            const grouped: Record<string, Array<{ emp: typeof hcEmployees[number]; globalIdx: number }>> = {};
-            hcEmployees.forEach((emp, globalIdx) => {
-              if (!grouped[emp.bu]) grouped[emp.bu] = [];
-              grouped[emp.bu].push({ emp, globalIdx });
-            });
-
-            const buGroups = buOrder.filter(bu => grouped[bu]);
-            Object.keys(grouped).forEach(bu => { if (!buGroups.includes(bu)) buGroups.push(bu); });
-
-            return (
-              <div className={`gradient-card overflow-x-auto${editing ? ' ring-1 ring-primary/30' : ''}`}>
-                <h3 className="text-sm font-semibold p-5 pb-3">Colaboradores Nomeados — {selectedYear}</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      {editing && <th className="px-2 py-2 min-w-[24px]"></th>}
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[160px]">Nome</th>
-                      <th className="text-left px-2 py-2 text-muted-foreground font-medium min-w-[120px]">Função</th>
-                      <th className="text-left px-2 py-2 text-muted-foreground font-medium min-w-[56px]">Código</th>
-                      <th className="text-left px-2 py-2 text-muted-foreground font-medium min-w-[80px]">BU</th>
-                      {MONTHS.map((m, i) => (
-                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${cutoff(i) ? ' border-r border-primary/30' : ''}`}>{m}</th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[80px]">Total Anual</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {buGroups.map(bu => {
-                      const employees = grouped[bu] ?? [];
-                      return (
-                        <React.Fragment key={bu}>
-                          <tr className="bg-secondary/30">
-                            <td colSpan={editing ? 5 + 12 + 1 : 4 + 12 + 1} className="sticky left-0 px-4 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">{bu}</td>
-                          </tr>
-                          {employees.map(({ emp, globalIdx }) => {
-                            const annual = yearMonths.reduce((s, p) => s + (emp.monthly[p] ?? 0), 0);
-                            return (
-                              <tr key={globalIdx} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                                {editing && (
-                                  <td className="px-2 py-1.5 text-center">
-                                    <button
-                                      onClick={() => removeEmployee(globalIdx)}
-                                      className="text-negative/60 hover:text-negative transition-colors"
-                                      title="Remover colaborador"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </button>
-                                  </td>
-                                )}
-                                <td className="sticky left-0 z-10 bg-card px-4 py-1.5 font-medium">
-                                  {editing ? (
-                                    <input
-                                      type="text"
-                                      className="w-36 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                      value={emp.name}
-                                      onChange={e => updateEmployeeField(globalIdx, 'name', e.target.value)}
-                                    />
-                                  ) : emp.name}
-                                </td>
-                                <td className="px-2 py-1.5 text-muted-foreground">
-                                  {editing ? (
-                                    <input
-                                      type="text"
-                                      className="w-28 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                      value={emp.role}
-                                      onChange={e => updateEmployeeField(globalIdx, 'role', e.target.value)}
-                                    />
-                                  ) : emp.role}
-                                </td>
-                                <td className="px-2 py-1.5 text-muted-foreground font-mono">
-                                  {editing ? (
-                                    <input
-                                      type="text"
-                                      className="w-14 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary font-mono"
-                                      value={emp.code}
-                                      onChange={e => updateEmployeeField(globalIdx, 'code', e.target.value)}
-                                    />
-                                  ) : emp.code}
-                                </td>
-                                <td className="px-2 py-1.5 text-muted-foreground">
-                                  {editing ? (
-                                    <input
-                                      type="text"
-                                      className="w-20 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                      value={emp.bu}
-                                      onChange={e => updateEmployeeField(globalIdx, 'bu', e.target.value)}
-                                    />
-                                  ) : emp.bu}
-                                </td>
-                                {yearMonths.map((p, i) => {
-                                  const val = emp.monthly[p] ?? 0;
-                                  return (
-                                    <td key={i} className={`text-right px-2 py-1.5 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
-                                      {editing && !isHistCell(i) ? (
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          className="w-20 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={val || ''}
-                                          onChange={e => updateEmployeeSalary(globalIdx, p, Number(e.target.value) || 0)}
-                                        />
-                                      ) : (
-                                        val === 0 ? '—' : formatCurrency(val)
-                                      )}
-                                    </td>
-                                  );
-                                })}
-                                <td className="text-right px-3 py-1.5 tabular-nums font-medium">{annual === 0 ? '—' : formatCurrency(annual)}</td>
-                              </tr>
-                            );
-                          })}
-                        </React.Fragment>
-                      );
-                    })}
-                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2" colSpan={editing ? 5 : 4}>Total Folha</td>
-                      {yearMonths.map((p, i) => {
-                        const total = hcEmployees.reduce((s, emp) => s + (emp.monthly[p] ?? 0), 0);
-                        return (
-                          <td key={i} className={`text-right px-2 py-2 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
-                            {total === 0 ? '—' : formatCurrency(total)}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right px-3 py-2 tabular-nums">
-                        {formatCurrency(yearMonths.reduce((s, p) => s + hcEmployees.reduce((ss, emp) => ss + (emp.monthly[p] ?? 0), 0), 0))}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                {editing && (
-                  <div className="px-4 py-3 border-t border-border/30">
-                    <button
-                      onClick={addEmployee}
-                      className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 transition-colors font-medium"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Adicionar Colaborador
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
 
           {/* Section 3: Indicadores de Folha */}
           {(() => {

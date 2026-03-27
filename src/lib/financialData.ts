@@ -72,12 +72,12 @@ export interface Assumptions {
   eduExpansaoTeamRate?: number;
   // Item 7: Squad operation structure
   squadConfig?: {
-    // Squad CFO: 1 CFO + 2 analistas por squad. Cada squad aguenta N clientes.
+    // Squad CaaS: 1 Diretor + 1 CFO + 1 FP&A por squad. Cada squad aguenta N clientes CaaS.
     cfoSalary: number;
     cfoAnalistaSalary: number;
     cfoAnalistasPerSquad: number;
     cfoClientsPerSquad: number;
-    // CS: 1 CS a cada N clientes (geral)
+    // CS: 1 CS a cada N clientes (geral) — inside Squad CaaS card
     csPerClients: number;
     csSalary: number;
     // Squad Setup SaaS: 1 analista + 2 implementadores. Cada squad aguenta N novos setups/mês.
@@ -89,6 +89,8 @@ export interface Assumptions {
     setupLiderSalary: number;
     setupSquadsPerLider: number;
   };
+  // Editable Selic monthly rate (default 1.17% = 0.0117)
+  selicMonthly?: number;
 }
 
 export type TicketKey = keyof Assumptions['tickets'];
@@ -194,12 +196,12 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   eduExpansaoTeamRate: 0.15,
   // Item 7: Squad config
   squadConfig: {
-    // Squad CFO: 1 CFO (R$15k) + 2 analistas (R$8k cada) = R$31k/squad, aguenta 15 clientes
+    // Squad CaaS: 1 Diretor (R$15k) + 2 (CFO + FP&A) (R$8k cada) = R$31k/squad, aguenta 15 clientes
     cfoSalary: 15000,
     cfoAnalistaSalary: 8000,
     cfoAnalistasPerSquad: 2,
     cfoClientsPerSquad: 15,
-    // CS: 1 CS (R$5k) a cada 100 clientes
+    // CS: 1 CS (R$5k) a cada 100 clientes — inside Squad CaaS
     csPerClients: 100,
     csSalary: 5000,
     // Squad Setup: 1 analista (R$8k) + 2 implementadores (R$8k cada) = R$24k/squad, aguenta 16 setups/mês
@@ -211,6 +213,8 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     setupLiderSalary: 12000,
     setupSquadsPerLider: 2,
   },
+  // Editable Selic monthly rate (default 1.17%)
+  selicMonthly: 0.0117,
 };
 
 // Base annual data (R$ thousands)
@@ -325,7 +329,7 @@ export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
   saasOxy: 'Oxy',
   saasOxyGenio: 'Oxy + Gênio',
   educationDonoCFO: 'Dono CFO',
-  baas: 'Oxy Hacker - Micro Franqueado',
+  baas: 'Assinatura',
   taxAT: 'Assessoria Tributária',
   taxGPT: 'Gestão Passivo Tributário',
   taxRCT: 'Recuperação Crédito Tributário',
