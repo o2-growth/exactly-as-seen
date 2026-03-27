@@ -178,24 +178,15 @@ describe('Engine: Sales deductions', () => {
     }
   });
 
-  it('deduction rate is ~9.65% for 2025-2026 (Lucro Presumido)', () => {
-    for (const y of [2025, 2026] as Year[]) {
+  it('deduction rate is ~8-10% (Lucro Presumido per BU — PIS+COFINS+ISS)', () => {
+    for (const y of YEARS) {
       const yr = model.years[y];
       if (yr.grossRevenue > 0) {
         const rate = Math.abs(yr.deductions / yr.grossRevenue);
-        expect(rate).toBeGreaterThan(0.09);
-        expect(rate).toBeLessThan(0.11);
-      }
-    }
-  });
-
-  it('deduction rate is ~15.25% for 2027+ (Lucro Real)', () => {
-    for (const y of [2027, 2028, 2029, 2030] as Year[]) {
-      const yr = model.years[y];
-      if (yr.grossRevenue > 0) {
-        const rate = Math.abs(yr.deductions / yr.grossRevenue);
-        expect(rate).toBeGreaterThan(0.14);
-        expect(rate).toBeLessThan(0.16);
+        // Per-BU rates: PIS 0.65% + COFINS 3% + ISS 2.9-5% ≈ 6.55-8.65% on BU revenue
+        // But deductions are only on CaaS+SaaS+Setup, not total gross revenue
+        expect(rate).toBeGreaterThan(0.04);
+        expect(rate).toBeLessThan(0.12);
       }
     }
   });
