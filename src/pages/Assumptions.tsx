@@ -697,16 +697,17 @@ export default function Assumptions() {
         </div>
       </div>
 
-      <Tabs defaultValue="receita" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="receita">Revenue</TabsTrigger>
-          <TabsTrigger value="marketing">COGS & Marketing</TabsTrigger>
-          <TabsTrigger value="operacao">SG&A & Financeiro</TabsTrigger>
-          <TabsTrigger value="headcount">Pessoal & Squad</TabsTrigger>
+      <Tabs defaultValue="revenue" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="revenue">Revenue</TabsTrigger>
+          <TabsTrigger value="tax">Tax Deductions</TabsTrigger>
+          <TabsTrigger value="cos">COS</TabsTrigger>
+          <TabsTrigger value="sga">SG&A</TabsTrigger>
+          <TabsTrigger value="economic">Econ. & Fin.</TabsTrigger>
         </TabsList>
 
-        {/* ─── TAB 1: RECEITA ─── */}
-        <TabsContent value="receita" className="space-y-6 mt-4">
+        {/* ─── BLOCO 1: REVENUE ─── */}
+        <TabsContent value="revenue" className="space-y-6 mt-4">
 
           {/* ── Section 1: Nº de Clientes — Expandable Rows ── */}
           <div className="gradient-card overflow-x-auto">
@@ -744,7 +745,6 @@ export default function Assumptions() {
 
                       return (
                         <React.Fragment key={`${group.group}-${row.label}`}>
-                          {/* Collapsed row — shows annual totals per year */}
                           <tr
                             className={`border-b border-border/20 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5' : 'hover:bg-secondary/20'}`}
                             onClick={() => setExpandedProducts(p => ({ ...p, [rowKey]: !p[rowKey] }))}
@@ -770,7 +770,6 @@ export default function Assumptions() {
                           {/* Expanded detail — monthly breakdown with inline edit */}
                           {isExpanded && row.dataKey && (() => {
                             const prodKey = row.dataKey as SubProductKey;
-                            // Direct update functions — bypass lock/unlock, update assumptions directly
                             const directUpdateClients = (yearToUpdate: Year, val: number) => {
                               setAssumptions(prev => ({
                                 ...prev,
@@ -790,7 +789,7 @@ export default function Assumptions() {
                             <tr className="border-b border-border/30">
                               <td colSpan={activeYears.length + 2} className="px-5 py-4 bg-secondary/5">
                                 <div className="space-y-4">
-                                  {/* Annual targets — editable per year */}
+                                  {/* Annual targets */}
                                   <div>
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (target fim de ano)</p>
                                     <div className="grid grid-cols-6 gap-2">
@@ -877,13 +876,11 @@ export default function Assumptions() {
                                                 value={monthTicket}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
-                                                  // Initialize monthly tickets if needed
                                                   const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
                                                   const yearArr = currentMonthlyTickets[prodKey]?.[selectedYear]
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
                                                   yearArr[i] = v;
-                                                  // Geometric interpolation for subsequent months
                                                   if (i < 11) {
                                                     const decTicket = yearArr[11];
                                                     const remainingSteps = 11 - i;
@@ -996,7 +993,6 @@ export default function Assumptions() {
                 </tr>
                 {CLIENTS_ROWS.flatMap(group => group.items.filter(r => r.dataKey)).map(row => {
                   const rowKey = row.dataKey!;
-                  const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churnRate = getChurnMonthly(rowKey, data);
                   const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                   const churnClients = monthly.map((val, i) => {
@@ -1037,7 +1033,6 @@ export default function Assumptions() {
                   const totalChurn = Array(12).fill(0);
                   for (const row of allProducts) {
                     const rowKey = row.dataKey!;
-                    const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                     const churnRate = getChurnMonthly(rowKey, data);
                     const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                     for (let i = 0; i < 12; i++) {
@@ -1095,7 +1090,7 @@ export default function Assumptions() {
             </table>
           </div>
 
-          {/* ── Section 2: Ticket Médio (Items 1, 10: monthly + per-year editing) ── */}
+          {/* ── Section 2: Ticket Médio ── */}
           <div className="gradient-card overflow-x-auto">
             <div className="flex items-center gap-3 p-5 pb-3 flex-wrap">
               <h3 className="text-sm font-semibold">
@@ -1105,11 +1100,9 @@ export default function Assumptions() {
                 <label className="text-[10px] text-muted-foreground">Editar por mês</label>
                 <button
                   onClick={() => {
-                    // Toggle monthly editing: when enabling, populate monthlyTickets from flat
                     const current = data.monthlyTickets ?? {};
                     const hasMonthly = Object.keys(current).length > 0;
                     if (!hasMonthly) {
-                      // Initialize from flat values
                       const init: Record<string, Record<number, number[]>> = {};
                       for (const key of Object.keys(data.tickets) as TicketKey[]) {
                         init[key] = {};
@@ -1123,7 +1116,6 @@ export default function Assumptions() {
                         setAssumptions({ ...assumptions, monthlyTickets: init });
                       }
                     } else {
-                      // Clear monthly overrides
                       if (editing) {
                         setEditState(prev => ({ ...prev, monthlyTickets: undefined }));
                       } else {
@@ -1230,57 +1222,7 @@ export default function Assumptions() {
             </table>
           </div>
 
-          {/* ── Section 3: Finance KPI ── */}
-          <div className="gradient-card p-5">
-            <h3 className="text-sm font-semibold mb-4">Finance KPI</h3>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground font-medium">Selic Mensal (%):</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                  value={((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}
-                  onChange={e => {
-                    const v = (Number(e.target.value) || 0) / 100;
-                    updateModel(prev => ({ ...prev, selicMonthly: v }));
-                  }}
-                />
-                <span className="text-[10px] text-muted-foreground">({((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}% a.m. = {((Math.pow(1 + (data.selicMonthly ?? 0.0117), 12) - 1) * 100).toFixed(1)}% a.a.)</span>
-              </div>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Indicador</th>
-                  {MONTHS.map(m => (
-                    <th key={m} className="text-right p-3 text-muted-foreground font-medium min-w-[58px]">{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Selic Mensal</td>
-                  {MONTHS.map((_, i) => {
-                    const monthlyPct = ((data.selicMonthly ?? 0.0117) * 100);
-                    return (
-                      <td key={i} className="text-right p-3 tabular-nums text-xs">
-                        {monthlyPct.toFixed(3)}%
-                      </td>
-                    );
-                  })}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">R$ em Custódia</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs text-muted-foreground">R$ 0</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Section 4: Churn Médio ── */}
+          {/* ── Section 3: Churn Médio ── */}
           <div className="gradient-card overflow-x-auto">
             <h3 className="text-sm font-semibold p-5 pb-3">Churn Médio</h3>
             <table className="w-full text-sm">
@@ -1293,79 +1235,48 @@ export default function Assumptions() {
                 </tr>
               </thead>
               <tbody>
-                {/* CFO as a Service */}
                 <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="p-3 font-medium">CFO as a Service</td>
                   {MONTHS.map((_, i) => (
                     <td key={i} className="text-right p-3 tabular-nums text-xs">
                       {editing ? (
                         i === 0 ? (
-                          <input
-                            type="number"
-                            step="0.5"
-                            className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnCaas}
-                            onChange={e => updateModel(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))}
-                          />
-                        ) : (
-                          <span className="text-muted-foreground">{data.churnCaas}%</span>
-                        )
-                      ) : (
-                        `${data.churnCaas}%`
-                      )}
+                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                            value={data.churnCaas} onChange={e => updateModel(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))} />
+                        ) : <span className="text-muted-foreground">{data.churnCaas}%</span>
+                      ) : `${data.churnCaas}%`}
                     </td>
                   ))}
                 </tr>
-                {/* Software as a Service */}
                 <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="p-3 font-medium">Software as a Service</td>
                   {MONTHS.map((_, i) => (
                     <td key={i} className="text-right p-3 tabular-nums text-xs">
                       {editing ? (
                         i === 0 ? (
-                          <input
-                            type="number"
-                            step="0.5"
-                            className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnSaas}
-                            onChange={e => updateModel(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))}
-                          />
-                        ) : (
-                          <span className="text-muted-foreground">{data.churnSaas}%</span>
-                        )
-                      ) : (
-                        `${data.churnSaas}%`
-                      )}
+                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                            value={data.churnSaas} onChange={e => updateModel(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))} />
+                        ) : <span className="text-muted-foreground">{data.churnSaas}%</span>
+                      ) : `${data.churnSaas}%`}
                     </td>
                   ))}
                 </tr>
-                {/* Education */}
                 <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="p-3 font-medium">Education</td>
                   {MONTHS.map((_, i) => (
                     <td key={i} className="text-right p-3 tabular-nums text-xs text-muted-foreground">0%</td>
                   ))}
                 </tr>
-                {/* Banking as a Service */}
                 <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="p-3 font-medium">Banking as a Service</td>
                   {MONTHS.map((_, i) => (
                     <td key={i} className="text-right p-3 tabular-nums text-xs">
                       {editing ? (
                         i === 0 ? (
-                          <input
-                            type="number"
-                            step="0.5"
-                            className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnBaas}
-                            onChange={e => updateModel(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))}
-                          />
-                        ) : (
-                          <span className="text-muted-foreground">{data.churnBaas}%</span>
-                        )
-                      ) : (
-                        `${data.churnBaas}%`
-                      )}
+                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
+                            value={data.churnBaas} onChange={e => updateModel(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))} />
+                        ) : <span className="text-muted-foreground">{data.churnBaas}%</span>
+                      ) : `${data.churnBaas}%`}
                     </td>
                   ))}
                 </tr>
@@ -1375,623 +1286,41 @@ export default function Assumptions() {
 
         </TabsContent>
 
-        {/* ─── TAB 2: MARKETING ─── */}
-        <TabsContent value="marketing" className="space-y-6 mt-4">
-          {/* Planned/Actual toggle */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-sm font-semibold">Marketing — Planejado vs Realizado</h3>
-            <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
-              {(['planned', 'actual'] as const).map(v => (
-                <button
-                  key={v}
-                  onClick={() => setMarketingView(v)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
-                    marketingView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {v === 'planned' ? 'Planejado' : 'Realizado'}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* ─── BLOCO 2: TAX DEDUCTIONS ─── */}
+        <TabsContent value="tax" className="space-y-6 mt-4">
 
-          {/* Realizado: historical marketing spend table */}
-          {marketingView === 'actual' && (() => {
-            const isHistPeriod = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-
-            const mkRows: { label: string; key: string; isSummary?: boolean }[] = [
-              { label: 'Despesas de Marketing', key: 'Despesas de Marketing', isSummary: true },
-              { label: 'Despesas Comerciais', key: 'Despesas Comerciais' },
-            ];
-
-            const getHistVal = (key: string, monthIdx: number): number => {
-              const period = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
-              return historicalExpenses[key]?.[period] ?? 0;
-            };
-
-            const getAnnual = (key: string): number =>
-              MONTHS.reduce((s, _, i) => s + getHistVal(key, i), 0);
-
-            const statusBadge = selectedYear <= 2025
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Realizado</span>
-              : selectedYear === 2026
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Jan–Mar Realizado</span>
-              : <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Projetado</span>;
-
-            return (
-              <div className="gradient-card overflow-x-auto">
-                <h3 className="text-sm font-semibold p-5 pb-3 flex items-center flex-wrap gap-1">
-                  Gastos de Marketing — {selectedYear}
-                  {statusBadge}
-                </h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Linha</th>
-                      {MONTHS.map((m, i) => (
-                        <th
-                          key={m}
-                          className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${selectedYear === 2026 && i === 2 ? ' border-r border-primary/30' : ''}`}
-                        >
-                          {m}
-                        </th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mkRows.map(row => (
-                      <tr
-                        key={row.key}
-                        className={`border-b border-border/20 transition-colors ${
-                          row.isSummary
-                            ? 'bg-secondary/40 hover:bg-secondary/60 font-semibold'
-                            : 'hover:bg-secondary/20'
-                        }`}
-                      >
-                        <td className={`sticky left-0 z-10 px-4 py-1.5 font-medium ${row.isSummary ? 'bg-secondary/40' : 'bg-card'}`}>
-                          {row.label}
-                        </td>
-                        {MONTHS.map((_, i) => {
-                          const val = getHistVal(row.key, i);
-                          const isHist = isHistPeriod(i);
-                          const isCutoffBorder = selectedYear === 2026 && i === 2;
-                          return (
-                            <td
-                              key={i}
-                              className={`text-right px-2 py-1.5 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${
-                                !isHist ? ' text-muted-foreground/60 italic' : ''
-                              }`}
-                            >
-                              {!isHist && val === 0 ? '—' : formatCurrency(val)}
-                            </td>
-                          );
-                        })}
-                        <td className="text-right px-3 py-1.5 tabular-nums font-medium">
-                          {formatCurrency(getAnnual(row.key))}
-                        </td>
-                      </tr>
-                    ))}
-                    {/* Total row */}
-                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL MARKETING</td>
-                      {MONTHS.map((_, i) => {
-                        const val = mkRows.reduce((s, r) => s + getHistVal(r.key, i), 0);
-                        const isHist = isHistPeriod(i);
-                        const isCutoffBorder = selectedYear === 2026 && i === 2;
-                        return (
-                          <td
-                            key={i}
-                            className={`text-right px-2 py-2 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${
-                              !isHist ? ' text-muted-foreground/60 italic' : ''
-                            }`}
-                          >
-                            {formatCurrency(val)}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right px-3 py-2 tabular-nums">
-                        {formatCurrency(mkRows.reduce((s, r) => s + getAnnual(r.key), 0))}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p className="text-[10px] text-muted-foreground p-3 pt-1">
-                  Fonte: Oxy DB — dados reais de despesas de marketing e comerciais extraidos do sistema financeiro.
-                </p>
-              </div>
-            );
-          })()}
-
-          {/* Item 5: PR & Events inputs */}
+          {/* Toggle IRPJ/CSLL */}
           <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">PR e Eventos Marketing (custo mensal)</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">PR (R$/mês)</label>
-                <input
-                  type="number"
-                  className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                  value={data.marketingPR ?? 0}
-                  onChange={e => {
-                    const v = Number(e.target.value) || 0;
-                    if (editing) {
-                      setEditState(prev => ({ ...prev, marketingPR: v }));
-                    } else {
-                      setAssumptions({ ...assumptions, marketingPR: v });
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">Eventos (R$/mês)</label>
-                <input
-                  type="number"
-                  className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                  value={data.marketingEvents ?? 0}
-                  onChange={e => {
-                    const v = Number(e.target.value) || 0;
-                    if (editing) {
-                      setEditState(prev => ({ ...prev, marketingEvents: v }));
-                    } else {
-                      setAssumptions({ ...assumptions, marketingEvents: v });
-                    }
-                  }}
-                />
-              </div>
+            <h3 className="text-sm font-semibold">Impostos sobre Lucro</h3>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-muted-foreground whitespace-nowrap">IRPJ/CSLL (imposto sobre lucro)</label>
+              <button
+                onClick={() => {
+                  const next = !data.taxEnabled;
+                  if (editing) {
+                    setEditState(prev => ({ ...prev, taxEnabled: next }));
+                  } else {
+                    setAssumptions({ ...assumptions, taxEnabled: next });
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  data.taxEnabled ? 'bg-primary' : 'bg-secondary border border-border'
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  data.taxEnabled ? 'translate-x-6' : 'translate-x-1'
+                }`} />
+              </button>
+              <span className="text-xs font-medium">{data.taxEnabled ? 'Ativo' : 'Zerado'}</span>
             </div>
           </div>
 
-          {/* Item 6: CAC per product */}
-          <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">CAC por Produto</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-3 py-2 text-muted-foreground font-medium">Produto</th>
-                    <th className="text-right px-3 py-2 text-muted-foreground font-medium">CAC (R$)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(Object.keys(data.tickets) as TicketKey[]).map(key => (
-                    <tr key={key} className="border-b border-border/30 hover:bg-secondary/20">
-                      <td className="px-3 py-2 text-xs">{SUB_PRODUCT_LABELS[key as keyof typeof SUB_PRODUCT_LABELS] || key}</td>
-                      <td className="text-right px-3 py-2">
-                        <input
-                          type="number"
-                          className="w-28 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                          value={data.cacPerProduct?.[key] ?? 0}
-                          onChange={e => {
-                            const v = Number(e.target.value) || 0;
-                            const newCac = { ...(data.cacPerProduct ?? {}), [key]: v };
-                            if (editing) {
-                              setEditState(prev => ({ ...prev, cacPerProduct: newCac }));
-                            } else {
-                              setAssumptions({ ...assumptions, cacPerProduct: newCac });
-                            }
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Unit Economics */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div className="gradient-card p-5">
-              <h3 className="text-sm font-semibold mb-4">Unit Economics</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Ticket Medio</p>
-                  <p className="text-lg font-bold">{formatCurrency(avgTicketVal)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Churn Medio (anual)</p>
-                  <p className="text-lg font-bold">{(avgChurn * 100).toFixed(1)}%</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">LTV</p>
-                  <p className="text-lg font-bold">{formatCurrency(ltv)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">LTV:CAC</p>
-                  <p className={`text-lg font-bold ${ltvCacRatio >= 3 ? 'text-positive' : 'text-negative'}`}>{ltvCacRatio.toFixed(1)}x</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">CAC Medio</p>
-                  <p className="text-lg font-bold">{formatCurrency(avgCac)}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Comissao de Vendas</p>
-                  <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ─── TAB 3: OPERACAO ─── */}
-        <TabsContent value="operacao" className="space-y-6 mt-4">
-
-          {/* ── Item 4: Tax toggle + Item 8: Edu/Expansão rate ── */}
-          <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">Configurações Fiscais e Operacionais</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Tax toggle */}
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap">IRPJ/CSLL (imposto sobre lucro)</label>
-                <button
-                  onClick={() => {
-                    const next = !data.taxEnabled;
-                    if (editing) {
-                      setEditState(prev => ({ ...prev, taxEnabled: next }));
-                    } else {
-                      setAssumptions({ ...assumptions, taxEnabled: next });
-                    }
-                  }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    data.taxEnabled ? 'bg-primary' : 'bg-secondary border border-border'
-                  }`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    data.taxEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
-                </button>
-                <span className="text-xs font-medium">{data.taxEnabled ? 'Ativo' : 'Zerado'}</span>
-              </div>
-              {/* Edu/Expansão team rate */}
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap">Custo Equipe Education/Expansão (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                  value={((data.eduExpansaoTeamRate ?? 0.15) * 100).toFixed(0)}
-                  onChange={e => {
-                    const v = (Number(e.target.value) || 0) / 100;
-                    if (editing) {
-                      setEditState(prev => ({ ...prev, eduExpansaoTeamRate: v }));
-                    } else {
-                      setAssumptions({ ...assumptions, eduExpansaoTeamRate: v });
-                    }
-                  }}
-                />
-                <span className="text-xs text-muted-foreground">% do faturamento</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Resumo Operacional Mensal ── */}
-          {(() => {
-            const isHistPeriod = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-
-            // Get value for a financial category from historicalFinancial (4-level: cat → group → item → period)
-            const getFinancialCatValue = (catCode: string, period: string): number => {
-              const cat = historicalFinancial[catCode];
-              if (!cat) return 0;
-              let sum = 0;
-              for (const group of Object.values(cat)) {
-                for (const item of Object.values(group as Record<string, Record<string, number>>)) {
-                  sum += (item[period] ?? 0);
-                }
-              }
-              return sum;
-            };
-
-            // Projected value from engine (R$ thousands → R$ reais, annual / 12)
-            const getProjected = (engineCode: string): number => {
-              const node = findNodeInTree(engineCode, model.pnlTree);
-              if (!node) return 0;
-              return Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12;
-            };
-
-            // Projected Despesas Fixas = sum of codes 4, 5, 6, 7
-            const getProjectedDespesasFixas = (): number => {
-              const codes = ['4', '5', '6', '7'];
-              return codes.reduce((sum, c) => {
-                const node = findNodeInTree(c, model.pnlTree);
-                return sum + (node ? Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12 : 0);
-              }, 0);
-            };
-
-            // Projected Despesas Financeiras = engine code '8D'
-            const getProjectedFinanceiras = (): number => getProjected('8D');
-            // Projected Provisões = engine code 'TAX'
-            const getProjectedProvisoes = (): number => getProjected('TAX');
-            // Projected Amortização = engine code '11'
-            const getProjectedAmortizacao = (): number => getProjected('11');
-            // Projected Investimentos = engine code '12'
-            const getProjectedInvestimentos = (): number => getProjected('12');
-
-            type OpRow = {
-              label: string;
-              indent?: boolean;
-              isSummary?: boolean;
-              groupKey?: string;
-              getHistValue: (period: string) => number;
-              getProjValue: () => number;
-            };
-
-            const rows: OpRow[] = [
-              {
-                label: 'Custos Variáveis',
-                isSummary: true,
-                groupKey: 'custos',
-                getHistValue: (p) => Object.values(historicalCosts).reduce((s, g) => s + (g[p] ?? 0), 0),
-                getProjValue: () => {
-                  const codes = ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6'];
-                  return codes.reduce((sum, c) => {
-                    const node = findNodeInTree(c, model.pnlTree);
-                    return sum + (node ? Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12 : 0);
-                  }, 0);
-                },
-              },
-              {
-                label: 'Custos CaaS', indent: true,
-                getHistValue: (p) => historicalCosts['Custos Caas']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Custos SaaS', indent: true,
-                getHistValue: (p) => historicalCosts['Custos SaaS']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Custos Customer Success', indent: true,
-                getHistValue: (p) => historicalCosts['Custos Customer Success']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Custos Education', indent: true,
-                getHistValue: (p) => historicalCosts['Custos Education']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Custos Expansão', indent: true,
-                getHistValue: (p) => historicalCosts['Custos Expansão']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Custos Tax', indent: true,
-                getHistValue: (p) => historicalCosts['Custos Tax']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Despesas Fixas',
-                isSummary: true,
-                groupKey: 'despesas',
-                getHistValue: (p) => Object.values(historicalExpenses).reduce((s, g) => s + (g[p] ?? 0), 0),
-                getProjValue: getProjectedDespesasFixas,
-              },
-              {
-                label: 'Desp. Administrativas', indent: true,
-                getHistValue: (p) => historicalExpenses['Despesas Administrativas']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Desp. Comerciais', indent: true,
-                getHistValue: (p) => historicalExpenses['Despesas Comerciais']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Desp. com Pessoal', indent: true,
-                getHistValue: (p) => historicalExpenses['Despesas com Pessoal']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Desp. de Marketing', indent: true,
-                getHistValue: (p) => historicalExpenses['Despesas de Marketing']?.[p] ?? 0,
-                getProjValue: () => 0,
-              },
-              {
-                label: 'Despesas Financeiras',
-                getHistValue: (p) => getFinancialCatValue('DF', p),
-                getProjValue: getProjectedFinanceiras,
-              },
-              {
-                label: 'Provisões (IRPJ/CSLL)',
-                getHistValue: (p) => getFinancialCatValue('PROV', p),
-                getProjValue: getProjectedProvisoes,
-              },
-              {
-                label: 'Amortização de Dívida',
-                getHistValue: (p) => getFinancialCatValue('AD', p),
-                getProjValue: getProjectedAmortizacao,
-              },
-              {
-                label: 'Investimentos',
-                getHistValue: (p) => getFinancialCatValue('INV', p),
-                getProjValue: getProjectedInvestimentos,
-              },
-            ];
-
-            // Determine which rows are visible (sub-items hidden when group is collapsed)
-            const visibleRows = rows.filter((row) => {
-              if (!row.indent) return true;
-              // Sub-items of custos group
-              const costLabels = ['Custos CaaS', 'Custos SaaS', 'Custos Customer Success', 'Custos Education', 'Custos Expansão', 'Custos Tax'];
-              const expLabels = ['Desp. Administrativas', 'Desp. Comerciais', 'Desp. com Pessoal', 'Desp. de Marketing'];
-              if (costLabels.includes(row.label)) return opExpandedGroups.custos;
-              if (expLabels.includes(row.label)) return opExpandedGroups.despesas;
-              return true;
-            });
-
-            // Monthly values for each row
-            const getMonthlyValue = (row: OpRow, monthIdx: number): { value: number; isHist: boolean } => {
-              const period = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
-              const isHist = (HISTORICAL_PERIODS as readonly string[]).includes(period);
-              if (isHist) {
-                return { value: row.getHistValue(period), isHist: true };
-              }
-              // Projected: only show for summary/non-indent rows, sub-items show 0 (rendered as —)
-              if (!row.indent) {
-                return { value: row.getProjValue(), isHist: false };
-              }
-              return { value: 0, isHist: false };
-            };
-
-            // Total row: sum of summary rows only
-            const summaryRows = rows.filter(r => r.isSummary || (!r.indent && !r.isSummary));
-            // Actually: sum all non-indent rows for the total
-            const nonSubRows = rows.filter(r => !r.indent);
-            const getTotalValue = (monthIdx: number): { value: number; isHist: boolean } => {
-              const { isHist } = getMonthlyValue(nonSubRows[0], monthIdx);
-              const value = nonSubRows.reduce((s, r) => s + getMonthlyValue(r, monthIdx).value, 0);
-              return { value, isHist };
-            };
-
-            // Annual total for a row
-            const getAnnualTotal = (row: OpRow): number =>
-              MONTHS.reduce((s, _, i) => s + getMonthlyValue(row, i).value, 0);
-            const getGrandTotal = (): number =>
-              MONTHS.reduce((s, _, i) => s + getTotalValue(i).value, 0);
-
-            const statusBadge = selectedYear <= 2025
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Realizado</span>
-              : selectedYear === 2026
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Jan–Mar Realizado</span>
-              : <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Projetado</span>;
-
-            return (
-              <div className="gradient-card overflow-x-auto">
-                <h3 className="text-sm font-semibold p-5 pb-3 flex items-center flex-wrap gap-1">
-                  Resumo Operacional — {selectedYear}
-                  {statusBadge}
-                </h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[190px]">Linha</th>
-                      {MONTHS.map((m, i) => (
-                        <th
-                          key={m}
-                          className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${selectedYear === 2026 && i === 2 ? ' border-r border-primary/30' : ''}`}
-                        >
-                          {m}
-                        </th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleRows.map((row) => {
-                      const isGroup = row.isSummary && row.groupKey;
-                      return (
-                        <tr
-                          key={row.label}
-                          className={`border-b border-border/20 transition-colors ${
-                            row.isSummary
-                              ? 'bg-secondary/40 hover:bg-secondary/60 font-semibold'
-                              : 'hover:bg-secondary/20'
-                          }`}
-                        >
-                          <td
-                            className={`sticky left-0 z-10 px-4 py-1.5 font-medium ${
-                              row.isSummary ? 'bg-secondary/40' : 'bg-card'
-                            }`}
-                          >
-                            <div
-                              className={`flex items-center gap-1 ${isGroup ? 'cursor-pointer select-none' : ''}`}
-                              onClick={isGroup ? () => setOpExpandedGroups(prev => ({ ...prev, [row.groupKey!]: !prev[row.groupKey!] })) : undefined}
-                            >
-                              {isGroup && (
-                                opExpandedGroups[row.groupKey!]
-                                  ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-                                  : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                              )}
-                              <span className={row.indent ? 'pl-4 text-muted-foreground' : ''}>{row.label}</span>
-                            </div>
-                          </td>
-                          {MONTHS.map((_, i) => {
-                            const { value, isHist } = getMonthlyValue(row, i);
-                            const isCutoffBorder = selectedYear === 2026 && i === 2;
-                            const showDash = !isHist && value === 0;
-                            return (
-                              <td
-                                key={i}
-                                className={`text-right px-2 py-1.5 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${
-                                  !isHist ? ' text-muted-foreground/60 italic' : ''
-                                }`}
-                              >
-                                {showDash ? '—' : formatCurrency(value)}
-                              </td>
-                            );
-                          })}
-                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">
-                            {formatCurrency(getAnnualTotal(row))}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {/* TOTAL OPERACIONAL */}
-                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL OPERACIONAL</td>
-                      {MONTHS.map((_, i) => {
-                        const { value, isHist } = getTotalValue(i);
-                        const isCutoffBorder = selectedYear === 2026 && i === 2;
-                        return (
-                          <td
-                            key={i}
-                            className={`text-right px-2 py-2 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${
-                              !isHist ? ' text-muted-foreground/60 italic' : ''
-                            }`}
-                          >
-                            {formatCurrency(value)}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right px-3 py-2 tabular-nums">{formatCurrency(getGrandTotal())}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
-
-          {/* Cost Assumptions */}
-          <div className="gradient-card p-5">
-            <h3 className="text-sm font-semibold mb-4">Cost Assumptions</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">SG&A % of Revenue</p>
-                <div className="text-sm font-semibold">
-                  {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaPercent} onChange={e => setEditState(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaPercent}%</span>}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">SG&A Annual Growth %</p>
-                <div className="text-sm font-semibold">
-                  {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaGrowthRate} onChange={e => setEditState(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaGrowthRate}%</span>}
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Headcount Cost Growth/yr</p>
-                <div className="text-sm font-semibold">
-                  {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.headcountGrowth} onChange={e => setEditState(p => ({ ...p, headcountGrowth: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.headcountGrowth}%</span>}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Regime Tributario */}
+          {/* Regime Tributário */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Scale className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Regime Tributario</h3>
-              <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">Transicao em 2027</span>
+              <h3 className="text-sm font-semibold">Regime Tributário</h3>
+              <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">Transição em 2027</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 space-y-2">
@@ -2017,102 +1346,53 @@ export default function Assumptions() {
             </div>
             <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>IRPJ 25% + CSLL 9% = 34% sobre lucro tributavel (EBT). Aplicado em ambos os regimes.</span>
+              <span>IRPJ 25% + CSLL 9% = 34% sobre lucro tributável (EBT). Aplicado em ambos os regimes.</span>
             </div>
           </div>
 
-          {/* Custos e Margens */}
-          <div className="gradient-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Receipt className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Custos e Margens</h3>
+        </TabsContent>
+
+        {/* ─── BLOCO 3: COS (Cost of Service) ─── */}
+        <TabsContent value="cos" className="space-y-6 mt-4">
+
+          {/* Custo Equipe Education/Expansão */}
+          <div className="gradient-card p-5 space-y-4">
+            <h3 className="text-sm font-semibold">Custos Operacionais Diretos</h3>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-muted-foreground whitespace-nowrap">Custo Equipe Education/Expansão (%)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                value={((data.eduExpansaoTeamRate ?? 0.15) * 100).toFixed(0)}
+                onChange={e => {
+                  const v = (Number(e.target.value) || 0) / 100;
+                  if (editing) {
+                    setEditState(prev => ({ ...prev, eduExpansaoTeamRate: v }));
+                  } else {
+                    setAssumptions({ ...assumptions, eduExpansaoTeamRate: v });
+                  }
+                }}
+              />
+              <span className="text-xs text-muted-foreground">% do faturamento</span>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Comissao de Vendas</p>
-                <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Crescimento SG&A/ano</p>
-                <p className="text-sm font-semibold">
-                  {editing ? (
-                    <input type="number" step="1" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaGrowthRate} onChange={e => setEditState(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaGrowthRate}%</span>}
-                </p>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-2">
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">CAPEX % do COGS SaaS</p>
-                <p className="text-sm font-semibold">50% (2025–26) -&gt; 30% (2027+)</p>
+                <p className="text-sm font-semibold">50% (2025–26) → 30% (2027+)</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">BaaS COGS/cliente</p>
-                <p className="text-sm font-semibold">R$ 25/mes (a partir de 2025)</p>
+                <p className="text-sm font-semibold">R$ 25/mês (a partir de 2025)</p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">PDD (Provisao p/ Devedores)</p>
+                <p className="text-xs text-muted-foreground">PDD (Provisão p/ Devedores)</p>
                 <p className="text-sm font-semibold">2% da receita bruta</p>
               </div>
             </div>
           </div>
 
-          {/* Resumo de Dividas */}
-          <div className="gradient-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Landmark className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Resumo de Dividas</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Saldo Total Devedor</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.outstanding, 0))}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Parcela Mensal Total</p>
-                <p className="text-sm font-semibold tabular-nums">
-                  {formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.monthlyPayment, 0))}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">N de Contratos</p>
-                <p className="text-sm font-semibold tabular-nums">{debtSchedule.length}</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Contrato</th>
-                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Credor</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Saldo (R$)</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcela/mes</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcelas rest.</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Previsao final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {debtSchedule.map(d => (
-                    <tr key={d.name} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
-                      <td className="py-2 text-xs font-medium">{d.name}</td>
-                      <td className="py-2 text-xs text-muted-foreground">{d.creditor}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.outstanding)}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.monthlyPayment)}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{d.remainingInstallments}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{d.finalDate ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ─── TAB 4: HEADCOUNT/PESSOAL ─── */}
-        <TabsContent value="headcount" className="space-y-6 mt-4">
-
-          {/* Item 7: Squad Operação Config */}
+          {/* Squad Operação Config */}
           <div className="gradient-card p-5 space-y-4">
             {(() => {
               const rawSq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
@@ -2129,33 +1409,25 @@ export default function Assumptions() {
                 }
               };
 
-              // Custo por squad CFO: 1 CFO + N analistas
               const cfoSquadCost = sq.cfoSalary + sq.cfoAnalistasPerSquad * sq.cfoAnalistaSalary;
-              // Custo por squad Setup: 1 analista + N implementadores + líder rateado
               const setupSquadCost = sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary + (sq.setupLiderSalary / sq.setupSquadsPerLider);
 
-              // Compute impact per year
               const yearImpact = activeYears.map(y => {
                 const yr = model.years[y];
                 const caasEnd = data.caasClients[y] ?? 0;
-                // Squads CFO
                 const numCfoSquads = Math.max(1, Math.ceil(caasEnd / Math.max(1, sq.cfoClientsPerSquad)));
                 const cfoTotal = numCfoSquads * cfoSquadCost;
                 const cfoHC = numCfoSquads * (1 + sq.cfoAnalistasPerSquad);
-                // CS
                 const numCS = Math.max(1, Math.ceil(yr.totalClients / Math.max(1, sq.csPerClients)));
                 const csTotal = numCS * sq.csSalary;
-                // Squads Setup
                 const saasThis = (data.subProductClients.saasOxy?.[y] ?? 0) + (data.subProductClients.saasOxyGenio?.[y] ?? 0);
                 const saasPrev = y > 2025 ? (data.subProductClients.saasOxy?.[(y - 1) as Year] ?? 0) + (data.subProductClients.saasOxyGenio?.[(y - 1) as Year] ?? 0) : 0;
                 const newSaasMonth = Math.max(0, (saasThis - saasPrev) / 12);
                 const numSetupSquads = Math.max(1, Math.ceil(newSaasMonth / Math.max(1, sq.setupSetupsPerSquad)));
                 const setupTotal = numSetupSquads * (sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary);
                 const setupHC = numSetupSquads * (1 + sq.setupImplPerSquad);
-                // Líderes
                 const numLideres = Math.max(1, Math.ceil(numSetupSquads / Math.max(1, sq.setupSquadsPerLider)));
                 const liderTotal = numLideres * sq.setupLiderSalary;
-
                 const monthCost = cfoTotal + csTotal + setupTotal + liderTotal;
                 const totalHC = cfoHC + numCS + setupHC + numLideres;
                 return { year: y, caasEnd, clients: yr.totalClients, numCfoSquads, cfoHC, numCS, numSetupSquads, setupHC, numLideres, totalHC, monthCost, annualCost: monthCost * 12, newSaasMonth: Math.round(newSaasMonth) };
@@ -2163,7 +1435,6 @@ export default function Assumptions() {
 
               return (
                 <>
-                  {/* 2 sections side by side */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Squad CaaS */}
                     <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
@@ -2282,141 +1553,13 @@ export default function Assumptions() {
             })()}
           </div>
 
-
-          {/* Section 3: Indicadores de Folha */}
-          {(() => {
-            const yearMonths = MONTHS.map((_, i) => `${selectedYear}-${String(i + 1).padStart(2, '0')}`);
-            const isHistCell = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-            const cutoff = (i: number) => selectedYear === 2026 && i === 2;
-
-            const indicators = [
-              {
-                label: 'Faturamento (MRR)',
-                getVal: (p: string) => payrollFaturamento[p] ?? 0,
-                format: (v: number) => formatCurrency(v),
-              },
-              {
-                label: 'Payroll / Gross Revenue',
-                getVal: (p: string) => (payrollGrossRevenueRatio[p] ?? 0) * 100,
-                format: (v: number) => `${v.toFixed(1)}%`,
-              },
-              {
-                label: 'Benefícios',
-                getVal: (p: string) => benefitsMonthly[p] ?? 0,
-                format: (v: number) => formatCurrency(v),
-              },
-            ];
-
-            return (
-              <div className="gradient-card overflow-x-auto">
-                <h3 className="text-sm font-semibold p-5 pb-3">Indicadores de Folha — {selectedYear}</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Indicador</th>
-                      {MONTHS.map((m, i) => (
-                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${cutoff(i) ? ' border-r border-primary/30' : ''}`}>{m}</th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total / Méd.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {indicators.map(ind => {
-                      const values = yearMonths.map(p => ind.getVal(p));
-                      const total = ind.label === 'Payroll / Gross Revenue'
-                        ? values.reduce((s, v) => s + v, 0) / 12
-                        : values.reduce((s, v) => s + v, 0);
-                      return (
-                        <tr key={ind.label} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                          <td className="sticky left-0 z-10 bg-card px-4 py-1.5 font-medium">{ind.label}</td>
-                          {yearMonths.map((p, i) => {
-                            const val = ind.getVal(p);
-                            return (
-                              <td key={i} className={`text-right px-2 py-1.5 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
-                                {ind.format(val)}
-                              </td>
-                            );
-                          })}
-                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">{ind.format(total)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
-
-          {/* Section 4: Reembolsos por Centro de Custo */}
-          {(() => {
-            const isHistCell = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-            const cutoff = (i: number) => selectedYear === 2026 && i === 2;
-            const yearMonths = MONTHS.map((_, i) => `${selectedYear}-${String(i + 1).padStart(2, '0')}`);
-
-            return (
-              <div className="gradient-card overflow-x-auto">
-                <h3 className="text-sm font-semibold p-5 pb-3">Reembolsos por Centro de Custo — {selectedYear}</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[220px]">Descrição</th>
-                      <th className="text-left px-2 py-2 text-muted-foreground font-medium min-w-[56px]">Código</th>
-                      <th className="text-left px-2 py-2 text-muted-foreground font-medium min-w-[80px]">BU</th>
-                      {MONTHS.map((m, i) => (
-                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${cutoff(i) ? ' border-r border-primary/30' : ''}`}>{m}</th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reimbursements.map(row => {
-                      const annual = yearMonths.reduce((s, p) => s + (row.monthly[p] ?? 0), 0);
-                      return (
-                        <tr key={row.desc} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                          <td className="sticky left-0 z-10 bg-card px-4 py-1.5 font-medium">{row.desc}</td>
-                          <td className="px-2 py-1.5 text-muted-foreground font-mono">{row.code}</td>
-                          <td className="px-2 py-1.5 text-muted-foreground">{row.bu}</td>
-                          {yearMonths.map((p, i) => {
-                            const val = row.monthly[p] ?? 0;
-                            return (
-                              <td key={i} className={`text-right px-2 py-1.5 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
-                                {val === 0 ? '—' : formatCurrency(val)}
-                              </td>
-                            );
-                          })}
-                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">{annual === 0 ? '—' : formatCurrency(annual)}</td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2" colSpan={3}>Total Reembolsos</td>
-                      {yearMonths.map((p, i) => {
-                        const total = reimbursements.reduce((s, row) => s + (row.monthly[p] ?? 0), 0);
-                        return (
-                          <td key={i} className={`text-right px-2 py-2 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
-                            {total === 0 ? '—' : formatCurrency(total)}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right px-3 py-2 tabular-nums">
-                        {formatCurrency(yearMonths.reduce((s, p) => s + reimbursements.reduce((ss, row) => ss + (row.monthly[p] ?? 0), 0), 0))}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
-
           {/* Headcount Projetado por Área */}
           {(() => {
             const data = editing ? editState : assumptions;
             const hcData = editing ? editState : assumptions;
             const ratios = hcData.headcountRatios;
             const salaries = hcData.salaryRanges;
-            
 
-            // Compute monthly total clients for selectedYear
             const subProductKeys = Object.keys(hcData.subProductClients) as SubProductKey[];
             const monthlyTotals: number[] = Array.from({ length: 12 }, (_, m) => {
               return subProductKeys.reduce((sum, key) => {
@@ -2524,7 +1667,7 @@ export default function Assumptions() {
             );
           })()}
 
-          {/* Regras de Contratação (editável) */}
+          {/* Regras de Contratação */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <UserCheck className="h-4 w-4 text-primary" />
@@ -2618,6 +1761,575 @@ export default function Assumptions() {
               </div>
             </div>
           </div>
+
+        </TabsContent>
+
+        {/* ─── BLOCO 4: SG&A ─── */}
+        <TabsContent value="sga" className="space-y-6 mt-4">
+
+          {/* Marketing Planejado vs Realizado */}
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h3 className="text-sm font-semibold">Marketing — Planejado vs Realizado</h3>
+            <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
+              {(['planned', 'actual'] as const).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setMarketingView(v)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
+                    marketingView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {v === 'planned' ? 'Planejado' : 'Realizado'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {marketingView === 'actual' && (() => {
+            const isHistPeriod = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
+            const mkRows: { label: string; key: string; isSummary?: boolean }[] = [
+              { label: 'Despesas de Marketing', key: 'Despesas de Marketing', isSummary: true },
+              { label: 'Despesas Comerciais', key: 'Despesas Comerciais' },
+            ];
+            const getHistVal = (key: string, monthIdx: number): number => {
+              const period = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
+              return historicalExpenses[key]?.[period] ?? 0;
+            };
+            const getAnnual = (key: string): number =>
+              MONTHS.reduce((s, _, i) => s + getHistVal(key, i), 0);
+            const statusBadge = selectedYear <= 2025
+              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Realizado</span>
+              : selectedYear === 2026
+              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Jan–Mar Realizado</span>
+              : <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Projetado</span>;
+
+            return (
+              <div className="gradient-card overflow-x-auto">
+                <h3 className="text-sm font-semibold p-5 pb-3 flex items-center flex-wrap gap-1">
+                  Gastos de Marketing — {selectedYear}
+                  {statusBadge}
+                </h3>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Linha</th>
+                      {MONTHS.map((m, i) => (
+                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${selectedYear === 2026 && i === 2 ? ' border-r border-primary/30' : ''}`}>{m}</th>
+                      ))}
+                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mkRows.map(row => (
+                      <tr key={row.key} className={`border-b border-border/20 transition-colors ${row.isSummary ? 'bg-secondary/40 hover:bg-secondary/60 font-semibold' : 'hover:bg-secondary/20'}`}>
+                        <td className={`sticky left-0 z-10 px-4 py-1.5 font-medium ${row.isSummary ? 'bg-secondary/40' : 'bg-card'}`}>{row.label}</td>
+                        {MONTHS.map((_, i) => {
+                          const val = getHistVal(row.key, i);
+                          const isHist = isHistPeriod(i);
+                          const isCutoffBorder = selectedYear === 2026 && i === 2;
+                          return (
+                            <td key={i} className={`text-right px-2 py-1.5 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
+                              {!isHist && val === 0 ? '—' : formatCurrency(val)}
+                            </td>
+                          );
+                        })}
+                        <td className="text-right px-3 py-1.5 tabular-nums font-medium">{formatCurrency(getAnnual(row.key))}</td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
+                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL MARKETING</td>
+                      {MONTHS.map((_, i) => {
+                        const val = mkRows.reduce((s, r) => s + getHistVal(r.key, i), 0);
+                        const isHist = isHistPeriod(i);
+                        const isCutoffBorder = selectedYear === 2026 && i === 2;
+                        return (
+                          <td key={i} className={`text-right px-2 py-2 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
+                            {formatCurrency(val)}
+                          </td>
+                        );
+                      })}
+                      <td className="text-right px-3 py-2 tabular-nums">{formatCurrency(mkRows.reduce((s, r) => s + getAnnual(r.key), 0))}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="text-[10px] text-muted-foreground p-3 pt-1">
+                  Fonte: Oxy DB — dados reais de despesas de marketing e comerciais extraídos do sistema financeiro.
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* PR e Eventos Marketing */}
+          <div className="gradient-card p-5 space-y-4">
+            <h3 className="text-sm font-semibold">PR e Eventos Marketing (custo mensal)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">PR (R$/mês)</label>
+                <input type="number" className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                  value={data.marketingPR ?? 0}
+                  onChange={e => {
+                    const v = Number(e.target.value) || 0;
+                    if (editing) { setEditState(prev => ({ ...prev, marketingPR: v })); }
+                    else { setAssumptions({ ...assumptions, marketingPR: v }); }
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">Eventos (R$/mês)</label>
+                <input type="number" className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                  value={data.marketingEvents ?? 0}
+                  onChange={e => {
+                    const v = Number(e.target.value) || 0;
+                    if (editing) { setEditState(prev => ({ ...prev, marketingEvents: v })); }
+                    else { setAssumptions({ ...assumptions, marketingEvents: v }); }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* CAC por Produto */}
+          <div className="gradient-card p-5 space-y-4">
+            <h3 className="text-sm font-semibold">CAC por Produto</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left px-3 py-2 text-muted-foreground font-medium">Produto</th>
+                    <th className="text-right px-3 py-2 text-muted-foreground font-medium">CAC (R$)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Object.keys(data.tickets) as TicketKey[]).map(key => (
+                    <tr key={key} className="border-b border-border/30 hover:bg-secondary/20">
+                      <td className="px-3 py-2 text-xs">{SUB_PRODUCT_LABELS[key as keyof typeof SUB_PRODUCT_LABELS] || key}</td>
+                      <td className="text-right px-3 py-2">
+                        <input type="number" className="w-28 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                          value={data.cacPerProduct?.[key] ?? 0}
+                          onChange={e => {
+                            const v = Number(e.target.value) || 0;
+                            const newCac = { ...(data.cacPerProduct ?? {}), [key]: v };
+                            if (editing) { setEditState(prev => ({ ...prev, cacPerProduct: newCac })); }
+                            else { setAssumptions({ ...assumptions, cacPerProduct: newCac }); }
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Comissão e SG&A */}
+          <div className="gradient-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Receipt className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Comissão e SG&A</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Comissão de Vendas</p>
+                <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">SG&A % of Revenue</p>
+                <div className="text-sm font-semibold">
+                  {editing ? (
+                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.sgaPercent} onChange={e => setEditState(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.sgaPercent}%</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">SG&A Annual Growth %</p>
+                <div className="text-sm font-semibold">
+                  {editing ? (
+                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.sgaGrowthRate} onChange={e => setEditState(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.sgaGrowthRate}%</span>}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Headcount Cost Growth/yr</p>
+                <div className="text-sm font-semibold">
+                  {editing ? (
+                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.headcountGrowth} onChange={e => setEditState(p => ({ ...p, headcountGrowth: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.headcountGrowth}%</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Resumo Operacional Mensal */}
+          {(() => {
+            const isHistPeriod = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
+            const getFinancialCatValue = (catCode: string, period: string): number => {
+              const cat = historicalFinancial[catCode];
+              if (!cat) return 0;
+              let sum = 0;
+              for (const group of Object.values(cat)) {
+                for (const item of Object.values(group as Record<string, Record<string, number>>)) {
+                  sum += (item[period] ?? 0);
+                }
+              }
+              return sum;
+            };
+            const getProjected = (engineCode: string): number => {
+              const node = findNodeInTree(engineCode, model.pnlTree);
+              if (!node) return 0;
+              return Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12;
+            };
+            const getProjectedDespesasFixas = (): number => {
+              const codes = ['4', '5', '6', '7'];
+              return codes.reduce((sum, c) => {
+                const node = findNodeInTree(c, model.pnlTree);
+                return sum + (node ? Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12 : 0);
+              }, 0);
+            };
+            const getProjectedFinanceiras = (): number => getProjected('8D');
+            const getProjectedProvisoes = (): number => getProjected('TAX');
+            const getProjectedAmortizacao = (): number => getProjected('11');
+            const getProjectedInvestimentos = (): number => getProjected('12');
+
+            type OpRow = {
+              label: string;
+              indent?: boolean;
+              isSummary?: boolean;
+              groupKey?: string;
+              getHistValue: (period: string) => number;
+              getProjValue: () => number;
+            };
+
+            const rows: OpRow[] = [
+              { label: 'Custos Variáveis', isSummary: true, groupKey: 'custos',
+                getHistValue: (p) => Object.values(historicalCosts).reduce((s, g) => s + (g[p] ?? 0), 0),
+                getProjValue: () => {
+                  const codes = ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6'];
+                  return codes.reduce((sum, c) => {
+                    const node = findNodeInTree(c, model.pnlTree);
+                    return sum + (node ? Math.abs(node.annual[selectedYear] ?? 0) * 1000 / 12 : 0);
+                  }, 0);
+                },
+              },
+              { label: 'Custos CaaS', indent: true, getHistValue: (p) => historicalCosts['Custos Caas']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Custos SaaS', indent: true, getHistValue: (p) => historicalCosts['Custos SaaS']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Custos Customer Success', indent: true, getHistValue: (p) => historicalCosts['Custos Customer Success']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Custos Education', indent: true, getHistValue: (p) => historicalCosts['Custos Education']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Custos Expansão', indent: true, getHistValue: (p) => historicalCosts['Custos Expansão']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Custos Tax', indent: true, getHistValue: (p) => historicalCosts['Custos Tax']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Despesas Fixas', isSummary: true, groupKey: 'despesas',
+                getHistValue: (p) => Object.values(historicalExpenses).reduce((s, g) => s + (g[p] ?? 0), 0),
+                getProjValue: getProjectedDespesasFixas },
+              { label: 'Desp. Administrativas', indent: true, getHistValue: (p) => historicalExpenses['Despesas Administrativas']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Desp. Comerciais', indent: true, getHistValue: (p) => historicalExpenses['Despesas Comerciais']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Desp. com Pessoal', indent: true, getHistValue: (p) => historicalExpenses['Despesas com Pessoal']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Desp. de Marketing', indent: true, getHistValue: (p) => historicalExpenses['Despesas de Marketing']?.[p] ?? 0, getProjValue: () => 0 },
+              { label: 'Despesas Financeiras', getHistValue: (p) => getFinancialCatValue('DF', p), getProjValue: getProjectedFinanceiras },
+              { label: 'Provisões (IRPJ/CSLL)', getHistValue: (p) => getFinancialCatValue('PROV', p), getProjValue: getProjectedProvisoes },
+              { label: 'Amortização de Dívida', getHistValue: (p) => getFinancialCatValue('AD', p), getProjValue: getProjectedAmortizacao },
+              { label: 'Investimentos', getHistValue: (p) => getFinancialCatValue('INV', p), getProjValue: getProjectedInvestimentos },
+            ];
+
+            const visibleRows = rows.filter((row) => {
+              if (!row.indent) return true;
+              const costLabels = ['Custos CaaS', 'Custos SaaS', 'Custos Customer Success', 'Custos Education', 'Custos Expansão', 'Custos Tax'];
+              const expLabels = ['Desp. Administrativas', 'Desp. Comerciais', 'Desp. com Pessoal', 'Desp. de Marketing'];
+              if (costLabels.includes(row.label)) return opExpandedGroups.custos;
+              if (expLabels.includes(row.label)) return opExpandedGroups.despesas;
+              return true;
+            });
+
+            const getMonthlyValue = (row: OpRow, monthIdx: number): { value: number; isHist: boolean } => {
+              const period = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
+              const isHist = (HISTORICAL_PERIODS as readonly string[]).includes(period);
+              if (isHist) return { value: row.getHistValue(period), isHist: true };
+              if (!row.indent) return { value: row.getProjValue(), isHist: false };
+              return { value: 0, isHist: false };
+            };
+
+            const nonSubRows = rows.filter(r => !r.indent);
+            const getTotalValue = (monthIdx: number): { value: number; isHist: boolean } => {
+              const { isHist } = getMonthlyValue(nonSubRows[0], monthIdx);
+              const value = nonSubRows.reduce((s, r) => s + getMonthlyValue(r, monthIdx).value, 0);
+              return { value, isHist };
+            };
+            const getAnnualTotal = (row: OpRow): number =>
+              MONTHS.reduce((s, _, i) => s + getMonthlyValue(row, i).value, 0);
+            const getGrandTotal = (): number =>
+              MONTHS.reduce((s, _, i) => s + getTotalValue(i).value, 0);
+
+            const statusBadge = selectedYear <= 2025
+              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Realizado</span>
+              : selectedYear === 2026
+              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Jan–Mar Realizado</span>
+              : <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Projetado</span>;
+
+            return (
+              <div className="gradient-card overflow-x-auto">
+                <h3 className="text-sm font-semibold p-5 pb-3 flex items-center flex-wrap gap-1">
+                  Resumo Operacional — {selectedYear}
+                  {statusBadge}
+                </h3>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[190px]">Linha</th>
+                      {MONTHS.map((m, i) => (
+                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${selectedYear === 2026 && i === 2 ? ' border-r border-primary/30' : ''}`}>{m}</th>
+                      ))}
+                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((row) => {
+                      const isGroup = row.isSummary && row.groupKey;
+                      return (
+                        <tr key={row.label} className={`border-b border-border/20 transition-colors ${row.isSummary ? 'bg-secondary/40 hover:bg-secondary/60 font-semibold' : 'hover:bg-secondary/20'}`}>
+                          <td className={`sticky left-0 z-10 px-4 py-1.5 font-medium ${row.isSummary ? 'bg-secondary/40' : 'bg-card'}`}>
+                            <div className={`flex items-center gap-1 ${isGroup ? 'cursor-pointer select-none' : ''}`}
+                              onClick={isGroup ? () => setOpExpandedGroups(prev => ({ ...prev, [row.groupKey!]: !prev[row.groupKey!] })) : undefined}>
+                              {isGroup && (
+                                opExpandedGroups[row.groupKey!]
+                                  ? <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                                  : <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                              )}
+                              <span className={row.indent ? 'pl-4 text-muted-foreground' : ''}>{row.label}</span>
+                            </div>
+                          </td>
+                          {MONTHS.map((_, i) => {
+                            const { value, isHist } = getMonthlyValue(row, i);
+                            const isCutoffBorder = selectedYear === 2026 && i === 2;
+                            const showDash = !isHist && value === 0;
+                            return (
+                              <td key={i} className={`text-right px-2 py-1.5 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
+                                {showDash ? '—' : formatCurrency(value)}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">{formatCurrency(getAnnualTotal(row))}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
+                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL OPERACIONAL</td>
+                      {MONTHS.map((_, i) => {
+                        const { value, isHist } = getTotalValue(i);
+                        const isCutoffBorder = selectedYear === 2026 && i === 2;
+                        return (
+                          <td key={i} className={`text-right px-2 py-2 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
+                            {formatCurrency(value)}
+                          </td>
+                        );
+                      })}
+                      <td className="text-right px-3 py-2 tabular-nums">{formatCurrency(getGrandTotal())}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* Indicadores de Folha */}
+          {(() => {
+            const yearMonths = MONTHS.map((_, i) => `${selectedYear}-${String(i + 1).padStart(2, '0')}`);
+            const isHistCell = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
+            const cutoff = (i: number) => selectedYear === 2026 && i === 2;
+            const indicators = [
+              { label: 'Faturamento (MRR)', getVal: (p: string) => payrollFaturamento[p] ?? 0, format: (v: number) => formatCurrency(v) },
+              { label: 'Payroll / Gross Revenue', getVal: (p: string) => (payrollGrossRevenueRatio[p] ?? 0) * 100, format: (v: number) => `${v.toFixed(1)}%` },
+              { label: 'Benefícios', getVal: (p: string) => benefitsMonthly[p] ?? 0, format: (v: number) => formatCurrency(v) },
+            ];
+            return (
+              <div className="gradient-card overflow-x-auto">
+                <h3 className="text-sm font-semibold p-5 pb-3">Indicadores de Folha — {selectedYear}</h3>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Indicador</th>
+                      {MONTHS.map((m, i) => (
+                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${cutoff(i) ? ' border-r border-primary/30' : ''}`}>{m}</th>
+                      ))}
+                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total / Méd.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indicators.map(ind => {
+                      const values = yearMonths.map(p => ind.getVal(p));
+                      const total = ind.label === 'Payroll / Gross Revenue'
+                        ? values.reduce((s, v) => s + v, 0) / 12
+                        : values.reduce((s, v) => s + v, 0);
+                      return (
+                        <tr key={ind.label} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                          <td className="sticky left-0 z-10 bg-card px-4 py-1.5 font-medium">{ind.label}</td>
+                          {yearMonths.map((p, i) => {
+                            const val = ind.getVal(p);
+                            return (
+                              <td key={i} className={`text-right px-2 py-1.5 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
+                                {ind.format(val)}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">{ind.format(total)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+          {/* Reembolsos por Centro de Custo */}
+          {(() => {
+            const isHistCell = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
+            const cutoff = (i: number) => selectedYear === 2026 && i === 2;
+            const yearMonths = MONTHS.map((_, i) => `${selectedYear}-${String(i + 1).padStart(2, '0')}`);
+            return (
+              <div className="gradient-card overflow-x-auto">
+                <h3 className="text-sm font-semibold p-5 pb-3">Reembolsos por Centro de Custo — {selectedYear}</h3>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Centro de Custo</th>
+                      {MONTHS.map((m, i) => (
+                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${cutoff(i) ? ' border-r border-primary/30' : ''}`}>{m}</th>
+                      ))}
+                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(reimbursements).map(([cc, months]) => {
+                      const annTotal = yearMonths.reduce((s, p) => s + (months[p] ?? 0), 0);
+                      return (
+                        <tr key={cc} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                          <td className="sticky left-0 z-10 bg-card px-4 py-1.5 font-medium">{cc}</td>
+                          {yearMonths.map((p, i) => {
+                            const val = months[p] ?? 0;
+                            return (
+                              <td key={i} className={`text-right px-2 py-1.5 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
+                                {val === 0 ? '—' : formatCurrency(val)}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right px-3 py-1.5 tabular-nums font-medium">{formatCurrency(annTotal)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
+                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL REEMBOLSOS</td>
+                      {yearMonths.map((p, i) => {
+                        const val = Object.values(reimbursements).reduce((s, m) => s + (m[p] ?? 0), 0);
+                        return (
+                          <td key={i} className={`text-right px-2 py-2 tabular-nums${cutoff(i) ? ' border-r border-primary/30' : ''}${!isHistCell(i) ? ' text-muted-foreground/60 italic' : ''}`}>
+                            {formatCurrency(val)}
+                          </td>
+                        );
+                      })}
+                      <td className="text-right px-3 py-2 tabular-nums">
+                        {formatCurrency(yearMonths.reduce((s, p) => s + Object.values(reimbursements).reduce((ss, m) => ss + (m[p] ?? 0), 0), 0))}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+
+        </TabsContent>
+
+        {/* ─── BLOCO 5: ECONOMIC AND FINANCIAL RESULTS ─── */}
+        <TabsContent value="economic" className="space-y-6 mt-4">
+
+          {/* Finance KPI / Selic */}
+          <div className="gradient-card p-5">
+            <h3 className="text-sm font-semibold mb-4">Finance KPI</h3>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground font-medium">Selic Mensal (%):</label>
+                <input type="number" step="0.01"
+                  className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                  value={((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}
+                  onChange={e => {
+                    const v = (Number(e.target.value) || 0) / 100;
+                    updateModel(prev => ({ ...prev, selicMonthly: v }));
+                  }}
+                />
+                <span className="text-[10px] text-muted-foreground">({((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}% a.m. = {((Math.pow(1 + (data.selicMonthly ?? 0.0117), 12) - 1) * 100).toFixed(1)}% a.a.)</span>
+              </div>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Indicador</th>
+                  {MONTHS.map(m => (
+                    <th key={m} className="text-right p-3 text-muted-foreground font-medium min-w-[58px]">{m}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
+                  <td className="p-3 font-medium">Selic Mensal</td>
+                  {MONTHS.map((_, i) => {
+                    const monthlyPct = ((data.selicMonthly ?? 0.0117) * 100);
+                    return (
+                      <td key={i} className="text-right p-3 tabular-nums text-xs">{monthlyPct.toFixed(3)}%</td>
+                    );
+                  })}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* Resumo de Dívidas */}
+          <div className="gradient-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Landmark className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Resumo de Dívidas</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Saldo Total Devedor</p>
+                <p className="text-sm font-semibold tabular-nums">{formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.outstanding, 0))}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Parcela Mensal Total</p>
+                <p className="text-sm font-semibold tabular-nums">{formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.monthlyPayment, 0))}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Nº de Contratos</p>
+                <p className="text-sm font-semibold tabular-nums">{debtSchedule.length}</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Contrato</th>
+                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Credor</th>
+                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Saldo (R$)</th>
+                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcela/mês</th>
+                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcelas rest.</th>
+                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Previsão final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {debtSchedule.map(d => (
+                    <tr key={d.name} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
+                      <td className="py-2 text-xs font-medium">{d.name}</td>
+                      <td className="py-2 text-xs text-muted-foreground">{d.creditor}</td>
+                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.outstanding)}</td>
+                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.monthlyPayment)}</td>
+                      <td className="py-2 text-right text-xs tabular-nums">{d.remainingInstallments}</td>
+                      <td className="py-2 text-right text-xs tabular-nums">{d.finalDate ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </TabsContent>
       </Tabs>
 
