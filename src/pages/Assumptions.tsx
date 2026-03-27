@@ -794,7 +794,7 @@ export default function Assumptions() {
                       const rowKey = row.dataKey ?? row.label;
                       const isExpanded = expandedProducts[rowKey] ?? false;
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
-                      const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
+                      const churn = row.dataKey ? getChurnMonthly(row.dataKey, data, selectedYear) : 0;
                       const monthly: number[] = row.dataKey
                         ? getMonthlyClients(row.dataKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))
                         : Array(12).fill(0);
