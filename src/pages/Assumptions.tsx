@@ -814,9 +814,6 @@ export default function Assumptions() {
                                 {row.dataKey ? (data.subProductClients[row.dataKey as SubProductKey]?.[y] ?? 0).toLocaleString('pt-BR') : '—'}
                               </td>
                             ))}
-                            <td className="text-right p-3 tabular-nums text-sm text-muted-foreground">
-                              {ticketVal > 0 ? `R$ ${ticketVal.toLocaleString('pt-BR')}` : '—'}
-                            </td>
                           </tr>
 
                           {/* Expanded detail — monthly breakdown with inline edit */}
