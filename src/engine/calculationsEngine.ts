@@ -4,12 +4,12 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
-  clientsBase2025, avgTicket, churnAnnual, salesDeductions, salesDeductionsByYear,
+  clientsBase2025, avgTicket, churnAnnual,
   cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
-  commercialExpenses2025, taxRates, revenueTaxes, debtSchedule,
+  commercialExpenses2025, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
   salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
   financialItems2025, outrosExpenses2025,
@@ -512,6 +512,33 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
   return { software, realestate };
 }
 
+// ─── LUCRO PRESUMIDO — TAX HELPERS ───
+
+function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
+  switch (tipoReceita) {
+    case 'revenda_mercadoria':
+    case 'material_didatico':
+      return { irpj: 0.08, csll: 0.12 };
+    default: // 'servico'
+      return { irpj: 0.32, csll: 0.32 };
+  }
+}
+
+function calcularDeducoesPorBU(
+  revenueByBU: Record<string, number>,
+  buConfigs: BUTaxConfig[]
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+  let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  for (const bu of buConfigs) {
+    const fat = revenueByBU[bu.buKey] || 0;
+    if (fat <= 0) continue;
+    deducaoPIS += fat * 0.0065;
+    deducaoCOFINS += fat * 0.03;
+    deducaoISSQN += fat * (bu.aliquotaIss / 100);
+  }
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+}
+
 // ─── COMPUTE FULL YEAR ───
 
 function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): AnnualOutput {
@@ -575,10 +602,11 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const baasRev = rev.baas / 1000;
     const taxRev = rev.tax / 1000;
 
-    // Deductions (rate changes at 2027: Lucro Presumido → Lucro Real)
-    // Deduções de vendas (ISS, COFINS, PIS) são obrigatórias — não zeradas pelo toggle de tax
-    const dedRate = salesDeductionsByYear[year] ?? salesDeductions.totalRate;
-    const ded = -grossRev * dedRate;
+    // Deductions — Lucro Presumido por BU (PIS + COFINS + ISS)
+    const buConfigs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
+    const revenueByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
+    const dedResult = calcularDeducoesPorBU(revenueByBU, buConfigs);
+    const ded = -dedResult.deducoesTotal;
 
     // Net revenue
     const netRev = grossRev + ded;
@@ -689,11 +717,18 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // EBT
     const ebt = ebitda + financialResult;
 
-    // Taxes — Item 4: zero when taxEnabled is false
+    // Taxes — Lucro Presumido: base presumida 32% × (IRPJ 15% + CSLL 9%) sobre faturamento por BU
     let irpj = 0, csll = 0;
     if (ebt > 0 && assumptions.taxEnabled !== false) {
-      irpj = -ebt * taxRates.irpj;
-      csll = -ebt * taxRates.csll;
+      const buConfs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
+      const revByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
+      for (const bu of buConfs) {
+        const fat = revByBU[bu.buKey] || 0;
+        if (fat <= 0) continue;
+        const base = getBasePresumida(bu.tipoReceita);
+        irpj += -(fat * base.irpj * 0.15);
+        csll += -(fat * base.csll * 0.09);
+      }
     }
     const totalTax = irpj + csll;
 
@@ -1437,21 +1472,22 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500 };
-          const ratesReal = { pis: 0.0165, cofins: 0.0760, iss: 0.0500 };
-          // Proportional sub-items (have computed values)
-          const proportionalItems: { code: string; label: string; key: 'pis' | 'cofins' | 'iss' }[] = [
-            { code: '2.03', label: 'ISS', key: 'iss' },
-            { code: '2.04', label: 'PIS', key: 'pis' },
-            { code: '2.05', label: 'COFINS', key: 'cofins' },
+          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS ~avg across BUs
+          // Use fixed proportions: PIS / (PIS+COFINS+ISS_avg), etc.
+          const pisPct = 0.0065;
+          const cofinsPct = 0.03;
+          // Average ISS weighted — approximate with sum of rates
+          const issAvg = 0.04; // ~weighted average across CaaS(5%), SaaS(2.9%), Setup(2.9%)
+          const totalPct = pisPct + cofinsPct + issAvg;
+          const proportionalItems: { code: string; label: string; proportion: number }[] = [
+            { code: '2.03', label: 'ISS', proportion: issAvg / totalPct },
+            { code: '2.04', label: 'PIS', proportion: pisPct / totalPct },
+            { code: '2.05', label: 'COFINS', proportion: cofinsPct / totalPct },
           ];
           const proportionalNodes = proportionalItems.map(sd => {
             const ann = {} as Record<Year, number>;
             for (const y of YEARS) {
-              const rates = (y as number) <= 2026 ? ratesPresumido : ratesReal;
-              const totalRate = salesDeductionsByYear[y as number];
-              const proportion = totalRate !== 0 ? rates[sd.key] / totalRate : 0;
-              ann[y] = Math.round(dedAn[y] * proportion);
+              ann[y] = Math.round(dedAn[y] * sd.proportion);
             }
             return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
           });

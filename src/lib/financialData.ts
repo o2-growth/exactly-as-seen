@@ -113,6 +113,14 @@ export interface Assumptions {
   selicMonthly?: number;
   // N/A flag for churn — products that are non-recurring don't have churn
   churnNotApplicable?: Partial<Record<TicketKey, boolean>>;
+  // Lucro Presumido — tax config per BU
+  buTaxConfigs?: BUTaxConfig[];
+}
+
+export interface BUTaxConfig {
+  buKey: string;          // 'caas' | 'saas' | 'setup'
+  tipoReceita: string;    // 'servico', 'revenda_mercadoria', etc.
+  aliquotaIss: number;    // ISS % (2 a 5)
 }
 
 export type TicketKey = keyof Assumptions['tickets'];
@@ -255,6 +263,12 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   },
   // Editable Selic monthly rate (default 1.17%)
   selicMonthly: 0.0117,
+  // Lucro Presumido — tax config per BU
+  buTaxConfigs: [
+    { buKey: 'caas',  tipoReceita: 'servico', aliquotaIss: 5 },
+    { buKey: 'saas',  tipoReceita: 'servico', aliquotaIss: 2.9 },
+    { buKey: 'setup', tipoReceita: 'servico', aliquotaIss: 2.9 },
+  ],
 };
 
 // Base annual data (R$ thousands)
