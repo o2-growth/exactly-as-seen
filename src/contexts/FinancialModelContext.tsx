@@ -21,7 +21,7 @@ interface FinancialModelContextType {
   filteredYears: Year[];
   focalYear: Year;
   rangeDataSource: YearDataSource;
-  setAssumptions: (a: Assumptions) => void;
+  setAssumptions: (a: Assumptions | ((prev: Assumptions) => Assumptions)) => void;
   updateAssumption: <K extends keyof Assumptions>(key: K, value: Assumptions[K]) => void;
   setScenario: (s: Scenario) => void;
   setSelectedYear: (y: Year) => void;

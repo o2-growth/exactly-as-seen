@@ -418,16 +418,17 @@ export default function Assumptions() {
       : Array(12).fill(null);
     yearArr[monthIdx] = newCount;
 
-    setAssumptions({
-      ...assumptions,
+    console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, yearArr);
+    setAssumptions(prev => ({
+      ...prev,
       monthlyClientOverrides: {
-        ...currentOverrides,
+        ...(prev.monthlyClientOverrides ?? {}),
         [key]: {
-          ...(currentOverrides[key as TicketKey] ?? {}),
+          ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
           [year]: yearArr,
         },
       },
-    });
+    }));
   };
 
   const handleApplyAll = () => {
@@ -459,11 +460,13 @@ export default function Assumptions() {
     setGrowthRates(newGrowthRates);
 
     // Propagate all Dec targets directly (bypass edit mode)
-    const newSPC = { ...assumptions.subProductClients };
-    for (const [k, yearMap] of Object.entries(subProductUpdates)) {
-      newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
-    }
-    setAssumptions({ ...assumptions, subProductClients: newSPC });
+    setAssumptions(prev => {
+      const newSPC = { ...prev.subProductClients };
+      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+        newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+      }
+      return { ...prev, subProductClients: newSPC };
+    });
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
@@ -489,13 +492,13 @@ export default function Assumptions() {
     });
 
     // Propagate Dec target directly (bypass edit mode)
-    setAssumptions({
-      ...assumptions,
+    setAssumptions(prev => ({
+      ...prev,
       subProductClients: {
-        ...assumptions.subProductClients,
-        [key]: { ...assumptions.subProductClients[key], [year]: newDecTarget },
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: newDecTarget },
       },
-    });
+    }));
   };
 
   // Used by Marketing tab actual-data table
@@ -706,19 +709,19 @@ export default function Assumptions() {
                             const prodKey = row.dataKey as SubProductKey;
                             // Direct update functions — bypass lock/unlock, update assumptions directly
                             const directUpdateClients = (yearToUpdate: Year, val: number) => {
-                              setAssumptions({
-                                ...assumptions,
+                              setAssumptions(prev => ({
+                                ...prev,
                                 subProductClients: {
-                                  ...assumptions.subProductClients,
-                                  [prodKey]: { ...assumptions.subProductClients[prodKey], [yearToUpdate]: val },
+                                  ...prev.subProductClients,
+                                  [prodKey]: { ...prev.subProductClients[prodKey], [yearToUpdate]: val },
                                 },
-                              });
+                              }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              setAssumptions({
-                                ...assumptions,
-                                tickets: { ...assumptions.tickets, [prodKey]: val },
-                              });
+                              setAssumptions(prev => ({
+                                ...prev,
+                                tickets: { ...prev.tickets, [prodKey]: val },
+                              }));
                             };
                             return (
                             <tr className="border-b border-border/30">
@@ -817,16 +820,16 @@ export default function Assumptions() {
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
                                                   yearArr[i] = v;
-                                                  setAssumptions({
-                                                    ...assumptions,
+                                                  setAssumptions(prev => ({
+                                                    ...prev,
                                                     monthlyTickets: {
-                                                      ...assumptions.monthlyTickets,
+                                                      ...(prev.monthlyTickets ?? {}),
                                                       [prodKey]: {
-                                                        ...(assumptions.monthlyTickets?.[prodKey] ?? {}),
+                                                        ...((prev.monthlyTickets ?? {})[prodKey] ?? {}),
                                                         [selectedYear]: yearArr,
                                                       },
                                                     },
-                                                  });
+                                                  }));
                                                 }}
                                               />
                                             )}
