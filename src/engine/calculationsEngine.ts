@@ -59,6 +59,7 @@ export interface AnnualOutput {
   baasRevenue: number;
   taxRevenue: number;
   deductions: number;
+  dedDetail: { pis: number; cofins: number; iss: number; csllRetido: number; pisRetido: number; icms: number; irrfRetido: number; cofinsRetido: number };
   netRevenue: number;
   cogs: number;
   cogsDetail: { caas: number; customerService: number; saas: number; education: number; baas: number };
