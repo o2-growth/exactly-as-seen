@@ -824,6 +824,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
     taxD.irpj += irpj; taxD.csll += csll;
+    dedD.pis += dedResult.deducaoPIS; dedD.cofins += dedResult.deducaoCOFINS; dedD.iss += dedResult.deducaoISSQN;
+    dedD.csllRetido += dedResult.deducaoCsllRetido; dedD.pisRetido += dedResult.deducaoPisRetido;
+    dedD.icms += dedResult.deducaoICMS; dedD.irrfRetido += dedResult.deducaoIrrfRetido; dedD.cofinsRetido += dedResult.deducaoCofinsRetido;
     debtD.loans += debt.loans; debtD.suppliers += debt.suppliers;
     capexD.software += capex.software; capexD.realestate += capex.realestate;
     lastClients = totalClientsM;
