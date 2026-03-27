@@ -84,7 +84,7 @@ const CLIENTS_ROWS: ClientGroup[] = [
   {
     group: 'Expansão',
     items: [
-      { label: 'Assinatura', dataKey: 'baas' },
+      { label: 'Oxy Hacker', dataKey: 'baas' },
       { label: 'Franquia',                       dataKey: null },
       { label: 'Master Franquia',                dataKey: null },
     ],
