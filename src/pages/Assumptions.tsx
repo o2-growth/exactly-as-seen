@@ -375,10 +375,28 @@ export default function Assumptions() {
       : Array(12).fill(null);
     yearArr[monthIdx] = newCount;
 
-    // Sync Dec target when editing month 11 directly
+    // Determine Dec target
     const decValue = monthIdx === 11
       ? newCount
       : (yearArr[11] !== null && yearArr[11] !== undefined ? yearArr[11] : assumptions.subProductClients[key][year]);
+
+    // Recalculate subsequent months via geometric interpolation from edited month to Dec target
+    if (monthIdx < 11) {
+      const remainingSteps = 11 - monthIdx; // steps from edited month to Dec
+      for (let j = monthIdx + 1; j <= 10; j++) {
+        const step = j - monthIdx;
+        let val: number;
+        if (newCount > 0 && decValue > 0) {
+          val = newCount * Math.pow(decValue / newCount, step / remainingSteps);
+        } else if (newCount === 0 && decValue > 0) {
+          val = decValue * (step / remainingSteps);
+        } else {
+          val = 0;
+        }
+        yearArr[j] = Math.round(val * 100) / 100;
+      }
+      yearArr[11] = decValue;
+    }
 
     console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, 'decTarget:', decValue);
     setAssumptions(prev => ({
