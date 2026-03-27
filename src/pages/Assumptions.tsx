@@ -184,6 +184,8 @@ function isHistorical(year: Year, monthIdx: number): boolean {
 }
 
 function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  // N/A — no churn for this product
+  if (data.churnNotApplicable?.[key]) return 0;
   // Check for per-product override first
   if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
     return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
