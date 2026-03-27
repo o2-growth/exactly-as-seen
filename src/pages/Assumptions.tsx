@@ -781,7 +781,7 @@ export default function Assumptions() {
                 {CLIENTS_ROWS.map(group => (
                   <React.Fragment key={group.group}>
                     <tr className="bg-secondary/40 border-b border-border/50">
-                      <td colSpan={activeYears.length + 2} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
+                      <td colSpan={activeYears.length + 1} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
                         {group.group}
                       </td>
                     </tr>
