@@ -375,9 +375,18 @@ export default function Assumptions() {
       : Array(12).fill(null);
     yearArr[monthIdx] = newCount;
 
-    console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, yearArr);
+    // Sync Dec target when editing month 11 directly
+    const decValue = monthIdx === 11
+      ? newCount
+      : (yearArr[11] !== null && yearArr[11] !== undefined ? yearArr[11] : assumptions.subProductClients[key][year]);
+
+    console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, 'decTarget:', decValue);
     setAssumptions(prev => ({
       ...prev,
+      subProductClients: {
+        ...prev.subProductClients,
+        [key]: { ...prev.subProductClients[key], [year]: decValue },
+      },
       monthlyClientOverrides: {
         ...(prev.monthlyClientOverrides ?? {}),
         [key]: {
