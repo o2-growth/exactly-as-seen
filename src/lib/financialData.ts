@@ -113,14 +113,40 @@ export interface Assumptions {
   selicMonthly?: number;
   // N/A flag for churn — products that are non-recurring don't have churn
   churnNotApplicable?: Partial<Record<TicketKey, boolean>>;
-  // Lucro Presumido — tax config per BU
+  // Lucro Presumido — tax config per BU (deprecated, kept for migration)
   buTaxConfigs?: BUTaxConfig[];
+  // Lucro Presumido — per-subproduct tax rates
+  subProductTaxRates?: Partial<Record<TicketKey, SubProductTaxConfig>>;
 }
 
 export interface BUTaxConfig {
-  buKey: string;          // 'caas' | 'saas' | 'setup'
-  tipoReceita: string;    // 'servico', 'revenda_mercadoria', etc.
-  aliquotaIss: number;    // ISS % (2 a 5)
+  buKey: string;
+  tipoReceita: string;
+  aliquotaIss: number;
+}
+
+export interface SubProductTaxConfig {
+  pis: number;       // default 0.65
+  cofins: number;    // default 3.0
+  iss: number;       // default 5.0 (CaaS) ou 2.9 (demais)
+  tipoReceita: string; // 'servico' (default)
+}
+
+/** All TicketKey values grouped by product category */
+export const CAAS_KEYS: TicketKey[] = ['caasAssessoria', 'caasEnterprise', 'caasCorporate', 'caasParceiros', 'caasSetup'];
+export const SAAS_KEYS: TicketKey[] = ['saasOxy', 'saasOxyGenio', 'saasSetup', 'saasParceiros', 'saasOxyGenioEsp'];
+export const EDUCATION_KEYS: TicketKey[] = ['educationDonoCFO', 'educationEN', 'educationFR', 'educationFSP'];
+export const EXPANSAO_KEYS: TicketKey[] = ['baas', 'baasFranquia', 'baasMasterFranquia'];
+export const TAX_KEYS: TicketKey[] = ['taxAT', 'taxGPT', 'taxRCT', 'taxRT', 'taxDTC'];
+export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...EDUCATION_KEYS, ...EXPANSAO_KEYS, ...TAX_KEYS];
+
+export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
+  const isCaas = CAAS_KEYS.includes(key);
+  return { pis: 0.65, cofins: 3.0, iss: isCaas ? 5.0 : 2.9, tipoReceita: 'servico' };
+}
+
+export function getSubProductTaxRate(key: TicketKey, assumptions: Assumptions): SubProductTaxConfig {
+  return assumptions.subProductTaxRates?.[key] ?? getDefaultSubProductTaxConfig(key);
 }
 
 export type TicketKey = keyof Assumptions['tickets'];

@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
@@ -524,6 +524,23 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
   }
 }
 
+function calcularDeducoesPorSubproduto(
+  revenueBySubproduct: Record<string, number>,
+  assumptions: Assumptions
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+  let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  for (const key of ALL_SUBPRODUCT_KEYS) {
+    const fat = revenueBySubproduct[key] || 0;
+    if (fat <= 0) continue;
+    const cfg = getSubProductTaxRate(key, assumptions);
+    deducaoPIS += fat * (cfg.pis / 100);
+    deducaoCOFINS += fat * (cfg.cofins / 100);
+    deducaoISSQN += fat * (cfg.iss / 100);
+  }
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+}
+
+// Legacy wrapper for backward compatibility
 function calcularDeducoesPorBU(
   revenueByBU: Record<string, number>,
   buConfigs: BUTaxConfig[]
@@ -602,10 +619,32 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const baasRev = rev.baas / 1000;
     const taxRev = rev.tax / 1000;
 
-    // Deductions — Lucro Presumido por BU (PIS + COFINS + ISS)
-    const buConfigs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
-    const revenueByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
-    const dedResult = calcularDeducoesPorBU(revenueByBU, buConfigs);
+    // Deductions — Lucro Presumido por subproduto (PIS + COFINS + ISS)
+    const revBySubprod: Record<string, number> = {
+      caasAssessoria: rev.caasAssessoria / 1000,
+      caasEnterprise: rev.caasEnterprise / 1000,
+      caasCorporate: rev.caasCorporate / 1000,
+      caasSetup: rev.caasSetup / 1000,
+      caasParceiros: 0,
+      saasOxy: rev.saasOxy / 1000,
+      saasOxyGenio: rev.saasOxyGenio / 1000,
+      saasSetup: rev.saasSetup / 1000,
+      saasParceiros: 0,
+      saasOxyGenioEsp: 0,
+      educationDonoCFO: rev.educationDonoCfo / 1000,
+      educationEN: 0,
+      educationFR: 0,
+      educationFSP: 0,
+      baas: rev.baasAssinatura / 1000,
+      baasFranquia: 0,
+      baasMasterFranquia: 0,
+      taxAT: rev.taxAT / 1000,
+      taxGPT: rev.taxGPT / 1000,
+      taxRCT: rev.taxRCT / 1000,
+      taxRT: rev.taxRT / 1000,
+      taxDTC: rev.taxDTC / 1000,
+    };
+    const dedResult = calcularDeducoesPorSubproduto(revBySubprod, assumptions);
     const ded = -dedResult.deducoesTotal;
 
     // Net revenue
@@ -717,15 +756,14 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // EBT
     const ebt = ebitda + financialResult;
 
-    // Taxes — Lucro Presumido: base presumida 32% × (IRPJ 15% + CSLL 9%) sobre faturamento por BU
+    // Taxes — Lucro Presumido: base presumida × (IRPJ 15% + CSLL 9%) sobre faturamento por subproduto
     let irpj = 0, csll = 0;
     if (ebt > 0 && assumptions.taxEnabled !== false) {
-      const buConfs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
-      const revByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
-      for (const bu of buConfs) {
-        const fat = revByBU[bu.buKey] || 0;
+      for (const key of ALL_SUBPRODUCT_KEYS) {
+        const fat = revBySubprod[key] || 0;
         if (fat <= 0) continue;
-        const base = getBasePresumida(bu.tipoReceita);
+        const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
+        const base = getBasePresumida(cfg.tipoReceita);
         irpj += -(fat * base.irpj * 0.15);
         csll += -(fat * base.csll * 0.09);
       }
