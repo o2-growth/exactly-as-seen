@@ -1169,46 +1169,7 @@ export default function Assumptions() {
                   );
                 })}
 
-                {/* ── Churn por produto ── */}
-                <tr className="bg-secondary/40 border-b border-border/50">
-                  <td colSpan={showGrowthPct ? 27 : 15} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
-                    Churn
-                  </td>
-                </tr>
-                {CLIENTS_ROWS.flatMap(group => group.items.filter(r => r.dataKey)).map(row => {
-                  const rowKey = row.dataKey!;
-                  const churnRate = getChurnMonthly(rowKey, data, selectedYear);
-                  const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
-                  const churnClients = monthly.map((val, i) => {
-                    const prev = i === 0
-                      ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
-                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
-                      : monthly[i - 1];
-                    return Math.round(prev * churnRate);
-                  });
-                  return (
-                    <tr key={`churn-${rowKey}`} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                      <td className="p-2 pl-5 font-medium text-xs text-negative">{row.label}</td>
-                      {MONTHS.map((_, i) => {
-                        const hist = isHistorical(selectedYear, i);
-                        const cutoff = selectedYear === 2026 && i === 2;
-                        return (
-                          <React.Fragment key={i}>
-                            <td className={`text-right px-1 py-1 tabular-nums text-xs text-negative/80${cutoff ? ' border-l-2 border-primary/40' : ''}${hist ? ' bg-secondary/30' : ''}`}>
-                              {churnClients[i] || '—'}
-                            </td>
-                            {showGrowthPct && <td className="text-right px-1 py-1" />}
-                          </React.Fragment>
-                        );
-                      })}
-                      <td className="text-right px-2 py-1 tabular-nums text-xs font-semibold text-negative bg-primary/5">
-                        {churnClients.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}
-                      </td>
-                      {showGrowthPct && <td />}
-                    </tr>
-                  );
-                })}
+
 
                 {/* ── Totais: Novos Clientes e Churn ── */}
                 {(() => {
