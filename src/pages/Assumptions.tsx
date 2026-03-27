@@ -1434,14 +1434,13 @@ export default function Assumptions() {
                     </table>
                   </div>
                 ))}
+                <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
+                  <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0. Base presumida: 32% para serviços.</span>
+                </div>
               </div>
             );
           })()}
-            <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
-              <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0. Base presumida: 32% para serviços.</span>
-            </div>
-          </div>
 
         </TabsContent>
 
