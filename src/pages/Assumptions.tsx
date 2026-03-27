@@ -205,7 +205,6 @@ function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year)
   }
   return 0;
 }
-}
 
 // computeProjectedClients removed — display now uses getMonthlyClients directly
 
