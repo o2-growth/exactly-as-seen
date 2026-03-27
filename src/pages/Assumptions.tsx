@@ -558,6 +558,49 @@ export default function Assumptions() {
     }
   };
 
+  const handleApplyTicketGrowth = (prodKey: SubProductKey, year: Year) => {
+    const pct = rowTicketGrowthPct[prodKey] ?? 0;
+    const rate = pct / 100;
+    const ticketVal = data.tickets[prodKey as TicketKey] ?? 0;
+    const currentMonthlyTickets = data.monthlyTickets ?? {};
+    const yearArr = currentMonthlyTickets[prodKey]?.[year]
+      ? [...currentMonthlyTickets[prodKey]![year]!]
+      : Array(12).fill(ticketVal);
+
+    // Find first non-historical month as base
+    let baseTicket = ticketVal;
+    for (let m = 0; m < 12; m++) {
+      if (!isHistorical(year, m)) {
+        baseTicket = yearArr[m] ?? ticketVal;
+        break;
+      }
+    }
+
+    // Apply compound growth to projected months
+    let compoundIdx = 0;
+    for (let m = 0; m < 12; m++) {
+      if (isHistorical(year, m)) continue;
+      yearArr[m] = Math.round(baseTicket * Math.pow(1 + rate, compoundIdx));
+      compoundIdx++;
+    }
+
+    const updater = (prev: AssumptionsType) => ({
+      ...prev,
+      monthlyTickets: {
+        ...(prev.monthlyTickets ?? {}),
+        [prodKey]: {
+          ...((prev.monthlyTickets ?? {})[prodKey] ?? {}),
+          [year]: yearArr,
+        },
+      },
+    });
+    if (editing) {
+      setEditState(updater);
+    } else {
+      setAssumptions(updater);
+    }
+  };
+
   // Used by Marketing tab actual-data table
   const subProductKeys = Object.keys(SUB_PRODUCT_LABELS) as SubProductKey[];
 
