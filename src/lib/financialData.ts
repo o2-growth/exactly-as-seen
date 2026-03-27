@@ -329,7 +329,7 @@ export const SUB_PRODUCT_LABELS: Record<keyof SubProductClients, string> = {
   saasOxy: 'Oxy',
   saasOxyGenio: 'Oxy + Gênio',
   educationDonoCFO: 'Dono CFO',
-  baas: 'Assinatura',
+  baas: 'Oxy Hacker',
   taxAT: 'Assessoria Tributária',
   taxGPT: 'Gestão Passivo Tributário',
   taxRCT: 'Recuperação Crédito Tributário',

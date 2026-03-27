@@ -144,7 +144,7 @@ const TICKETS_ROWS: TicketGroup[] = [
   {
     group: 'Expansão',
     items: [
-      { label: 'Assinatura', dataKey: 'baas', staticValue: 229 },
+      { label: 'Oxy Hacker', dataKey: 'baas', staticValue: 229 },
       { label: 'Franquia',                       dataKey: null,   staticValue: 0 },
       { label: 'Master Franquia',                dataKey: null,   staticValue: 0 },
     ],
