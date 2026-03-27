@@ -1278,31 +1278,7 @@ export default function Assumptions() {
         {/* ─── BLOCO 2: TAX DEDUCTIONS — Lucro Presumido por Subproduto ─── */}
         <TabsContent value="tax" className="space-y-6 mt-4">
 
-          {/* Toggle IRPJ/CSLL */}
-          <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">Impostos sobre Lucro</h3>
-            <div className="flex items-center gap-3">
-              <label className="text-xs text-muted-foreground whitespace-nowrap">IRPJ/CSLL (imposto sobre lucro)</label>
-              <button
-                onClick={() => {
-                  const next = !data.taxEnabled;
-                  if (editing) {
-                    setEditState(prev => ({ ...prev, taxEnabled: next }));
-                  } else {
-                    setAssumptions({ ...assumptions, taxEnabled: next });
-                  }
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  data.taxEnabled ? 'bg-primary' : 'bg-secondary border border-border'
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition-transform ${
-                  data.taxEnabled ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
-              <span className="text-xs font-medium">{data.taxEnabled ? 'Ativo' : 'Zerado'}</span>
-            </div>
-          </div>
+
 
           {/* Matriz por Categoria */}
           {(() => {
