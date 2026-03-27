@@ -690,11 +690,18 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // EBT
     const ebt = ebitda + financialResult;
 
-    // Taxes — Item 4: zero when taxEnabled is false
+    // Taxes — Lucro Presumido: base presumida 32% × (IRPJ 15% + CSLL 9%) sobre faturamento por BU
     let irpj = 0, csll = 0;
     if (ebt > 0 && assumptions.taxEnabled !== false) {
-      irpj = -ebt * taxRates.irpj;
-      csll = -ebt * taxRates.csll;
+      const buConfs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
+      const revByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
+      for (const bu of buConfs) {
+        const fat = revByBU[bu.buKey] || 0;
+        if (fat <= 0) continue;
+        const base = getBasePresumida(bu.tipoReceita);
+        irpj += -(fat * base.irpj * 0.15);
+        csll += -(fat * base.csll * 0.09);
+      }
     }
     const totalTax = irpj + csll;
 
