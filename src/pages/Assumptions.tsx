@@ -1236,67 +1236,7 @@ export default function Assumptions() {
           </div>
 
 
-          {/* ── Section 3: Churn Médio ── */}
-          <div className="gradient-card overflow-x-auto">
-            <h3 className="text-sm font-semibold p-5 pb-3">Churn Médio</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">BU</th>
-                  {MONTHS.map(m => (
-                    <th key={m} className="text-right p-3 text-muted-foreground font-medium min-w-[58px]">{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">CFO as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnCaas} onChange={e => updateModel(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnCaas}%</span>
-                      ) : `${data.churnCaas}%`}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Software as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnSaas} onChange={e => updateModel(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnSaas}%</span>
-                      ) : `${data.churnSaas}%`}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Education</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs text-muted-foreground">0%</td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Banking as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnBaas} onChange={e => updateModel(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnBaas}%</span>
-                      ) : `${data.churnBaas}%`}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
 
         </TabsContent>
 
