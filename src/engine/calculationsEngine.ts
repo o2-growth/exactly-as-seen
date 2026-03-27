@@ -619,10 +619,32 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const baasRev = rev.baas / 1000;
     const taxRev = rev.tax / 1000;
 
-    // Deductions — Lucro Presumido por BU (PIS + COFINS + ISS)
-    const buConfigs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
-    const revenueByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
-    const dedResult = calcularDeducoesPorBU(revenueByBU, buConfigs);
+    // Deductions — Lucro Presumido por subproduto (PIS + COFINS + ISS)
+    const revBySubprod: Record<string, number> = {
+      caasAssessoria: rev.caasAssessoria / 1000,
+      caasEnterprise: rev.caasEnterprise / 1000,
+      caasCorporate: rev.caasCorporate / 1000,
+      caasSetup: rev.caasSetup / 1000,
+      caasParceiros: 0,
+      saasOxy: rev.saasOxy / 1000,
+      saasOxyGenio: rev.saasOxyGenio / 1000,
+      saasSetup: rev.saasSetup / 1000,
+      saasParceiros: 0,
+      saasOxyGenioEsp: 0,
+      educationDonoCFO: rev.educationDonoCfo / 1000,
+      educationEN: 0,
+      educationFR: 0,
+      educationFSP: 0,
+      baas: rev.baasAssinatura / 1000,
+      baasFranquia: 0,
+      baasMasterFranquia: 0,
+      taxAT: rev.taxAT / 1000,
+      taxGPT: rev.taxGPT / 1000,
+      taxRCT: rev.taxRCT / 1000,
+      taxRT: rev.taxRT / 1000,
+      taxDTC: rev.taxDTC / 1000,
+    };
+    const dedResult = calcularDeducoesPorSubproduto(revBySubprod, assumptions);
     const ded = -dedResult.deducoesTotal;
 
     // Net revenue
