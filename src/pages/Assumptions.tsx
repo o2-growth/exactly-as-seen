@@ -368,8 +368,9 @@ export default function Assumptions() {
   };
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
-    // Direct override: store the value in monthlyClientOverrides
-    const currentOverrides = assumptions.monthlyClientOverrides ?? {};
+    // Read from the correct state source (editState when editing, assumptions otherwise)
+    const source = editing ? editState : assumptions;
+    const currentOverrides = source.monthlyClientOverrides ?? {};
     const yearArr = currentOverrides[key as TicketKey]?.[year]
       ? [...currentOverrides[key as TicketKey]![year]!]
       : Array(12).fill(null);
@@ -378,11 +379,11 @@ export default function Assumptions() {
     // Determine Dec target
     const decValue = monthIdx === 11
       ? newCount
-      : (yearArr[11] !== null && yearArr[11] !== undefined ? yearArr[11] : assumptions.subProductClients[key][year]);
+      : (yearArr[11] !== null && yearArr[11] !== undefined ? yearArr[11] : source.subProductClients[key][year]);
 
     // Recalculate subsequent months via geometric interpolation from edited month to Dec target
     if (monthIdx < 11) {
-      const remainingSteps = 11 - monthIdx; // steps from edited month to Dec
+      const remainingSteps = 11 - monthIdx;
       for (let j = monthIdx + 1; j <= 10; j++) {
         const step = j - monthIdx;
         let val: number;
@@ -399,7 +400,7 @@ export default function Assumptions() {
     }
 
     console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, 'decTarget:', decValue);
-    setAssumptions(prev => ({
+    updateModel(prev => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
