@@ -1274,7 +1274,7 @@ export default function Assumptions() {
 
         </TabsContent>
 
-        {/* ─── BLOCO 2: TAX DEDUCTIONS — Lucro Presumido por BU ─── */}
+        {/* ─── BLOCO 2: TAX DEDUCTIONS — Lucro Presumido por Subproduto ─── */}
         <TabsContent value="tax" className="space-y-6 mt-4">
 
           {/* Toggle IRPJ/CSLL */}
@@ -1303,72 +1303,125 @@ export default function Assumptions() {
             </div>
           </div>
 
-          {/* Configuração por BU */}
+          {/* Matriz completa por Subproduto */}
           <div className="gradient-card p-5 space-y-4">
             <div className="flex items-center gap-2 mb-2">
               <Scale className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Lucro Presumido — Alíquotas por BU</h3>
+              <h3 className="text-sm font-semibold">Lucro Presumido — Alíquotas por Subproduto</h3>
             </div>
-            <div className="overflow-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-border/50">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">BU</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Tipo Receita</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">ISS (%)</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">PIS</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">COFINS</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">IRPJ efetivo</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">CSLL efetivo</th>
-                    <th className="text-right py-2 px-3 font-medium text-primary">Total efetivo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!).map((bu, idx) => {
-                    const basePresumida = bu.tipoReceita === 'servico' ? 0.32 : 0.08;
-                    const irpjEfetivo = basePresumida * 0.15 * 100;
-                    const csllBase = bu.tipoReceita === 'servico' ? 0.32 : 0.12;
-                    const csllEfetivo = csllBase * 0.09 * 100;
-                    const totalEfetivo = 0.65 + 3.0 + bu.aliquotaIss + irpjEfetivo + csllEfetivo;
-                    const buLabel = bu.buKey === 'caas' ? 'CaaS' : bu.buKey === 'saas' ? 'SaaS' : 'Setup';
-                    return (
-                      <tr key={bu.buKey} className="border-b border-border/30">
-                        <td className="py-2 px-3 font-medium">{buLabel}</td>
-                        <td className="py-2 px-3 text-muted-foreground capitalize">{bu.tipoReceita === 'servico' ? 'Serviço' : bu.tipoReceita}</td>
-                        <td className="py-2 px-3 text-right">
-                          <input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="10"
-                            className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={bu.aliquotaIss}
-                            onChange={e => {
-                              const newIss = Number(e.target.value) || 0;
-                              const configs = [...(data.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!)];
-                              configs[idx] = { ...configs[idx], aliquotaIss: newIss };
-                              if (editing) {
-                                setEditState(prev => ({ ...prev, buTaxConfigs: configs }));
-                              } else {
-                                setAssumptions({ ...assumptions, buTaxConfigs: configs });
-                              }
-                            }}
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-right text-muted-foreground">0,65%</td>
-                        <td className="py-2 px-3 text-right text-muted-foreground">3,00%</td>
-                        <td className="py-2 px-3 text-right text-muted-foreground">{irpjEfetivo.toFixed(2).replace('.', ',')}%</td>
-                        <td className="py-2 px-3 text-right text-muted-foreground">{csllEfetivo.toFixed(2).replace('.', ',')}%</td>
-                        <td className="py-2 px-3 text-right font-semibold text-primary">{totalEfetivo.toFixed(2).replace('.', ',')}%</td>
+            <div className="overflow-x-auto">
+              {(() => {
+                const TAX_GROUPS: { label: string; keys: FinTicketKey[] }[] = [
+                  { label: 'CaaS', keys: CAAS_KEYS as FinTicketKey[] },
+                  { label: 'SaaS', keys: SAAS_KEYS as FinTicketKey[] },
+                  { label: 'Education', keys: EDUCATION_KEYS as FinTicketKey[] },
+                  { label: 'Expansão', keys: EXPANSAO_KEYS as FinTicketKey[] },
+                  { label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
+                ];
+                const TAX_ROWS = ['PIS (%)', 'COFINS (%)', 'ISS (%)', 'IRPJ efetivo (%)', 'CSLL efetivo (%)', 'TOTAL efetivo (%)'];
+
+                const getConfig = (key: FinTicketKey): SubProductTaxConfig => {
+                  return getSubProductTaxRate(key, data as AssumptionsType);
+                };
+
+                const updateSubProductTax = (key: FinTicketKey, field: keyof SubProductTaxConfig, val: number) => {
+                  const current = getConfig(key);
+                  const updated = { ...current, [field]: val };
+                  const rates = { ...(data.subProductTaxRates ?? {}), [key]: updated };
+                  if (editing) {
+                    setEditState(prev => ({ ...prev, subProductTaxRates: rates }));
+                  } else {
+                    setAssumptions({ ...assumptions, subProductTaxRates: rates } as AssumptionsType);
+                  }
+                };
+
+                const shortLabels: Record<string, string> = {
+                  caasAssessoria: 'Serv.Esp', caasEnterprise: 'Enterpr', caasCorporate: 'Corp', caasParceiros: 'Parc', caasSetup: 'BPO Fin',
+                  saasOxy: 'Oxy', saasOxyGenio: 'Oxy+G', saasSetup: 'Setup', saasParceiros: 'Parc', saasOxyGenioEsp: 'Oxy+G+E',
+                  educationDonoCFO: 'DonoCFO', educationEN: 'EN', educationFR: 'FR', educationFSP: 'FSP',
+                  baas: 'OxyHack', baasFranquia: 'Franq', baasMasterFranquia: 'MFranq',
+                  taxAT: 'AT', taxGPT: 'GPT', taxRCT: 'RCT', taxRT: 'RT', taxDTC: 'DTC',
+                };
+
+                return (
+                  <table className="text-[11px] border-collapse min-w-[900px]">
+                    <thead>
+                      {/* Group header row */}
+                      <tr className="border-b border-border/50">
+                        <th className="text-left py-1.5 px-2 font-medium text-muted-foreground sticky left-0 bg-card z-10 min-w-[120px]">Dedução</th>
+                        {TAX_GROUPS.map(g => (
+                          <th key={g.label} colSpan={g.keys.length} className="text-center py-1.5 px-1 font-semibold text-primary border-l border-border/30">
+                            {g.label}
+                          </th>
+                        ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      {/* Subproduct header row */}
+                      <tr className="border-b border-border/50">
+                        <th className="sticky left-0 bg-card z-10" />
+                        {TAX_GROUPS.map(g => g.keys.map((k, ki) => (
+                          <th key={k} className={`text-center py-1 px-1 font-medium text-muted-foreground whitespace-nowrap ${ki === 0 ? 'border-l border-border/30' : ''}`}>
+                            {shortLabels[k] ?? k}
+                          </th>
+                        )))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TAX_ROWS.map((rowLabel, ri) => {
+                        const isEditable = ri < 3; // PIS, COFINS, ISS
+                        const isTotal = ri === 5;
+                        return (
+                          <tr key={rowLabel} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
+                            <td className={`py-1.5 px-2 font-medium sticky left-0 bg-card z-10 ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                              {rowLabel}
+                            </td>
+                            {TAX_GROUPS.map(g => g.keys.map((k, ki) => {
+                              const cfg = getConfig(k);
+                              const baseP = cfg.tipoReceita === 'servico' ? 0.32 : 0.08;
+                              const csllBase = cfg.tipoReceita === 'servico' ? 0.32 : 0.12;
+                              let cellValue: number;
+                              switch (ri) {
+                                case 0: cellValue = cfg.pis; break;
+                                case 1: cellValue = cfg.cofins; break;
+                                case 2: cellValue = cfg.iss; break;
+                                case 3: cellValue = baseP * 0.15 * 100; break;
+                                case 4: cellValue = csllBase * 0.09 * 100; break;
+                                default: cellValue = cfg.pis + cfg.cofins + cfg.iss + (baseP * 0.15 * 100) + (csllBase * 0.09 * 100); break;
+                              }
+
+                              if (isEditable) {
+                                const field: keyof SubProductTaxConfig = ri === 0 ? 'pis' : ri === 1 ? 'cofins' : 'iss';
+                                return (
+                                  <td key={k} className={`py-1 px-0.5 text-center ${ki === 0 ? 'border-l border-border/30' : ''}`}>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      min="0"
+                                      max="20"
+                                      className="w-12 bg-secondary border border-border rounded px-1 py-0.5 text-center text-[11px] tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                      value={cellValue}
+                                      onChange={e => updateSubProductTax(k, field, Number(e.target.value) || 0)}
+                                    />
+                                  </td>
+                                );
+                              }
+
+                              return (
+                                <td key={k} className={`py-1.5 px-1 text-center tabular-nums ${ki === 0 ? 'border-l border-border/30' : ''} ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
+                                  {cellValue.toFixed(2).replace('.', ',')}%
+                                </td>
+                              );
+                            }))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
             </div>
             <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0.</span>
+              <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0. Base presumida: 32% para serviços.</span>
             </div>
           </div>
 
