@@ -321,7 +321,7 @@ export default function Assumptions() {
   };
 
   const updateTicket = (key: TicketKey, val: number) => {
-    updateModel(prev => ({
+    setAssumptions(prev => ({
       ...prev,
       tickets: { ...prev.tickets, [key]: val },
     }));
@@ -459,7 +459,7 @@ export default function Assumptions() {
 
     setGrowthRates(newGrowthRates);
 
-    setAssumptions(prev => {
+    const applyAllUpdater = (prev: AssumptionsType) => {
       const newSPC = { ...prev.subProductClients };
       for (const [k, yearMap] of Object.entries(decTargets)) {
         newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
@@ -472,7 +472,12 @@ export default function Assumptions() {
           ...overridesAccum,
         },
       };
-    });
+    };
+    if (editing) {
+      setEditState(applyAllUpdater);
+    } else {
+      setAssumptions(applyAllUpdater);
+    }
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
@@ -508,7 +513,7 @@ export default function Assumptions() {
       return updated;
     });
 
-    setAssumptions(prev => ({
+    const applyRowUpdater = (prev: AssumptionsType) => ({
       ...prev,
       subProductClients: {
         ...prev.subProductClients,
@@ -521,7 +526,12 @@ export default function Assumptions() {
           [year]: projected,
         },
       },
-    }));
+    });
+    if (editing) {
+      setEditState(applyRowUpdater);
+    } else {
+      setAssumptions(applyRowUpdater);
+    }
   };
 
   // Used by Marketing tab actual-data table
@@ -2068,7 +2078,11 @@ export default function Assumptions() {
               ) as typeof defaults;
               const updateSquad = (field: string, val: number) => {
                 const newSq = { ...sq, [field]: val };
-                setAssumptions(prev => ({ ...(typeof prev === 'object' ? prev : assumptions), squadConfig: newSq }));
+                if (editing) {
+                  setEditState(prev => ({ ...prev, squadConfig: newSq }));
+                } else {
+                  setAssumptions(prev => ({ ...prev, squadConfig: newSq }));
+                }
               };
 
               // Custo por squad CFO: 1 CFO + N analistas
