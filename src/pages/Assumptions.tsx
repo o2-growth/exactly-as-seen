@@ -1289,7 +1289,24 @@ export default function Assumptions() {
               { id: 'expansao', label: 'Expansão', keys: EXPANSAO_KEYS as FinTicketKey[] },
               { id: 'tax', label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
             ];
-            const TAX_ROWS = ['PIS (%)', 'COFINS (%)', 'ISS (%)', 'IRPJ efetivo (%)', 'CSLL efetivo (%)', 'TOTAL efetivo (%)'];
+            // Each row: { label, field (if editable), computed (if calculated) }
+            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
+              { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
+              { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
+              { label: '2.03  ISS (%)', field: 'iss' },
+              { label: '2.04  PIS (%)', field: 'pis' },
+              { label: '2.05  COFINS (%)', field: 'cofins' },
+              { label: '2.06  ICMS (%)', field: 'icms' },
+              { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
+              { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
+              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100 },
+              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100 },
+              { label: 'TOTAL efetivo (%)', computed: (cfg) => {
+                const irpj = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100;
+                const csll = (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100;
+                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
+              }, isTotal: true },
+            ];
 
             const fullLabels: Record<string, string> = {
               caasAssessoria: 'Serviços Especializados', caasEnterprise: 'Enterprise', caasCorporate: 'Corporate', caasParceiros: 'Parceiros', caasSetup: 'BPO Financeiro',
