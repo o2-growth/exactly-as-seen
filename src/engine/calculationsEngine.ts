@@ -527,8 +527,9 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
 function calcularDeducoesPorSubproduto(
   revenueBySubproduct: Record<string, number>,
   assumptions: Assumptions
-): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducaoCsllRetido: number; deducaoPisRetido: number; deducaoICMS: number; deducaoIrrfRetido: number; deducaoCofinsRetido: number; deducoesTotal: number } {
   let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  let deducaoCsllRetido = 0, deducaoPisRetido = 0, deducaoICMS = 0, deducaoIrrfRetido = 0, deducaoCofinsRetido = 0;
   for (const key of ALL_SUBPRODUCT_KEYS) {
     const fat = revenueBySubproduct[key] || 0;
     if (fat <= 0) continue;
@@ -536,8 +537,14 @@ function calcularDeducoesPorSubproduto(
     deducaoPIS += fat * (cfg.pis / 100);
     deducaoCOFINS += fat * (cfg.cofins / 100);
     deducaoISSQN += fat * (cfg.iss / 100);
+    deducaoCsllRetido += fat * (cfg.csllRetido / 100);
+    deducaoPisRetido += fat * (cfg.pisRetido / 100);
+    deducaoICMS += fat * (cfg.icms / 100);
+    deducaoIrrfRetido += fat * (cfg.irrfRetido / 100);
+    deducaoCofinsRetido += fat * (cfg.cofinsRetido / 100);
   }
-  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+  const deducoesTotal = deducaoPIS + deducaoCOFINS + deducaoISSQN + deducaoCsllRetido + deducaoPisRetido + deducaoICMS + deducaoIrrfRetido + deducaoCofinsRetido;
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducaoCsllRetido, deducaoPisRetido, deducaoICMS, deducaoIrrfRetido, deducaoCofinsRetido, deducoesTotal };
 }
 
 // Legacy wrapper for backward compatibility
