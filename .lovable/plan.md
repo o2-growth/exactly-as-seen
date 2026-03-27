@@ -1,51 +1,40 @@
 
 
-# Restaurar valores originais de caasAssessoria
+# Fix: edição de um mês deve recalcular meses seguintes
 
 ## Problema
-Os valores de `caasAssessoria` foram alterados acidentalmente na UI (2025: 21→5, 2026: 78→19) e esses valores foram persistidos automaticamente no banco de dados e localStorage.
+
+Quando o usuário edita Abril (ex: muda para 6), apenas Abril muda. Mas o modelo financeiro usa interpolação geométrica — cada mês depende do anterior. Então editar Abril deveria recalcular Mai-Dez mantendo a mesma curva de crescimento até o target de Dezembro.
+
+Atualmente, `handleClientChange` salva apenas o override do mês editado (`yearArr[monthIdx] = newCount`) e deixa os outros como `null`. Os meses `null` voltam ao valor base (interpolação geométrica original), ignorando o novo valor de Abril.
 
 ## Solução
-Limpar os dados persistidos e os overrides mensais de `caasAssessoria` para que o sistema volte a usar os valores padrão do `DEFAULT_ASSUMPTIONS`:
-- **2025**: 21
-- **2026**: 78
 
-### Alteração em `src/pages/Assumptions.tsx`
-Adicionar um `useEffect` temporário (ou chamar `resetAssumptions()` seletivamente) que:
-1. No mount, verifica se `subProductClients.caasAssessoria[2025] !== 21` ou `[2026] !== 78`
-2. Se sim, corrige os valores e limpa os `monthlyClientOverrides` de `caasAssessoria` para 2025 e 2026
+Quando o usuário edita um mês projetado (não histórico), recalcular todos os meses **após** o editado usando interpolação geométrica do novo valor até o target de Dezembro, e salvar tudo como overrides.
 
-**Abordagem mais simples**: corrigir diretamente no `DEFAULT_ASSUMPTIONS` não resolve porque o valor persistido sobrescreve os defaults no load. Então vamos adicionar um one-time fix no `FinancialModelContext.tsx`:
+### `src/pages/Assumptions.tsx` — `handleClientChange`
 
-### `src/contexts/FinancialModelContext.tsx`
-Após o `loadSnapshots` no useEffect de mount, adicionar uma correção pontual:
-
-```typescript
-loadSnapshots().then(saved => {
-  if (saved) {
-    // One-time fix: restore accidentally changed caasAssessoria values
-    const fixed = { ...saved };
-    let needsFix = false;
-    if (fixed.subProductClients?.caasAssessoria?.[2025] === 5) {
-      fixed.subProductClients.caasAssessoria[2025] = 21;
-      needsFix = true;
-    }
-    if (fixed.subProductClients?.caasAssessoria?.[2026] === 19) {
-      fixed.subProductClients.caasAssessoria[2026] = 78;
-      needsFix = true;
-    }
-    // Also clear any monthly overrides for these years
-    if (needsFix && fixed.monthlyClientOverrides?.caasAssessoria) {
-      delete fixed.monthlyClientOverrides.caasAssessoria[2025];
-      delete fixed.monthlyClientOverrides.caasAssessoria[2026];
-    }
-    setAssumptions(fixed);
-  }
-});
+```
+handleClientChange(key, year, monthIdx, newCount):
+  1. Pegar o array atual de overrides (ou null × 12)
+  2. Setar yearArr[monthIdx] = newCount
+  3. Se monthIdx < 11:
+     - decTarget = yearArr[11] ?? subProductClients[key][year]
+     - Para cada mês j de (monthIdx+1) até 10:
+       - Interpolar geometricamente de newCount (mês editado) até decTarget (mês 11)
+       - yearArr[j] = interpolatedValue
+     - yearArr[11] = decTarget (manter Dec inalterado)
+  4. Se monthIdx === 11:
+     - decTarget = newCount
+     - Não recalcular meses anteriores
+  5. Salvar yearArr completo nos overrides + sync decTarget
 ```
 
-Também limpar o localStorage para garantir consistência.
+A interpolação: `newCount * (decTarget / newCount)^(step / remainingSteps)` onde `step` vai de 1 a `remainingSteps` (distância do mês editado até Dezembro).
+
+### Meses históricos (bloqueados)
+Meses históricos já são bloqueados na UI (🔒), então esta lógica só se aplica a meses editáveis.
 
 ### Arquivos alterados
-- `src/contexts/FinancialModelContext.tsx` — one-time data fix no load
+- `src/pages/Assumptions.tsx` — `handleClientChange` recalcula meses subsequentes
 
