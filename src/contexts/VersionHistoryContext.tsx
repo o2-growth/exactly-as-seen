@@ -35,7 +35,7 @@ function generateId() {
 }
 
 function getNextVersion(versions: VersionSnapshot[]): string {
-  if (versions.length === 0) return '1.0';
+  if (versions.length === 0) return '1.1';
   const last = versions[versions.length - 1].version;
   const [major, minor] = last.split('.').map(Number);
   return `${major}.${minor + 1}`;
