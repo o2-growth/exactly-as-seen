@@ -1274,7 +1274,7 @@ export default function Assumptions() {
 
         </TabsContent>
 
-        {/* ─── BLOCO 2: TAX DEDUCTIONS ─── */}
+        {/* ─── BLOCO 2: TAX DEDUCTIONS — Lucro Presumido por BU ─── */}
         <TabsContent value="tax" className="space-y-6 mt-4">
 
           {/* Toggle IRPJ/CSLL */}
@@ -1295,7 +1295,7 @@ export default function Assumptions() {
                   data.taxEnabled ? 'bg-primary' : 'bg-secondary border border-border'
                 }`}
               >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-background shadow-lg ring-0 transition-transform ${
                   data.taxEnabled ? 'translate-x-6' : 'translate-x-1'
                 }`} />
               </button>
@@ -1303,38 +1303,72 @@ export default function Assumptions() {
             </div>
           </div>
 
-          {/* Regime Tributário */}
-          <div className="gradient-card p-5">
-            <div className="flex items-center gap-2 mb-4">
+          {/* Configuração por BU */}
+          <div className="gradient-card p-5 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
               <Scale className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Regime Tributário</h3>
-              <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">Transição em 2027</span>
+              <h3 className="text-sm font-semibold">Lucro Presumido — Alíquotas por BU</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BadgePercent className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-xs font-semibold text-foreground">Lucro Presumido (2025–2026)</p>
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>PIS 0,65% + COFINS 3,0% + ISS 5,0% + Descontos 1,0%</p>
-                  <p className="text-sm font-semibold text-foreground">Taxa total: 9,65%</p>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <BadgePercent className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-xs font-semibold text-foreground">Lucro Real (2027–2030)</p>
-                </div>
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>PIS 1,65% + COFINS 7,6% + ISS 5,0% + Descontos 1,0%</p>
-                  <p className="text-sm font-semibold text-foreground">Taxa total: 15,25%</p>
-                </div>
-              </div>
+            <div className="overflow-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border/50">
+                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">BU</th>
+                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Tipo Receita</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">ISS (%)</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">PIS</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">COFINS</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">IRPJ efetivo</th>
+                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">CSLL efetivo</th>
+                    <th className="text-right py-2 px-3 font-medium text-primary">Total efetivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!).map((bu, idx) => {
+                    const basePresumida = bu.tipoReceita === 'servico' ? 0.32 : 0.08;
+                    const irpjEfetivo = basePresumida * 0.15 * 100;
+                    const csllBase = bu.tipoReceita === 'servico' ? 0.32 : 0.12;
+                    const csllEfetivo = csllBase * 0.09 * 100;
+                    const totalEfetivo = 0.65 + 3.0 + bu.aliquotaIss + irpjEfetivo + csllEfetivo;
+                    const buLabel = bu.buKey === 'caas' ? 'CaaS' : bu.buKey === 'saas' ? 'SaaS' : 'Setup';
+                    return (
+                      <tr key={bu.buKey} className="border-b border-border/30">
+                        <td className="py-2 px-3 font-medium">{buLabel}</td>
+                        <td className="py-2 px-3 text-muted-foreground capitalize">{bu.tipoReceita === 'servico' ? 'Serviço' : bu.tipoReceita}</td>
+                        <td className="py-2 px-3 text-right">
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="10"
+                            className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                            value={bu.aliquotaIss}
+                            onChange={e => {
+                              const newIss = Number(e.target.value) || 0;
+                              const configs = [...(data.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!)];
+                              configs[idx] = { ...configs[idx], aliquotaIss: newIss };
+                              if (editing) {
+                                setEditState(prev => ({ ...prev, buTaxConfigs: configs }));
+                              } else {
+                                setAssumptions({ ...assumptions, buTaxConfigs: configs });
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">0,65%</td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">3,00%</td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">{irpjEfetivo.toFixed(2).replace('.', ',')}%</td>
+                        <td className="py-2 px-3 text-right text-muted-foreground">{csllEfetivo.toFixed(2).replace('.', ',')}%</td>
+                        <td className="py-2 px-3 text-right font-semibold text-primary">{totalEfetivo.toFixed(2).replace('.', ',')}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
             <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
               <Info className="h-3 w-3 mt-0.5 shrink-0" />
-              <span>IRPJ 25% + CSLL 9% = 34% sobre lucro tributável (EBT). Aplicado em ambos os regimes.</span>
+              <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0.</span>
             </div>
           </div>
 
