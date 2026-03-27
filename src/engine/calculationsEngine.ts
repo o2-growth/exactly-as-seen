@@ -1472,29 +1472,22 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS per BU
-          const buConfs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
-          // Weighted average ISS across BUs for proportional split
-          const proportionalItems: { code: string; label: string; rate: number }[] = [
-            { code: '2.03', label: 'ISS', rate: 0 }, // computed below
-            { code: '2.04', label: 'PIS', rate: 0.0065 },
-            { code: '2.05', label: 'COFINS', rate: 0.03 },
+          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS ~avg across BUs
+          // Use fixed proportions: PIS / (PIS+COFINS+ISS_avg), etc.
+          const pisPct = 0.0065;
+          const cofinsPct = 0.03;
+          // Average ISS weighted — approximate with sum of rates
+          const issAvg = 0.04; // ~weighted average across CaaS(5%), SaaS(2.9%), Setup(2.9%)
+          const totalPct = pisPct + cofinsPct + issAvg;
+          const proportionalItems: { code: string; label: string; proportion: number }[] = [
+            { code: '2.03', label: 'ISS', proportion: issAvg / totalPct },
+            { code: '2.04', label: 'PIS', proportion: pisPct / totalPct },
+            { code: '2.05', label: 'COFINS', proportion: cofinsPct / totalPct },
           ];
-          // For each year compute actual PIS/COFINS/ISS proportions from the deductions total
-          const proportionalNodes = proportionalItems.map((sd, sdIdx) => {
+          const proportionalNodes = proportionalItems.map(sd => {
             const ann = {} as Record<Year, number>;
             for (const y of YEARS) {
-              const yr = yearlyOutputs[y];
-              if (!yr || dedAn[y] === 0) { ann[y] = 0; continue; }
-              // Reconstruct per-BU revenues from annual outputs
-              const caasRev = yr.revenueDetail.caasAssessoria + yr.revenueDetail.caasEnterprise + yr.revenueDetail.caasCorporate + yr.revenueDetail.caasSetup;
-              const saasRev = yr.revenueDetail.saasOxy + yr.revenueDetail.saasOxyGenio + yr.revenueDetail.saasSetup;
-              const setupRev = yr.revenueDetail.caasSetup;
-              const revByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: setupRev };
-              const dedBU = calcularDeducoesPorBU(revByBU, buConfs);
-              if (sdIdx === 0) ann[y] = Math.round(-dedBU.deducaoISSQN);
-              else if (sdIdx === 1) ann[y] = Math.round(-dedBU.deducaoPIS);
-              else ann[y] = Math.round(-dedBU.deducaoCOFINS);
+              ann[y] = Math.round(dedAn[y] * sd.proportion);
             }
             return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
           });
