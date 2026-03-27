@@ -434,7 +434,8 @@ export default function Assumptions() {
   const handleApplyAll = () => {
     const rate = applyAllPct / 100;
     const newGrowthRates = { ...growthRates };
-    const subProductUpdates: Partial<Record<SubProductKey, Record<number, number>>> = {};
+    const overridesAccum: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>> = {};
+    const decTargets: Partial<Record<SubProductKey, Record<number, number>>> = {};
 
     for (const y of YEARS) {
       const yearRates = { ...newGrowthRates[y] };
@@ -447,11 +448,25 @@ export default function Assumptions() {
             if (!isHistorical(y, m)) arr[m] = rate;
           }
           yearRates[k] = arr;
-          // Compute Dec target
-          const monthlyChurn = getChurnMonthly(k, data);
-          const newMonthly = computeProjectedClients(k, y, arr, monthlyChurn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-          if (!subProductUpdates[k]) subProductUpdates[k] = {};
-          subProductUpdates[k]![y] = newMonthly[11];
+
+          // Build sequential projection to get monthly values with growth
+          const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+          const churnRate = getChurnMonthly(k, data);
+          let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+          const projected: (number | null)[] = Array(12).fill(null);
+          for (let m = 0; m < 12; m++) {
+            if (isHistorical(y, m)) {
+              prev = Math.round(base[m]);
+            } else {
+              const next = Math.max(0, Math.round(prev * (1 + arr[m] - churnRate)));
+              projected[m] = next;
+              prev = next;
+            }
+          }
+          if (!overridesAccum[k]) overridesAccum[k] = {};
+          overridesAccum[k]![y] = projected;
+          if (!decTargets[k]) decTargets[k] = {};
+          decTargets[k]![y] = projected[11] ?? Math.round(base[11]);
         }
       }
       newGrowthRates[y] = yearRates;
@@ -459,13 +474,19 @@ export default function Assumptions() {
 
     setGrowthRates(newGrowthRates);
 
-    // Propagate all Dec targets directly (bypass edit mode)
     setAssumptions(prev => {
       const newSPC = { ...prev.subProductClients };
-      for (const [k, yearMap] of Object.entries(subProductUpdates)) {
+      for (const [k, yearMap] of Object.entries(decTargets)) {
         newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
       }
-      return { ...prev, subProductClients: newSPC };
+      return {
+        ...prev,
+        subProductClients: newSPC,
+        monthlyClientOverrides: {
+          ...(prev.monthlyClientOverrides ?? {}),
+          ...overridesAccum,
+        },
+      };
     });
   };
 
