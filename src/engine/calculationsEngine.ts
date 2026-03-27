@@ -865,6 +865,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     grossRevenue: r(annualGrossRevenue), caasRevenue: r(annualCaas), saasRevenue: r(annualSaas),
     educationRevenue: r(annualEdu), baasRevenue: r(annualBaas), taxRevenue: r(annualTaxRev),
     deductions: r(annualDeductions), netRevenue: r(annualNetRevenue),
+    dedDetail: { pis: r(dedD.pis), cofins: r(dedD.cofins), iss: r(dedD.iss), csllRetido: r(dedD.csllRetido), pisRetido: r(dedD.pisRetido), icms: r(dedD.icms), irrfRetido: r(dedD.irrfRetido), cofinsRetido: r(dedD.cofinsRetido) },
     cogs: r(annualCogs), cogsDetail: { caas: r(cogsD.caas), customerService: r(cogsD.customerService), saas: r(cogsD.saas), education: r(cogsD.education), baas: r(cogsD.baas) },
     grossProfit: r(annualGrossProfit),
     grossMarginPct: annualNetRevenue !== 0 ? Number(((annualGrossProfit / annualNetRevenue) * 100).toFixed(1)) : 0,
