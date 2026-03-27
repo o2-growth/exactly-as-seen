@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { hasBackendConfig, getBackendClient, getBackendConfigError } from '@/lib/supabase-safe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,9 +15,13 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const configOk = hasBackendConfig();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!configOk) return;
     setLoading(true);
+    const supabase = getBackendClient();
 
     try {
       if (mode === 'forgot') {
@@ -67,7 +71,9 @@ export default function Auth() {
             {mode === 'forgot' ? 'Recuperar senha' : mode === 'login' ? 'Bem-vindo de volta' : 'Criar conta'}
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            {mode === 'forgot'
+            {!configOk
+              ? getBackendConfigError()
+              : mode === 'forgot'
               ? 'Enviaremos um link para redefinir sua senha.'
               : mode === 'login'
               ? 'Acesse o painel financeiro da O2 Inc.'
@@ -87,6 +93,7 @@ export default function Auth() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={!configOk}
                 className="h-11 bg-background border-border"
               />
             </div>
@@ -102,6 +109,7 @@ export default function Auth() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={!configOk}
                     minLength={6}
                     className="h-11 bg-background border-border pr-10"
                   />
@@ -127,7 +135,7 @@ export default function Auth() {
               </div>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full h-11 font-semibold text-sm gap-2">
+            <Button type="submit" disabled={loading || !configOk} className="w-full h-11 font-semibold text-sm gap-2">
               {loading ? (
                 <span className="animate-spin h-4 w-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
               ) : mode === 'forgot' ? (

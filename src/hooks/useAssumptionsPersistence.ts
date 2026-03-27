@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { hasBackendConfig, getBackendClientSafe } from '@/lib/supabase-safe';
 import { Assumptions, DEFAULT_ASSUMPTIONS, Scenario } from '@/lib/financialData';
 
 export interface AssumptionsSnapshot {
@@ -22,9 +22,26 @@ export function useAssumptionsPersistence() {
     setLoading(true);
     setError(null);
     try {
+      const supabase = getBackendClientSafe();
+      if (!supabase) {
+        // No backend — use localStorage fallback
+        const stored = localStorage.getItem('o2_assumptions');
+        if (stored) {
+          setSnapshots([{
+            id: 'local',
+            name: 'Local Save',
+            scenario: 'BASE',
+            assumptions: JSON.parse(stored),
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }]);
+        }
+        return null;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        // Not logged in — use localStorage fallback
         const stored = localStorage.getItem('o2_assumptions');
         if (stored) {
           setSnapshots([{
@@ -58,13 +75,11 @@ export function useAssumptionsPersistence() {
       }));
       setSnapshots(mapped);
 
-      // Return the active one
       const active = mapped.find(s => s.is_active);
       return active?.assumptions ?? null;
     } catch (err: any) {
       console.error('Error loading assumptions:', err);
       setError(err.message);
-      // Fallback to localStorage
       const stored = localStorage.getItem('o2_assumptions');
       return stored ? JSON.parse(stored) : null;
     } finally {
@@ -80,22 +95,19 @@ export function useAssumptionsPersistence() {
     setSaving(true);
     setError(null);
     try {
-      // Always save to localStorage as backup
       localStorage.setItem('o2_assumptions', JSON.stringify(assumptions));
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        // Not logged in — localStorage only
-        return;
-      }
+      const supabase = getBackendClientSafe();
+      if (!supabase) return;
 
-      // Deactivate all existing for this user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       await (supabase as any)
         .from('assumptions_snapshots')
         .update({ is_active: false })
         .eq('user_id', user.id);
 
-      // Upsert active snapshot
       const { error: upsertError } = await (supabase as any)
         .from('assumptions_snapshots')
         .insert({
@@ -122,6 +134,9 @@ export function useAssumptionsPersistence() {
     }
 
     try {
+      const supabase = getBackendClientSafe();
+      if (!supabase) return null;
+
       const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('assumptions')

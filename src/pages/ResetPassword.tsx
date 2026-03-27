@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { hasBackendConfig, getBackendClient, getBackendConfigError } from '@/lib/supabase-safe';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,27 +15,32 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [isValidSession, setIsValidSession] = useState(false);
 
+  const configOk = hasBackendConfig();
+
   useEffect(() => {
+    if (!configOk) return;
+    const supabase = getBackendClient();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsValidSession(true);
       }
     });
-    // Also check if already in a recovery session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setIsValidSession(true);
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [configOk]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!configOk) return;
     if (password !== confirmPassword) {
       toast({ title: 'Erro', description: 'As senhas não coincidem.', variant: 'destructive' });
       return;
     }
     setLoading(true);
     try {
+      const supabase = getBackendClient();
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       toast({ title: 'Senha atualizada!', description: 'Você já pode fazer login com a nova senha.' });
@@ -57,11 +62,15 @@ export default function ResetPassword() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
             Redefinir senha
           </h1>
-          <p className="text-muted-foreground mt-2 text-sm">Digite sua nova senha abaixo.</p>
+          <p className="text-muted-foreground mt-2 text-sm">
+            {!configOk ? getBackendConfigError() : 'Digite sua nova senha abaixo.'}
+          </p>
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
-          {!isValidSession ? (
+          {!configOk ? (
+            <p className="text-center text-muted-foreground text-sm">{getBackendConfigError()}</p>
+          ) : !isValidSession ? (
             <p className="text-center text-muted-foreground text-sm">
               Link inválido ou expirado. Solicite um novo link de recuperação na{' '}
               <button onClick={() => navigate('/auth')} className="text-primary font-semibold hover:underline">tela de login</button>.

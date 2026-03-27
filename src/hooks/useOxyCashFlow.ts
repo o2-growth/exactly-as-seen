@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-
+import { hasBackendConfig, getProjectId, getAnonKey } from '@/lib/supabase-safe';
 
 export interface OxyChartItem {
   month: string;
@@ -10,7 +10,7 @@ export interface OxyChartItem {
 
 export interface OxyDetailItem {
   label: string;
-  type: string; // 'supplier' | 'customer'
+  type: string;
   data: { period: string; value: number }[];
 }
 
@@ -29,6 +29,18 @@ export function useOxyCashFlow(startDate: string, endDate: string, enabled: bool
   useEffect(() => {
     if (!enabled) return;
 
+    if (!hasBackendConfig()) {
+      setError('Backend não configurado');
+      return;
+    }
+
+    const projectId = getProjectId();
+    const anonKey = getAnonKey();
+    if (!projectId || !anonKey) {
+      setError('Configuração de projeto ausente');
+      return;
+    }
+
     let cancelled = false;
 
     async function fetchData() {
@@ -36,13 +48,11 @@ export function useOxyCashFlow(startDate: string, endDate: string, enabled: bool
         setLoading(true);
         setError(null);
 
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
         const url = `https://${projectId}.supabase.co/functions/v1/fetch-oxy-cashflow?startDate=${startDate}&endDate=${endDate}`;
         
         const response = await fetch(url, {
           headers: {
-            'apikey': anonKey,
+            'apikey': anonKey!,
             'Authorization': `Bearer ${anonKey}`,
           },
         });
@@ -52,7 +62,6 @@ export function useOxyCashFlow(startDate: string, endDate: string, enabled: bool
 
         if (cancelled) return;
 
-        // Parse chart data
         const chart: OxyChartItem[] = (result.chart?.data?.items || []).map((item: any) => {
           const values = item.values || [];
           const entradas = values.find((v: any) => v.label === 'Entradas')?.value || 0;
@@ -61,7 +70,6 @@ export function useOxyCashFlow(startDate: string, endDate: string, enabled: bool
           return { month: item.month, entradas, saidas, saldo };
         });
 
-        // Parse card details
         const recebido: OxyDetailItem[] = (result.cardRecebido?.data?.data || []).map((item: any) => ({
           label: item.label,
           type: item.type,
