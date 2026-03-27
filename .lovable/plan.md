@@ -1,34 +1,18 @@
 
 
-# Fix: edição de ticket mensal deve propagar para meses seguintes
+# Ajustar versão exibida de v1.0 para v1.1
 
-## Problema
-Ao editar o ticket médio de um mês (ex: Abril), apenas aquele mês muda. Os meses seguintes continuam com o valor flat original, então o MRR de Dezembro não reflete a mudança. O comportamento deveria ser igual ao de clientes: interpolar geometricamente do mês editado até Dezembro.
+## O que será feito
 
-## Solução
-Aplicar a mesma lógica de propagação geométrica usada em `handleClientChange` para os tickets mensais.
+Alterar a versão base inicial do modelo de `'1.0'` para `'1.1'` no `VersionHistoryContext`.
 
-### `src/pages/Assumptions.tsx` — onCommit do ticket mensal (linhas ~839-856)
+## Alteração
 
-Após `yearArr[i] = v`, adicionar recálculo dos meses seguintes:
+**`src/contexts/VersionHistoryContext.tsx`** — 3 pontos:
 
-```
-onCommit(v):
-  1. yearArr[i] = v  (mês editado)
-  2. Se i < 11:
-     - decTicket = yearArr[11]  (ticket de Dezembro, já inicializado como ticketVal)
-     - Para j de (i+1) até 10:
-       - step = j - i
-       - remainingSteps = 11 - i
-       - Se v > 0 e decTicket > 0:
-           yearArr[j] = v * (decTicket / v)^(step / remainingSteps)
-       - Senão: yearArr[j] = decTicket (fallback linear)
-     - yearArr[11] = decTicket (manter Dez inalterado)
-  3. Se i === 11:
-     - Apenas atualiza Dezembro, não recalcula anteriores
-  4. Salvar yearArr nos assumptions.monthlyTickets
-```
+1. **Linha 38** — fallback de `getNextVersion`: `'1.0'` → `'1.1'`
+2. **Linha 101** — versão do snapshot inicial: `version: '1.0'` → `version: '1.1'`
+3. **Linha 114** — fallback de `currentVersion`: `'1.0'` → `'1.1'`
 
-### Arquivo alterado
-- `src/pages/Assumptions.tsx` — propagação geométrica no onCommit do ticket mensal
+**Nota:** Como as versões são salvas no localStorage, o usuário pode precisar limpar o localStorage (ou o código pode incluir lógica para atualizar o snapshot existente) para que a mudança surta efeito imediatamente.
 
