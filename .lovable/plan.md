@@ -1,40 +1,34 @@
 
 
-# Fix: edição de um mês deve recalcular meses seguintes
+# Fix: edição de ticket mensal deve propagar para meses seguintes
 
 ## Problema
-
-Quando o usuário edita Abril (ex: muda para 6), apenas Abril muda. Mas o modelo financeiro usa interpolação geométrica — cada mês depende do anterior. Então editar Abril deveria recalcular Mai-Dez mantendo a mesma curva de crescimento até o target de Dezembro.
-
-Atualmente, `handleClientChange` salva apenas o override do mês editado (`yearArr[monthIdx] = newCount`) e deixa os outros como `null`. Os meses `null` voltam ao valor base (interpolação geométrica original), ignorando o novo valor de Abril.
+Ao editar o ticket médio de um mês (ex: Abril), apenas aquele mês muda. Os meses seguintes continuam com o valor flat original, então o MRR de Dezembro não reflete a mudança. O comportamento deveria ser igual ao de clientes: interpolar geometricamente do mês editado até Dezembro.
 
 ## Solução
+Aplicar a mesma lógica de propagação geométrica usada em `handleClientChange` para os tickets mensais.
 
-Quando o usuário edita um mês projetado (não histórico), recalcular todos os meses **após** o editado usando interpolação geométrica do novo valor até o target de Dezembro, e salvar tudo como overrides.
+### `src/pages/Assumptions.tsx` — onCommit do ticket mensal (linhas ~839-856)
 
-### `src/pages/Assumptions.tsx` — `handleClientChange`
+Após `yearArr[i] = v`, adicionar recálculo dos meses seguintes:
 
 ```
-handleClientChange(key, year, monthIdx, newCount):
-  1. Pegar o array atual de overrides (ou null × 12)
-  2. Setar yearArr[monthIdx] = newCount
-  3. Se monthIdx < 11:
-     - decTarget = yearArr[11] ?? subProductClients[key][year]
-     - Para cada mês j de (monthIdx+1) até 10:
-       - Interpolar geometricamente de newCount (mês editado) até decTarget (mês 11)
-       - yearArr[j] = interpolatedValue
-     - yearArr[11] = decTarget (manter Dec inalterado)
-  4. Se monthIdx === 11:
-     - decTarget = newCount
-     - Não recalcular meses anteriores
-  5. Salvar yearArr completo nos overrides + sync decTarget
+onCommit(v):
+  1. yearArr[i] = v  (mês editado)
+  2. Se i < 11:
+     - decTicket = yearArr[11]  (ticket de Dezembro, já inicializado como ticketVal)
+     - Para j de (i+1) até 10:
+       - step = j - i
+       - remainingSteps = 11 - i
+       - Se v > 0 e decTicket > 0:
+           yearArr[j] = v * (decTicket / v)^(step / remainingSteps)
+       - Senão: yearArr[j] = decTicket (fallback linear)
+     - yearArr[11] = decTicket (manter Dez inalterado)
+  3. Se i === 11:
+     - Apenas atualiza Dezembro, não recalcula anteriores
+  4. Salvar yearArr nos assumptions.monthlyTickets
 ```
 
-A interpolação: `newCount * (decTarget / newCount)^(step / remainingSteps)` onde `step` vai de 1 a `remainingSteps` (distância do mês editado até Dezembro).
-
-### Meses históricos (bloqueados)
-Meses históricos já são bloqueados na UI (🔒), então esta lógica só se aplica a meses editáveis.
-
-### Arquivos alterados
-- `src/pages/Assumptions.tsx` — `handleClientChange` recalcula meses subsequentes
+### Arquivo alterado
+- `src/pages/Assumptions.tsx` — propagação geométrica no onCommit do ticket mensal
 
