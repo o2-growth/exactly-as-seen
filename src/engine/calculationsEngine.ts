@@ -1524,14 +1524,6 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
           const ddA = (field: keyof AnnualOutput['dedDetail']) => a(y => y.dedDetail[field]);
-          const ddM = (field: keyof AnnualOutput['dedDetail']) => mo((_, yi) => {
-            // Allocate monthly proportionally from annual detail
-            const annDed = outputs[yi].dedDetail[field];
-            const annTotal = outputs[yi].deductions;
-            const monthlyDed = outputs[yi].monthlyData.map(md => annTotal !== 0 ? md.deductions * (annDed / annTotal) : 0);
-            return monthlyDed;
-          });
-          // Helper to build a deduction node
           const dedNode = (code: string, label: string, field: keyof AnnualOutput['dedDetail']): PnlNode => {
             const ann = ddA(field);
             return { code, label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
