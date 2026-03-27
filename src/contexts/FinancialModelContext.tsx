@@ -82,6 +82,35 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           }
         }
 
+        // Ensure all default subProductClients keys exist (e.g. tax keys added later)
+        if (fixed.subProductClients) {
+          fixed.subProductClients = {
+            ...DEFAULT_ASSUMPTIONS.subProductClients,
+            ...fixed.subProductClients,
+          };
+        }
+
+        // Ensure all default ticket keys exist
+        if (fixed.tickets) {
+          fixed.tickets = {
+            ...DEFAULT_ASSUMPTIONS.tickets,
+            ...fixed.tickets,
+          };
+        }
+
+        // Ensure taxClients exists
+        if (!fixed.taxClients) {
+          fixed.taxClients = { ...DEFAULT_ASSUMPTIONS.taxClients };
+        }
+
+        // Ensure cacPerProduct has all keys
+        if (fixed.cacPerProduct) {
+          fixed.cacPerProduct = {
+            ...DEFAULT_ASSUMPTIONS.cacPerProduct,
+            ...fixed.cacPerProduct,
+          };
+        }
+
         setAssumptions(fixed);
       }
     });

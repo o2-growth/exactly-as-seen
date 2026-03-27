@@ -18,6 +18,11 @@ const SUB_PRODUCT_COLORS: Record<SubProductKey, string> = {
   saasOxyGenio: 'hsl(280 85% 60%)',
   educationDonoCFO: 'hsl(38 92% 50%)',
   baas: 'hsl(340 82% 52%)',
+  taxAT: 'hsl(0 70% 50%)',
+  taxGPT: 'hsl(15 75% 50%)',
+  taxRCT: 'hsl(30 70% 50%)',
+  taxRT: 'hsl(45 65% 50%)',
+  taxDTC: 'hsl(60 60% 45%)',
 };
 
 // Compute projected headcount from engine ratios
