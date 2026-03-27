@@ -575,10 +575,11 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const baasRev = rev.baas / 1000;
     const taxRev = rev.tax / 1000;
 
-    // Deductions (rate changes at 2027: Lucro Presumido → Lucro Real)
-    // Deduções de vendas (ISS, COFINS, PIS) são obrigatórias — não zeradas pelo toggle de tax
-    const dedRate = salesDeductionsByYear[year] ?? salesDeductions.totalRate;
-    const ded = -grossRev * dedRate;
+    // Deductions — Lucro Presumido por BU (PIS + COFINS + ISS)
+    const buConfigs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
+    const revenueByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: (rev.caasSetup ?? 0) / 1000 };
+    const dedResult = calcularDeducoesPorBU(revenueByBU, buConfigs);
+    const ded = -dedResult.deducoesTotal;
 
     // Net revenue
     const netRev = grossRev + ded;
