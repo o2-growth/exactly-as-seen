@@ -111,6 +111,8 @@ export interface Assumptions {
   };
   // Editable Selic monthly rate (default 1.17% = 0.0117)
   selicMonthly?: number;
+  // N/A flag for churn — products that are non-recurring don't have churn
+  churnNotApplicable?: Partial<Record<TicketKey, boolean>>;
 }
 
 export type TicketKey = keyof Assumptions['tickets'];
