@@ -675,7 +675,7 @@ export default function Assumptions() {
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                       const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
                       const monthly: number[] = row.dataKey
-                        ? computeProjectedClients(row.dataKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides)
+                        ? getMonthlyClients(row.dataKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))
                         : Array(12).fill(0);
                       const ticketVal = row.dataKey ? data.tickets[row.dataKey as TicketKey] ?? 0 : 0;
 
