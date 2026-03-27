@@ -21,7 +21,7 @@ function MonthlyClientInput({ value, onCommit, className }: { value: number; onC
 }
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Year, Assumptions as AssumptionsType, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients } from '@/lib/financialData';
+import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients } from '@/lib/financialData';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
 import { Lock, Unlock, Save, X, RotateCcw, Scale, Receipt, Landmark, Info, BadgePercent, UserCheck, Pencil, ChevronDown, ChevronRight, Plus } from 'lucide-react';
@@ -2061,92 +2061,134 @@ export default function Assumptions() {
           <div className="gradient-card p-5 space-y-4">
             <h3 className="text-sm font-semibold">Squad Operação — Estrutura de Custo</h3>
             {(() => {
-              const sq = data.squadConfig ?? {
-                diretorSalary: 30000, cfoOperacaoSalary: 20000, analistaSalary: 7500, numAnalistas: 2,
-                csPerClients: 100, csSalary: 5000, saasSquadImpl: 2, saasSquadImplSalary: 8000,
-                saasSquadAnalista: 1, saasSquadAnalistaSalary: 10000, saasSquadLider: 1,
-                saasSquadLiderSalary: 12500, sparePerAnalyst: 5,
-              };
+              const sq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
               const updateSquad = (field: string, val: number) => {
                 const newSq = { ...sq, [field]: val };
-                if (editing) {
-                  setEditState(prev => ({ ...prev, squadConfig: newSq }));
-                } else {
-                  setAssumptions({ ...assumptions, squadConfig: newSq });
-                }
+                setAssumptions(prev => ({ ...(typeof prev === 'object' ? prev : assumptions), squadConfig: newSq }));
               };
-              const fields: { label: string; field: string; value: number; prefix?: string }[] = [
-                { label: 'Diretor (R$/mês)', field: 'diretorSalary', value: sq.diretorSalary, prefix: 'R$' },
-                { label: 'CFO Operação (R$/mês)', field: 'cfoOperacaoSalary', value: sq.cfoOperacaoSalary, prefix: 'R$' },
-                { label: 'Analistas (qtd)', field: 'numAnalistas', value: sq.numAnalistas },
-                { label: 'Analista (R$/mês)', field: 'analistaSalary', value: sq.analistaSalary, prefix: 'R$' },
-                { label: 'CS a cada N clientes', field: 'csPerClients', value: sq.csPerClients },
-                { label: 'CS (R$/mês)', field: 'csSalary', value: sq.csSalary, prefix: 'R$' },
-                { label: 'SaaS Implementadores', field: 'saasSquadImpl', value: sq.saasSquadImpl },
-                { label: 'Implementador (R$/mês)', field: 'saasSquadImplSalary', value: sq.saasSquadImplSalary, prefix: 'R$' },
-                { label: 'SaaS Analista (qtd)', field: 'saasSquadAnalista', value: sq.saasSquadAnalista },
-                { label: 'SaaS Analista (R$/mês)', field: 'saasSquadAnalistaSalary', value: sq.saasSquadAnalistaSalary, prefix: 'R$' },
-                { label: 'SaaS Líder (qtd)', field: 'saasSquadLider', value: sq.saasSquadLider },
-                { label: 'SaaS Líder (R$/mês)', field: 'saasSquadLiderSalary', value: sq.saasSquadLiderSalary, prefix: 'R$' },
-                { label: 'Sobra p/ +1 analista', field: 'sparePerAnalyst', value: sq.sparePerAnalyst },
-              ];
-              const totalFixed = sq.diretorSalary + sq.cfoOperacaoSalary + (sq.numAnalistas * sq.analistaSalary) +
-                (sq.saasSquadImpl * sq.saasSquadImplSalary) + (sq.saasSquadAnalista * sq.saasSquadAnalistaSalary) +
-                (sq.saasSquadLider * sq.saasSquadLiderSalary);
-              const spareAnalysts = sq.sparePerAnalyst > 0 ? Math.floor(sq.numAnalistas / sq.sparePerAnalyst) : 0;
-              const fixedHC = 1 + 1 + sq.numAnalistas + sq.saasSquadImpl + sq.saasSquadAnalista + sq.saasSquadLider + spareAnalysts;
 
-              // Compute impact per year using model data
+              // Custo por squad CFO: 1 CFO + N analistas
+              const cfoSquadCost = sq.cfoSalary + sq.cfoAnalistasPerSquad * sq.cfoAnalistaSalary;
+              // Custo por squad Setup: 1 analista + N implementadores + líder rateado
+              const setupSquadCost = sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary + (sq.setupLiderSalary / sq.setupSquadsPerLider);
+
+              // Compute impact per year
               const yearImpact = activeYears.map(y => {
                 const yr = model.years[y];
-                const totalCl = yr.totalClients;
-                const numCS = Math.max(1, Math.ceil(totalCl / Math.max(1, sq.csPerClients)));
-                const csCost = numCS * sq.csSalary;
-                const spareCost = spareAnalysts * sq.analistaSalary;
-                const monthCost = totalFixed + csCost + spareCost;
-                const annualCost = monthCost * 12;
-                const totalSquadHC = fixedHC + numCS;
-                return { year: y, clients: totalCl, numCS, totalSquadHC, monthCost, annualCost };
+                const caasEnd = data.caasClients[y] ?? 0;
+                // Squads CFO
+                const numCfoSquads = Math.max(1, Math.ceil(caasEnd / Math.max(1, sq.cfoClientsPerSquad)));
+                const cfoTotal = numCfoSquads * cfoSquadCost;
+                const cfoHC = numCfoSquads * (1 + sq.cfoAnalistasPerSquad);
+                // CS
+                const numCS = Math.max(1, Math.ceil(yr.totalClients / Math.max(1, sq.csPerClients)));
+                const csTotal = numCS * sq.csSalary;
+                // Squads Setup
+                const saasThis = (data.subProductClients.saasOxy?.[y] ?? 0) + (data.subProductClients.saasOxyGenio?.[y] ?? 0);
+                const saasPrev = y > 2025 ? (data.subProductClients.saasOxy?.[(y - 1) as Year] ?? 0) + (data.subProductClients.saasOxyGenio?.[(y - 1) as Year] ?? 0) : 0;
+                const newSaasMonth = Math.max(0, (saasThis - saasPrev) / 12);
+                const numSetupSquads = Math.max(1, Math.ceil(newSaasMonth / Math.max(1, sq.setupSetupsPerSquad)));
+                const setupTotal = numSetupSquads * (sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary);
+                const setupHC = numSetupSquads * (1 + sq.setupImplPerSquad);
+                // Líderes
+                const numLideres = Math.max(1, Math.ceil(numSetupSquads / Math.max(1, sq.setupSquadsPerLider)));
+                const liderTotal = numLideres * sq.setupLiderSalary;
+
+                const monthCost = cfoTotal + csTotal + setupTotal + liderTotal;
+                const totalHC = cfoHC + numCS + setupHC + numLideres;
+                return { year: y, caasEnd, clients: yr.totalClients, numCfoSquads, cfoHC, numCS, numSetupSquads, setupHC, numLideres, totalHC, monthCost, annualCost: monthCost * 12, newSaasMonth: Math.round(newSaasMonth) };
               });
 
               return (
                 <>
-                  {/* Editable fields */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {fields.map(f => (
-                      <div key={f.field} className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">{f.label}</label>
-                        <input
-                          type="number"
-                          className="w-full bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                          value={f.value}
-                          onChange={e => updateSquad(f.field, Number(e.target.value) || 0)}
-                        />
+                  {/* 3 sections side by side */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Squad CFO */}
+                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Squad CFO</p>
+                      <p className="text-[10px] text-muted-foreground">1 CFO + {sq.cfoAnalistasPerSquad} analistas = {formatCurrencyFull(cfoSquadCost)}/mês por squad</p>
+                      <p className="text-[10px] text-muted-foreground">Cada squad aguenta {sq.cfoClientsPerSquad} clientes CaaS</p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Analista (R$/mês)</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Analistas/squad</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Clientes/squad</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                  {/* Summary line */}
-                  <div className="flex items-center gap-4 pt-2 text-xs text-muted-foreground">
-                    <span>Custo fixo squad: <strong className="text-foreground">{formatCurrencyFull(totalFixed)}</strong>/mês</span>
-                    <span>Equipe fixa: <strong className="text-foreground">{fixedHC}</strong> pessoas</span>
-                    <span>CS escala: 1 a cada {sq.csPerClients} clientes @ {formatCurrencyFull(sq.csSalary)}/mês</span>
+                    {/* CS */}
+                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Customer Success</p>
+                      <p className="text-[10px] text-muted-foreground">1 CS a cada {sq.csPerClients} clientes @ {formatCurrencyFull(sq.csSalary)}/mês</p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Clientes/CS</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Squad Setup SaaS */}
+                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
+                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">Squad Setup SaaS</p>
+                      <p className="text-[10px] text-muted-foreground">1 analista + {sq.setupImplPerSquad} impl = {formatCurrencyFull(setupSquadCost)}/mês por squad</p>
+                      <p className="text-[10px] text-muted-foreground">Cada squad aguenta {sq.setupSetupsPerSquad} setups/mês. Líder cuida de {sq.setupSquadsPerLider} squads.</p>
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Analista/Impl (R$/mês)</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Impl/squad</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Setups/squad/mês</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Líder (R$/mês)</label>
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Impact per year table */}
                   <div className="pt-3">
-                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">Impacto por Ano (Squad substitui headcount ratio-based)</h4>
+                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">Impacto por Ano</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="border-b border-border">
-                            <th className="text-left px-3 py-2 text-muted-foreground font-medium">Ano</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Clientes</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Nº CS</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">HC Squad</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Custo/Mês</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">Custo/Ano</th>
-                            <th className="text-right px-3 py-2 text-muted-foreground font-medium">% da Receita</th>
+                            <th className="text-left px-2 py-2 text-muted-foreground font-medium">Ano</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Clientes CaaS</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Squads CFO</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Total Clientes</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Nº CS</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Novos SaaS/mês</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Squads Setup</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Líderes</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">HC Total</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Custo/Mês</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Custo/Ano</th>
+                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">% Receita</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2156,13 +2198,18 @@ export default function Assumptions() {
                               : '—';
                             return (
                               <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
-                                <td className="px-3 py-2 font-medium">{yi.year}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{yi.clients.toLocaleString('pt-BR')}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{yi.numCS}</td>
-                                <td className="text-right px-3 py-2 tabular-nums font-medium">{yi.totalSquadHC}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">{formatCurrencyFull(yi.monthCost)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums font-medium">{formatCurrency(yi.annualCost)}</td>
-                                <td className="text-right px-3 py-2 tabular-nums">
+                                <td className="px-2 py-2 font-medium">{yi.year}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.caasEnd.toLocaleString('pt-BR')}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.numCfoSquads}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.clients.toLocaleString('pt-BR')}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.numCS}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.newSaasMonth}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.numSetupSquads}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{yi.numLideres}</td>
+                                <td className="text-right px-2 py-2 tabular-nums font-medium">{yi.totalHC}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">{formatCurrencyFull(yi.monthCost)}</td>
+                                <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.annualCost)}</td>
+                                <td className="text-right px-2 py-2 tabular-nums">
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                                     Number(revPct) > 10 ? 'bg-red-500/15 text-red-400' :
                                     Number(revPct) > 5 ? 'bg-amber-500/15 text-amber-500' :

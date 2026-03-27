@@ -61,19 +61,22 @@ export interface Assumptions {
   eduExpansaoTeamRate?: number;
   // Item 7: Squad operation structure
   squadConfig?: {
-    diretorSalary: number;
-    cfoOperacaoSalary: number;
-    analistaSalary: number;
-    numAnalistas: number;
+    // Squad CFO: 1 CFO + 2 analistas por squad. Cada squad aguenta N clientes.
+    cfoSalary: number;
+    cfoAnalistaSalary: number;
+    cfoAnalistasPerSquad: number;
+    cfoClientsPerSquad: number;
+    // CS: 1 CS a cada N clientes (geral)
     csPerClients: number;
     csSalary: number;
-    saasSquadImpl: number;
-    saasSquadImplSalary: number;
-    saasSquadAnalista: number;
-    saasSquadAnalistaSalary: number;
-    saasSquadLider: number;
-    saasSquadLiderSalary: number;
-    sparePerAnalyst: number;
+    // Squad Setup SaaS: 1 analista + 2 implementadores. Cada squad aguenta N novos setups/mês.
+    setupAnalistaSalary: number;
+    setupImplSalary: number;
+    setupImplPerSquad: number;
+    setupSetupsPerSquad: number;
+    // Líder Setup: 1 líder a cada N squads de setup. Custo dividido entre os squads que lidera.
+    setupLiderSalary: number;
+    setupSquadsPerLider: number;
   };
 }
 
@@ -164,19 +167,22 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   eduExpansaoTeamRate: 0.15,
   // Item 7: Squad config
   squadConfig: {
-    diretorSalary: 30000,
-    cfoOperacaoSalary: 20000,
-    analistaSalary: 7500,
-    numAnalistas: 2,
+    // Squad CFO: 1 CFO (R$15k) + 2 analistas (R$8k cada) = R$31k/squad, aguenta 15 clientes
+    cfoSalary: 15000,
+    cfoAnalistaSalary: 8000,
+    cfoAnalistasPerSquad: 2,
+    cfoClientsPerSquad: 15,
+    // CS: 1 CS (R$5k) a cada 100 clientes
     csPerClients: 100,
     csSalary: 5000,
-    saasSquadImpl: 2,
-    saasSquadImplSalary: 8000,
-    saasSquadAnalista: 1,
-    saasSquadAnalistaSalary: 10000,
-    saasSquadLider: 1,
-    saasSquadLiderSalary: 12500,
-    sparePerAnalyst: 5,
+    // Squad Setup: 1 analista (R$8k) + 2 implementadores (R$8k cada) = R$24k/squad, aguenta 16 setups/mês
+    setupAnalistaSalary: 8000,
+    setupImplSalary: 8000,
+    setupImplPerSquad: 2,
+    setupSetupsPerSquad: 16,
+    // Líder: R$12k, cuida de 2 squads (custo dividido = R$6k por squad → total R$30k/squad)
+    setupLiderSalary: 12000,
+    setupSquadsPerLider: 2,
   },
 };
 

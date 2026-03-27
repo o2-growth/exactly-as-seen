@@ -337,22 +337,39 @@ function calcMonthlyHeadcount(
 
   if (sq) {
     // ── SQUAD MODE: structured headcount replaces ratio-based ──
-    // Fixed positions
-    const squadFixed = sq.diretorSalary + sq.cfoOperacaoSalary + (sq.numAnalistas * sq.analistaSalary);
-    // CS scales: 1 CS per N clients (protected against div by zero)
+
+    // 1. Squads CFO: 1 CFO + N analistas por squad. Cada squad aguenta M clientes CaaS.
+    const numCfoSquads = Math.max(1, Math.ceil(caasClients / Math.max(1, sq.cfoClientsPerSquad)));
+    const cfoCost = numCfoSquads * (sq.cfoSalary + sq.cfoAnalistasPerSquad * sq.cfoAnalistaSalary);
+    const cfoHC = numCfoSquads * (1 + sq.cfoAnalistasPerSquad);
+
+    // 2. CS: 1 CS a cada N clientes (todos os clientes)
     const numCS = Math.max(1, Math.ceil(totalClients / Math.max(1, sq.csPerClients)));
-    const csTotal = numCS * sq.csSalary;
-    // SaaS Squad: fixed team
-    const saasSquadTotal = (sq.saasSquadImpl * sq.saasSquadImplSalary) +
-      (sq.saasSquadAnalista * sq.saasSquadAnalistaSalary) +
-      (sq.saasSquadLider * sq.saasSquadLiderSalary);
-    // Spare rule: every N spare clients, +1 analyst
-    const spareAnalysts = sq.sparePerAnalyst > 0 ? Math.floor(sq.numAnalistas / sq.sparePerAnalyst) : 0;
-    const spareTotal = spareAnalysts * sq.analistaSalary;
+    const csCost = numCS * sq.csSalary;
 
-    salaries += (squadFixed + csTotal + saasSquadTotal + spareTotal) / 1000;
+    // 3. Squads Setup SaaS: 1 analista + N implementadores por squad.
+    //    Cada squad aguenta M novos setups por mês.
+    //    Novos clientes SaaS = proxy para setups necessários.
+    //    Usamos a média mensal de novos clientes do ano como estimativa.
+    const saasClientsThisYear = (assumptions?.subProductClients?.saasOxy?.[year as Year] ?? 0)
+      + (assumptions?.subProductClients?.saasOxyGenio?.[year as Year] ?? 0);
+    const saasClientsPrevYear = year > 2025
+      ? (assumptions?.subProductClients?.saasOxy?.[(year - 1) as Year] ?? 0)
+        + (assumptions?.subProductClients?.saasOxyGenio?.[(year - 1) as Year] ?? 0)
+      : 0;
+    const newSaasPerMonth = Math.max(0, (saasClientsThisYear - saasClientsPrevYear) / 12);
+    const numSetupSquads = Math.max(1, Math.ceil(newSaasPerMonth / Math.max(1, sq.setupSetupsPerSquad)));
+    const setupSquadCost = numSetupSquads * (sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary);
+    const setupSquadHC = numSetupSquads * (1 + sq.setupImplPerSquad);
 
-    const squadHC = 1 + 1 + sq.numAnalistas + numCS + sq.saasSquadImpl + sq.saasSquadAnalista + sq.saasSquadLider + spareAnalysts;
+    // 4. Líderes Setup: 1 líder a cada N squads de setup
+    const numLideres = Math.max(1, Math.ceil(numSetupSquads / Math.max(1, sq.setupSquadsPerLider)));
+    const liderCost = numLideres * sq.setupLiderSalary;
+
+    const totalSquadCost = cfoCost + csCost + setupSquadCost + liderCost;
+    salaries += totalSquadCost / 1000;
+
+    const squadHC = cfoHC + numCS + setupSquadHC + numLideres;
     const baseHC = namedEmployees2025.filter(e => !('endMonth' in e)).length;
     totalHC = baseHC + squadHC;
   } else {
