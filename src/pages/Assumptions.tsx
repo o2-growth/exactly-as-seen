@@ -183,23 +183,28 @@ function isHistorical(year: Year, monthIdx: number): boolean {
   return false;
 }
 
-function getChurnMonthly(key: SubProductKey, data: AssumptionsType): number {
-  if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup') {
+function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  // Check for per-product override first
+  if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
+    return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
+  }
+  if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup' || key === 'caasParceiros') {
     return data.churnCaas / 100 / 12;
   }
-  if (key === 'saasOxy' || key === 'saasOxyGenio') {
+  if (key === 'saasOxy' || key === 'saasOxyGenio' || key === 'saasSetup' || key === 'saasParceiros' || key === 'saasOxyGenioEsp') {
     return data.churnSaas / 100 / 12;
   }
-  if (key === 'educationDonoCFO') {
+  if (key === 'educationDonoCFO' || key === 'educationEN' || key === 'educationFR' || key === 'educationFSP') {
     return 0;
   }
-  if (key === 'baas') {
+  if (key === 'baas' || key === 'baasFranquia' || key === 'baasMasterFranquia') {
     return data.churnBaas / 100 / 12;
   }
   if (key === 'taxAT' || key === 'taxGPT' || key === 'taxRCT' || key === 'taxRT' || key === 'taxDTC') {
     return 0;
   }
   return 0;
+}
 }
 
 // computeProjectedClients removed — display now uses getMonthlyClients directly
