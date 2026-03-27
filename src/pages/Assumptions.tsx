@@ -706,7 +706,10 @@ export default function Assumptions() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
               <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `${(v / 1000).toFixed(0)}M`} />
-              <Tooltip formatter={(v: number) => formatCurrency(v * 1000)} />
+              <Tooltip formatter={(v: number) => formatCurrency(v * 1000)} labelFormatter={(label, payload) => {
+                const total = payload?.reduce((sum: number, p: any) => sum + (p.value || 0), 0) || 0;
+                return `${label} — Total: ${formatCurrency(total * 1000)}`;
+              }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="CaaS" stackId="a" fill="hsl(var(--primary))" />
               <Bar dataKey="SaaS" stackId="a" fill="hsl(210, 70%, 55%)" />
@@ -731,7 +734,10 @@ export default function Assumptions() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
               <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
-              <Tooltip />
+              <Tooltip formatter={(v: number) => v.toLocaleString('pt-BR')} labelFormatter={(label, payload) => {
+                const total = payload?.reduce((sum: number, p: any) => sum + (p.value || 0), 0) || 0;
+                return `${label} — Total: ${total.toLocaleString('pt-BR')}`;
+              }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Line type="monotone" dataKey="CaaS" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="SaaS" stroke="hsl(210, 70%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
