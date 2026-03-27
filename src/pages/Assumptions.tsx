@@ -725,6 +725,7 @@ export default function Assumptions() {
               CaaS: data.caasClients[y],
               SaaS: data.saasClients[y],
               Education: data.educationClients[y],
+              Expansão: data.subProductClients?.baas?.[y] ?? 0,
               Tax: data.taxClients[y],
             }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -735,6 +736,7 @@ export default function Assumptions() {
               <Line type="monotone" dataKey="CaaS" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="SaaS" stroke="hsl(210, 70%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="Education" stroke="hsl(150, 50%, 50%)" strokeWidth={2} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="Expansão" stroke="hsl(30, 80%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="Tax" stroke="hsl(280, 60%, 55%)" strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
