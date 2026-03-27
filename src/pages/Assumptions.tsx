@@ -697,7 +697,7 @@ export default function Assumptions() {
         </div>
       </div>
 
-      <Tabs defaultValue="receita" className="w-full">
+      <Tabs defaultValue="revenue" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="tax">Tax Deductions</TabsTrigger>
