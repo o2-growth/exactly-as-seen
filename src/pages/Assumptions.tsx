@@ -270,6 +270,7 @@ export default function Assumptions() {
 
   const [applyAllPct, setApplyAllPct] = useState(6);
   const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>({});
+  const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>({});
   const [opExpandedGroups, setOpExpandedGroups] = useState<Record<string, boolean>>({
     custos: false,
     despesas: false,
@@ -554,6 +555,49 @@ export default function Assumptions() {
       setEditState(applyRowUpdater);
     } else {
       setAssumptions(applyRowUpdater);
+    }
+  };
+
+  const handleApplyTicketGrowth = (prodKey: SubProductKey, year: Year) => {
+    const pct = rowTicketGrowthPct[prodKey] ?? 0;
+    const rate = pct / 100;
+    const ticketVal = data.tickets[prodKey as TicketKey] ?? 0;
+    const currentMonthlyTickets = data.monthlyTickets ?? {};
+    const yearArr = currentMonthlyTickets[prodKey]?.[year]
+      ? [...currentMonthlyTickets[prodKey]![year]!]
+      : Array(12).fill(ticketVal);
+
+    // Find first non-historical month as base
+    let baseTicket = ticketVal;
+    for (let m = 0; m < 12; m++) {
+      if (!isHistorical(year, m)) {
+        baseTicket = yearArr[m] ?? ticketVal;
+        break;
+      }
+    }
+
+    // Apply compound growth to projected months
+    let compoundIdx = 0;
+    for (let m = 0; m < 12; m++) {
+      if (isHistorical(year, m)) continue;
+      yearArr[m] = Math.round(baseTicket * Math.pow(1 + rate, compoundIdx));
+      compoundIdx++;
+    }
+
+    const updater = (prev: AssumptionsType) => ({
+      ...prev,
+      monthlyTickets: {
+        ...(prev.monthlyTickets ?? {}),
+        [prodKey]: {
+          ...((prev.monthlyTickets ?? {})[prodKey] ?? {}),
+          [year]: yearArr,
+        },
+      },
+    });
+    if (editing) {
+      setEditState(updater);
+    } else {
+      setAssumptions(updater);
     }
   };
 
@@ -859,7 +903,27 @@ export default function Assumptions() {
 
                                   {/* Ticket mensal + summary */}
                                   <div className="space-y-2 pt-1">
-                                    <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-muted-foreground">Crescimento:</span>
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={rowTicketGrowthPct[prodKey] ?? 0}
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => setRowTicketGrowthPct(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
+                                        />
+                                        <span className="text-[10px] text-muted-foreground">%</span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                        >
+                                          Aplicar
+                                        </button>
+                                      </div>
+                                    </div>
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
@@ -927,6 +991,42 @@ export default function Assumptions() {
                                       {(() => {
                                         const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         return <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * decTicket)}</strong></span>;
+                                      })()}
+                                    </div>
+                                  </div>
+
+                                  {/* Receita Bruta Total */}
+                                  <div className="space-y-2 pt-1">
+                                    <p className="text-xs font-semibold text-muted-foreground">Receita Bruta (R$/mês) — {selectedYear}</p>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        const monthTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                        const grossRevenue = monthly[i] * monthTicket;
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-accent/20 border border-accent/30'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-foreground">
+                                              {formatCurrencyFull(grossRevenue)}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="flex items-center gap-6 text-xs">
+                                      {(() => {
+                                        const totalAno = MONTHS.reduce((sum, _, i) => {
+                                          const mt = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                          return sum + monthly[i] * mt;
+                                        }, 0);
+                                        const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
+                                        const mrrDez = monthly[11] * decTicket;
+                                        return (
+                                          <>
+                                            <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(totalAno)}</strong></span>
+                                            <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(mrrDez)}</strong></span>
+                                          </>
+                                        );
                                       })()}
                                     </div>
                                   </div>
