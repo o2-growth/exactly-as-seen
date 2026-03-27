@@ -183,17 +183,21 @@ function isHistorical(year: Year, monthIdx: number): boolean {
   return false;
 }
 
-function getChurnMonthly(key: SubProductKey, data: AssumptionsType): number {
-  if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup') {
+function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  // Check for per-product override first
+  if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
+    return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
+  }
+  if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup' || key === 'caasParceiros') {
     return data.churnCaas / 100 / 12;
   }
-  if (key === 'saasOxy' || key === 'saasOxyGenio') {
+  if (key === 'saasOxy' || key === 'saasOxyGenio' || key === 'saasSetup' || key === 'saasParceiros' || key === 'saasOxyGenioEsp') {
     return data.churnSaas / 100 / 12;
   }
-  if (key === 'educationDonoCFO') {
+  if (key === 'educationDonoCFO' || key === 'educationEN' || key === 'educationFR' || key === 'educationFSP') {
     return 0;
   }
-  if (key === 'baas') {
+  if (key === 'baas' || key === 'baasFranquia' || key === 'baasMasterFranquia') {
     return data.churnBaas / 100 / 12;
   }
   if (key === 'taxAT' || key === 'taxGPT' || key === 'taxRCT' || key === 'taxRT' || key === 'taxDTC') {
@@ -271,6 +275,7 @@ export default function Assumptions() {
   const [applyAllPct, setApplyAllPct] = useState(6);
   const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>({});
   const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>({});
+  const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>({});
   const [opExpandedGroups, setOpExpandedGroups] = useState<Record<string, boolean>>({
     custos: false,
     despesas: false,
@@ -460,7 +465,7 @@ export default function Assumptions() {
 
           // Build sequential projection to get monthly values with growth
           const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-          const churnRate = getChurnMonthly(k, data);
+          const churnRate = getChurnMonthly(k, data, y);
           let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
           const projected: (number | null)[] = Array(12).fill(null);
           for (let m = 0; m < 12; m++) {
@@ -515,7 +520,7 @@ export default function Assumptions() {
 
     // Build sequential projection with growth rates and save as full overrides
     const base = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-    const churnRate = getChurnMonthly(key, data);
+    const churnRate = getChurnMonthly(key, data, year);
     let prev = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
     const projected: (number | null)[] = Array(12).fill(null);
     for (let m = 0; m < 12; m++) {
@@ -789,7 +794,7 @@ export default function Assumptions() {
                       const rowKey = row.dataKey ?? row.label;
                       const isExpanded = expandedProducts[rowKey] ?? false;
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
-                      const churn = row.dataKey ? getChurnMonthly(row.dataKey, data) : 0;
+                      const churn = row.dataKey ? getChurnMonthly(row.dataKey, data, selectedYear) : 0;
                       const monthly: number[] = row.dataKey
                         ? getMonthlyClients(row.dataKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))
                         : Array(12).fill(0);
@@ -1034,6 +1039,80 @@ export default function Assumptions() {
                                         );
                                       })()}
                                     </div>
+                                   </div>
+
+                                  {/* Churn (clientes/mês) */}
+                                  <div className="space-y-2 pt-1">
+                                    <div className="flex items-center gap-4">
+                                      <p className="text-xs font-semibold text-negative">Churn (clientes/mês) — {selectedYear}</p>
+                                      <div className="ml-auto flex items-center gap-2">
+                                        <span className="text-[10px] text-muted-foreground">Taxa de churn:</span>
+                                        <input
+                                          type="number"
+                                          step="0.5"
+                                          className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={rowChurnPct[prodKey] ?? (() => {
+                                            const rate = getChurnMonthly(prodKey, data, selectedYear);
+                                            return Math.round(rate * 12 * 100 * 10) / 10;
+                                          })()}
+                                          onClick={e => e.stopPropagation()}
+                                          onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
+                                        />
+                                        <span className="text-[10px] text-muted-foreground">% a.a.</span>
+                                        <button
+                                          className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            const pct = rowChurnPct[prodKey] ?? (() => {
+                                              const rate = getChurnMonthly(prodKey, data, selectedYear);
+                                              return Math.round(rate * 12 * 100 * 10) / 10;
+                                            })();
+                                            setAssumptions(prev => ({
+                                              ...prev,
+                                              monthlyChurnRates: {
+                                                ...(prev.monthlyChurnRates ?? {}),
+                                                [prodKey]: {
+                                                  ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
+                                                  [selectedYear]: pct,
+                                                },
+                                              },
+                                            }));
+                                          }}
+                                        >
+                                          Aplicar
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        const churnRate = getChurnMonthly(prodKey, data, selectedYear);
+                                        const prev = i === 0
+                                          ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                          : monthly[i - 1];
+                                        const churnVal = Math.round(prev * churnRate);
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
+                                              {churnVal || '—'}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="flex items-center gap-6 text-xs">
+                                      {(() => {
+                                        const churnRate = getChurnMonthly(prodKey, data, selectedYear);
+                                        const totalChurn = MONTHS.reduce((sum, _, i) => {
+                                          const prev = i === 0
+                                            ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                            : monthly[i - 1];
+                                          return sum + Math.round(prev * churnRate);
+                                        }, 0);
+                                        return <span className="text-negative">Total ano: <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos</span>;
+                                      })()}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1055,7 +1134,7 @@ export default function Assumptions() {
                 {CLIENTS_ROWS.flatMap(group => group.items.filter(r => r.dataKey)).map(row => {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
-                  const churn = getChurnMonthly(rowKey, data);
+                  const churn = getChurnMonthly(rowKey, data, selectedYear);
                   const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                   const newClients = monthly.map((val, i) => {
                     if (i === 0) {
@@ -1090,46 +1169,7 @@ export default function Assumptions() {
                   );
                 })}
 
-                {/* ── Churn por produto ── */}
-                <tr className="bg-secondary/40 border-b border-border/50">
-                  <td colSpan={showGrowthPct ? 27 : 15} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
-                    Churn
-                  </td>
-                </tr>
-                {CLIENTS_ROWS.flatMap(group => group.items.filter(r => r.dataKey)).map(row => {
-                  const rowKey = row.dataKey!;
-                  const churnRate = getChurnMonthly(rowKey, data);
-                  const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
-                  const churnClients = monthly.map((val, i) => {
-                    const prev = i === 0
-                      ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                        ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
-                        : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
-                      : monthly[i - 1];
-                    return Math.round(prev * churnRate);
-                  });
-                  return (
-                    <tr key={`churn-${rowKey}`} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                      <td className="p-2 pl-5 font-medium text-xs text-negative">{row.label}</td>
-                      {MONTHS.map((_, i) => {
-                        const hist = isHistorical(selectedYear, i);
-                        const cutoff = selectedYear === 2026 && i === 2;
-                        return (
-                          <React.Fragment key={i}>
-                            <td className={`text-right px-1 py-1 tabular-nums text-xs text-negative/80${cutoff ? ' border-l-2 border-primary/40' : ''}${hist ? ' bg-secondary/30' : ''}`}>
-                              {churnClients[i] || '—'}
-                            </td>
-                            {showGrowthPct && <td className="text-right px-1 py-1" />}
-                          </React.Fragment>
-                        );
-                      })}
-                      <td className="text-right px-2 py-1 tabular-nums text-xs font-semibold text-negative bg-primary/5">
-                        {churnClients.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}
-                      </td>
-                      {showGrowthPct && <td />}
-                    </tr>
-                  );
-                })}
+
 
                 {/* ── Totais: Novos Clientes e Churn ── */}
                 {(() => {
@@ -1138,7 +1178,7 @@ export default function Assumptions() {
                   const totalChurn = Array(12).fill(0);
                   for (const row of allProducts) {
                     const rowKey = row.dataKey!;
-                    const churnRate = getChurnMonthly(rowKey, data);
+                    const churnRate = getChurnMonthly(rowKey, data, selectedYear);
                     const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                     for (let i = 0; i < 12; i++) {
                       const prev = i === 0
@@ -1196,67 +1236,7 @@ export default function Assumptions() {
           </div>
 
 
-          {/* ── Section 3: Churn Médio ── */}
-          <div className="gradient-card overflow-x-auto">
-            <h3 className="text-sm font-semibold p-5 pb-3">Churn Médio</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">BU</th>
-                  {MONTHS.map(m => (
-                    <th key={m} className="text-right p-3 text-muted-foreground font-medium min-w-[58px]">{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">CFO as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnCaas} onChange={e => updateModel(p => ({ ...p, churnCaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnCaas}%</span>
-                      ) : `${data.churnCaas}%`}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Software as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnSaas} onChange={e => updateModel(p => ({ ...p, churnSaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnSaas}%</span>
-                      ) : `${data.churnSaas}%`}
-                    </td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Education</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs text-muted-foreground">0%</td>
-                  ))}
-                </tr>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Banking as a Service</td>
-                  {MONTHS.map((_, i) => (
-                    <td key={i} className="text-right p-3 tabular-nums text-xs">
-                      {editing ? (
-                        i === 0 ? (
-                          <input type="number" step="0.5" className="w-16 bg-secondary border border-primary/30 rounded px-2 py-1 text-right text-xs text-foreground outline-none focus:ring-1 focus:ring-primary"
-                            value={data.churnBaas} onChange={e => updateModel(p => ({ ...p, churnBaas: Number(e.target.value) || 0 }))} />
-                        ) : <span className="text-muted-foreground">{data.churnBaas}%</span>
-                      ) : `${data.churnBaas}%`}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+
 
         </TabsContent>
 
