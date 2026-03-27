@@ -520,7 +520,7 @@ export default function Assumptions() {
 
     // Build sequential projection with growth rates and save as full overrides
     const base = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-    const churnRate = getChurnMonthly(key, data);
+    const churnRate = getChurnMonthly(key, data, year);
     let prev = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
     const projected: (number | null)[] = Array(12).fill(null);
     for (let m = 0; m < 12; m++) {
