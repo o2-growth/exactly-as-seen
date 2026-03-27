@@ -68,6 +68,20 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
         if (needsFix) {
           localStorage.removeItem('o2_assumptions');
         }
+
+        // Migrate old squadConfig field names to new ones
+        if (fixed.squadConfig) {
+          const sc = fixed.squadConfig as Record<string, unknown>;
+          const oldFields = ['diretorSalary', 'cfoOperacaoSalary', 'analistaSalary', 'numAnalistas',
+            'saasSquadImpl', 'saasSquadImplSalary', 'saasSquadAnalista', 'saasSquadAnalistaSalary',
+            'saasSquadLider', 'saasSquadLiderSalary', 'sparePerAnalyst'];
+          const hasOldFields = oldFields.some(f => f in sc);
+          if (hasOldFields) {
+            fixed.squadConfig = { ...DEFAULT_ASSUMPTIONS.squadConfig! };
+            localStorage.removeItem('o2_assumptions');
+          }
+        }
+
         setAssumptions(fixed);
       }
     });

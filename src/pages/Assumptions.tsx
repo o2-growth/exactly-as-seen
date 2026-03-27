@@ -2061,7 +2061,11 @@ export default function Assumptions() {
           <div className="gradient-card p-5 space-y-4">
             <h3 className="text-sm font-semibold">Squad Operação — Estrutura de Custo</h3>
             {(() => {
-              const sq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
+              const rawSq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
+              const defaults = DEFAULT_ASSUMPTIONS.squadConfig!;
+              const sq = Object.fromEntries(
+                Object.keys(defaults).map(k => [k, (rawSq as Record<string, number>)[k] != null && !Number.isNaN((rawSq as Record<string, number>)[k]) ? (rawSq as Record<string, number>)[k] : (defaults as Record<string, number>)[k]])
+              ) as typeof defaults;
               const updateSquad = (field: string, val: number) => {
                 const newSq = { ...sq, [field]: val };
                 setAssumptions(prev => ({ ...(typeof prev === 'object' ? prev : assumptions), squadConfig: newSq }));
