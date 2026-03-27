@@ -774,7 +774,7 @@ export default function Assumptions() {
                   {activeYears.map(y => (
                     <th key={y} className={`text-right p-3 text-muted-foreground font-medium min-w-[80px] ${y === selectedYear ? 'bg-primary/5' : ''}`}>{y}</th>
                   ))}
-                  <th className="text-right p-3 text-muted-foreground font-medium min-w-[80px]">Ticket</th>
+                  
                 </tr>
               </thead>
               <tbody>
