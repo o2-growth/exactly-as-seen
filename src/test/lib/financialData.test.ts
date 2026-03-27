@@ -98,15 +98,22 @@ describe('Financial Data: Default Assumptions', () => {
 
   it('squadConfig has all required fields', () => {
     const sq = a.squadConfig!;
-    expect(sq.diretorSalary).toBeGreaterThan(0);
-    expect(sq.cfoOperacaoSalary).toBeGreaterThan(0);
-    expect(sq.analistaSalary).toBeGreaterThan(0);
-    expect(sq.numAnalistas).toBeGreaterThanOrEqual(1);
-    expect(sq.csPerClients).toBeGreaterThan(0);
-    expect(sq.csSalary).toBeGreaterThan(0);
-    expect(sq.saasSquadImpl).toBeGreaterThanOrEqual(1);
-    expect(sq.saasSquadLider).toBeGreaterThanOrEqual(1);
-    expect(sq.sparePerAnalyst).toBeGreaterThan(0);
+    // Squad CFO
+    expect(sq.cfoSalary).toBe(15000);
+    expect(sq.cfoAnalistaSalary).toBe(8000);
+    expect(sq.cfoAnalistasPerSquad).toBe(2);
+    expect(sq.cfoClientsPerSquad).toBe(15);
+    // CS
+    expect(sq.csPerClients).toBe(100);
+    expect(sq.csSalary).toBe(5000);
+    // Squad Setup SaaS
+    expect(sq.setupAnalistaSalary).toBe(8000);
+    expect(sq.setupImplSalary).toBe(8000);
+    expect(sq.setupImplPerSquad).toBe(2);
+    expect(sq.setupSetupsPerSquad).toBe(16);
+    // Líder Setup
+    expect(sq.setupLiderSalary).toBe(12000);
+    expect(sq.setupSquadsPerLider).toBe(2);
   });
 
   it('headcountRatios are all positive', () => {

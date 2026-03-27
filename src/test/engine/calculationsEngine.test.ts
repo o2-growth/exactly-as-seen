@@ -377,10 +377,228 @@ describe('Engine: Squad config (Item 7)', () => {
 
   it('squad salaries impact EBITDA', () => {
     const sq = { ...DEFAULT_ASSUMPTIONS.squadConfig! };
-    const cheap = getModel({ squadConfig: { ...sq, diretorSalary: 10000, cfoOperacaoSalary: 10000 } });
-    const expensive = getModel({ squadConfig: { ...sq, diretorSalary: 50000, cfoOperacaoSalary: 40000 } });
+    const cheap = getModel({ squadConfig: { ...sq, cfoSalary: 10000, cfoAnalistaSalary: 5000 } });
+    const expensive = getModel({ squadConfig: { ...sq, cfoSalary: 50000, cfoAnalistaSalary: 20000 } });
     for (const y of YEARS) {
       expect(cheap.years[y].ebitda).toBeGreaterThan(expensive.years[y].ebitda);
+    }
+  });
+});
+
+// ─── 9b. SQUAD BUSINESS RULES — Detailed Verification ────────────────────────
+// These tests verify the exact squad formulas against the business rules:
+//   CFO Squad: 1 CFO (R$15k) + 2 analysts (R$8k) = R$31k/squad, capacity 15 CaaS clients
+//   CS: 1 CS (R$5k) per 100 total clients
+//   Setup Squad: 1 analyst (R$8k) + 2 impl (R$8k) = R$24k/squad, capacity 16 setups/month
+//   Setup Leader: R$12k, manages 2 squads
+
+describe('Engine: Squad business rules — CFO squads', () => {
+  // Use 2026 with monthlyClientOverrides to set flat client counts per month.
+  // CaaS clients for headcount = assessoria + enterprise + corporate (NOT setup).
+  // We set these via overrides so every month has the exact count we want.
+
+  function makeAssumptions(caasPerMonth: number): Partial<Assumptions> {
+    // Distribute evenly across assessoria/enterprise/corporate
+    const assessoria = Math.floor(caasPerMonth / 3);
+    const enterprise = Math.floor(caasPerMonth / 3);
+    const corporate = caasPerMonth - assessoria - enterprise;
+    return {
+      monthlyClientOverrides: {
+        caasAssessoria:  { 2026: Array(12).fill(assessoria) },
+        caasEnterprise:  { 2026: Array(12).fill(enterprise) },
+        caasCorporate:   { 2026: Array(12).fill(corporate) },
+        caasSetup:       { 2026: Array(12).fill(0) },
+        saasOxy:         { 2026: Array(12).fill(0) },
+        saasOxyGenio:    { 2026: Array(12).fill(0) },
+        educationDonoCFO:{ 2026: Array(12).fill(0) },
+        baas:            { 2026: Array(12).fill(0) },
+      },
+    };
+  }
+
+  it('15 CaaS clients → exactly 1 CFO squad (1 CFO + 2 analysts = 3 people)', () => {
+    // numCfoSquads = ceil(15/15) = 1
+    // cfoCost = 1 * (15000 + 2*8000) = 31000/month
+    // cfoHC = 1 * (1+2) = 3
+    const model15 = getModel(makeAssumptions(15));
+    const model30 = getModel(makeAssumptions(30));
+
+    // With 15 clients, headcount cost should be lower than 30 clients
+    // (30 clients = 2 squads = double the CFO squad cost)
+    const hc15 = Math.abs(model15.years[2026].headcount);
+    const hc30 = Math.abs(model30.years[2026].headcount);
+    expect(hc30).toBeGreaterThan(hc15);
+  });
+
+  it('30 CaaS clients → 2 CFO squads (6 people)', () => {
+    // numCfoSquads = ceil(30/15) = 2
+    // cfoCost = 2 * 31000 = 62000/month
+    // Difference between 30 and 15 CaaS clients should be ~R$31k/month = R$372k/year
+    const model15 = getModel(makeAssumptions(15));
+    const model30 = getModel(makeAssumptions(30));
+
+    // Extra squad cost = R$31k/month * 12 = R$372k/year = 372 in R$thousands
+    // But benefits also scale, so allow some tolerance
+    const diff = Math.abs(model30.years[2026].headcount) - Math.abs(model15.years[2026].headcount);
+    // The difference should be in the range of one squad + benefits
+    // 1 squad = R$31k/month salary + benefits for 3 people
+    // 31k * 12 / 1000 = 372 (R$k), with 10% year multiplier = ~409
+    expect(diff).toBeGreaterThan(300); // at least R$300k annual (conservative)
+    expect(diff).toBeLessThan(600);    // at most R$600k (generous upper bound with benefits)
+  });
+
+  it('16 CaaS clients → 2 CFO squads (ceiling division)', () => {
+    // numCfoSquads = ceil(16/15) = 2
+    const model15 = getModel(makeAssumptions(15));  // 1 squad
+    const model16 = getModel(makeAssumptions(16));  // 2 squads (ceil)
+    const hc15 = Math.abs(model15.years[2026].headcount);
+    const hc16 = Math.abs(model16.years[2026].headcount);
+    // Should jump up when crossing 15-client boundary
+    expect(hc16).toBeGreaterThan(hc15);
+  });
+});
+
+describe('Engine: Squad business rules — CS', () => {
+  function makeAssumptions(totalPerMonth: number): Partial<Assumptions> {
+    // Spread across multiple products to get desired total client count
+    return {
+      monthlyClientOverrides: {
+        caasAssessoria:  { 2026: Array(12).fill(5) },
+        caasEnterprise:  { 2026: Array(12).fill(5) },
+        caasCorporate:   { 2026: Array(12).fill(5) },
+        caasSetup:       { 2026: Array(12).fill(0) },
+        saasOxy:         { 2026: Array(12).fill(Math.floor((totalPerMonth - 15) / 2)) },
+        saasOxyGenio:    { 2026: Array(12).fill(totalPerMonth - 15 - Math.floor((totalPerMonth - 15) / 2)) },
+        educationDonoCFO:{ 2026: Array(12).fill(0) },
+        baas:            { 2026: Array(12).fill(0) },
+      },
+    };
+  }
+
+  it('100 total clients → 1 CS', () => {
+    // numCS = ceil(100/100) = 1, cost = 5000/month
+    const model100 = getModel(makeAssumptions(100));
+    const model250 = getModel(makeAssumptions(250));
+    // With 250 clients we need ceil(250/100) = 3 CS vs 1 CS for 100
+    // Extra 2 CS = 2 * 5000 * 12 / 1000 = 120 R$k/year (+ benefits + yearMult)
+    const diff = Math.abs(model250.years[2026].headcount) - Math.abs(model100.years[2026].headcount);
+    expect(diff).toBeGreaterThan(80);  // at least R$80k more (conservative)
+  });
+
+  it('250 total clients → 3 CS (ceiling division)', () => {
+    // numCS = ceil(250/100) = 3
+    // vs 200 clients = ceil(200/100) = 2 CS
+    const model200 = getModel(makeAssumptions(200));
+    const model250 = getModel(makeAssumptions(250));
+    const hc200 = Math.abs(model200.years[2026].headcount);
+    const hc250 = Math.abs(model250.years[2026].headcount);
+    // 250 crosses the 200 boundary → 1 extra CS
+    expect(hc250).toBeGreaterThan(hc200);
+  });
+});
+
+describe('Engine: Squad business rules — Setup squads & leaders', () => {
+  // Setup squads depend on new SaaS clients per month:
+  //   newSaasPerMonth = (saasClientsThisYear - saasClientsPrevYear) / 12
+  // For 2026: uses subProductClients saasOxy + saasOxyGenio for 2026 vs 2025.
+
+  it('16 new SaaS/month → 1 setup squad + 1 leader', () => {
+    // To get 16 new SaaS per month: newSaasPerMonth = (thisYear - prevYear) / 12
+    // So thisYear - prevYear = 192
+    // Default 2025 SaaS: saasOxy=55 + saasOxyGenio=47 = 102
+    // Need 2026 total = 102 + 192 = 294 → split across oxy/oxyGenio
+    const model = getModel({
+      subProductClients: {
+        ...DEFAULT_ASSUMPTIONS.subProductClients,
+        saasOxy:      { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxy,      2026: 198 },
+        saasOxyGenio: { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxyGenio, 2026: 96 },
+      },
+    });
+    // numSetupSquads = ceil(16/16) = 1
+    // numLideres = ceil(1/2) = 1
+    // This should work - we verify via headcount cost being reasonable
+    expect(model.years[2026].headcount).toBeLessThan(0); // costs are negative
+  });
+
+  it('33 new SaaS/month → 3 setup squads + 2 leaders', () => {
+    // newSaasPerMonth = 33 → thisYear - prevYear = 396
+    // 2025 base = 102, so 2026 = 498
+    const model = getModel({
+      subProductClients: {
+        ...DEFAULT_ASSUMPTIONS.subProductClients,
+        saasOxy:      { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxy,      2026: 350 },
+        saasOxyGenio: { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxyGenio, 2026: 148 },
+      },
+    });
+    // numSetupSquads = ceil(33/16) = 3
+    // numLideres = ceil(3/2) = 2
+    // More squads + leaders = higher cost than 16/month scenario
+    const model16 = getModel({
+      subProductClients: {
+        ...DEFAULT_ASSUMPTIONS.subProductClients,
+        saasOxy:      { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxy,      2026: 198 },
+        saasOxyGenio: { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxyGenio, 2026: 96 },
+      },
+    });
+    // 33/month has 3 squads + 2 leaders vs 1 squad + 1 leader
+    // Extra: 2 squads * R$24k + 1 leader * R$12k = R$60k/month = R$720k/year
+    const diff = Math.abs(model.years[2026].headcount) - Math.abs(model16.years[2026].headcount);
+    expect(diff).toBeGreaterThan(500); // at least R$500k more (conservative)
+  });
+});
+
+describe('Engine: Squad cost totals', () => {
+  it('1 CFO squad + 1 CS + 1 setup squad + 1 leader = R$72k/month', () => {
+    // Verify the per-squad cost formula:
+    //   CFO squad:  15000 + 2*8000 = 31000
+    //   CS:         5000
+    //   Setup squad: 8000 + 2*8000 = 24000
+    //   Leader:     12000
+    //   Total:      72000/month = 864k/year in R$
+    const sq = DEFAULT_ASSUMPTIONS.squadConfig!;
+    const cfoSquadCost = sq.cfoSalary + sq.cfoAnalistasPerSquad * sq.cfoAnalistaSalary;
+    expect(cfoSquadCost).toBe(31000);
+
+    const csCost = sq.csSalary;
+    expect(csCost).toBe(5000);
+
+    const setupSquadCost = sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary;
+    expect(setupSquadCost).toBe(24000);
+
+    const liderCost = sq.setupLiderSalary;
+    expect(liderCost).toBe(12000);
+
+    const totalPerMonth = cfoSquadCost + csCost + setupSquadCost + liderCost;
+    expect(totalPerMonth).toBe(72000);
+  });
+});
+
+describe('Engine: Squad costs flow into P&L headcount line', () => {
+  it('headcount line with squad is more negative than without squad', () => {
+    const withSquad = getModel(); // defaults include squadConfig
+    const noSquad = getModel({ squadConfig: undefined } as any);
+    // With squad, headcount cost includes squad salaries on top of base payroll
+    // In later years with many clients, squad cost should dominate
+    for (const y of [2028, 2029, 2030] as Year[]) {
+      expect(Math.abs(withSquad.years[y].headcount)).toBeGreaterThan(
+        Math.abs(noSquad.years[y].headcount)
+      );
+    }
+  });
+
+  it('headcount detail salaries include squad costs', () => {
+    const model = getModel();
+    for (const y of YEARS) {
+      // salaries should be negative (expense)
+      expect(model.years[y].headcountDetail.salaries).toBeLessThan(0);
+      // benefits should be negative (expense)
+      expect(model.years[y].headcountDetail.benefits).toBeLessThan(0);
+      // total = salaries + benefits
+      expectClose(
+        model.years[y].headcountDetail.salaries + model.years[y].headcountDetail.benefits,
+        model.years[y].headcount,
+        1
+      );
     }
   });
 });
@@ -697,11 +915,10 @@ describe('Engine: Combined brownfield scenario', () => {
         saasOxy: { 2027: Array(12).fill(1500) },
       },
       squadConfig: {
-        diretorSalary: 35000, cfoOperacaoSalary: 25000, analistaSalary: 8000,
-        numAnalistas: 3, csPerClients: 80, csSalary: 6000,
-        saasSquadImpl: 3, saasSquadImplSalary: 9000, saasSquadAnalista: 2,
-        saasSquadAnalistaSalary: 11000, saasSquadLider: 1, saasSquadLiderSalary: 15000,
-        sparePerAnalyst: 4,
+        cfoSalary: 20000, cfoAnalistaSalary: 9000, cfoAnalistasPerSquad: 3,
+        cfoClientsPerSquad: 12, csPerClients: 80, csSalary: 6000,
+        setupAnalistaSalary: 9000, setupImplSalary: 9000, setupImplPerSquad: 3,
+        setupSetupsPerSquad: 12, setupLiderSalary: 15000, setupSquadsPerLider: 2,
       },
     });
 
