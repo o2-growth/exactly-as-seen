@@ -877,7 +877,7 @@ export default function Assumptions() {
                   const rowKey = row.dataKey!;
                   const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                   const churn = getChurnMonthly(rowKey, data);
-                  const monthly = computeProjectedClients(rowKey, selectedYear, growthArr, churn, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                  const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                   const newClients = monthly.map((val, i) => {
                     if (i === 0) {
                       let prevBase: number;
