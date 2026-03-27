@@ -1472,21 +1472,29 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           { code: '1.6.5', label: 'Diagnóstico Tributário & Compliance', annual: taxDTCAn, monthly: allocMo(taxBuMo, taxDTCAn, taxBuAn) },
         ]},
         { code: '2', label: 'Deduções de Vendas', annual: dedAn, monthly: dedMo, children: (() => {
-          const ratesPresumido = { pis: 0.0065, cofins: 0.0300, iss: 0.0500 };
-          const ratesReal = { pis: 0.0165, cofins: 0.0760, iss: 0.0500 };
-          // Proportional sub-items (have computed values)
-          const proportionalItems: { code: string; label: string; key: 'pis' | 'cofins' | 'iss' }[] = [
-            { code: '2.03', label: 'ISS', key: 'iss' },
-            { code: '2.04', label: 'PIS', key: 'pis' },
-            { code: '2.05', label: 'COFINS', key: 'cofins' },
+          // Lucro Presumido: PIS 0,65%, COFINS 3%, ISS per BU
+          const buConfs = assumptions.buTaxConfigs ?? DEFAULT_ASSUMPTIONS.buTaxConfigs!;
+          // Weighted average ISS across BUs for proportional split
+          const proportionalItems: { code: string; label: string; rate: number }[] = [
+            { code: '2.03', label: 'ISS', rate: 0 }, // computed below
+            { code: '2.04', label: 'PIS', rate: 0.0065 },
+            { code: '2.05', label: 'COFINS', rate: 0.03 },
           ];
-          const proportionalNodes = proportionalItems.map(sd => {
+          // For each year compute actual PIS/COFINS/ISS proportions from the deductions total
+          const proportionalNodes = proportionalItems.map((sd, sdIdx) => {
             const ann = {} as Record<Year, number>;
             for (const y of YEARS) {
-              const rates = (y as number) <= 2026 ? ratesPresumido : ratesReal;
-              const totalRate = salesDeductionsByYear[y as number];
-              const proportion = totalRate !== 0 ? rates[sd.key] / totalRate : 0;
-              ann[y] = Math.round(dedAn[y] * proportion);
+              const yr = yearlyOutputs[y];
+              if (!yr || dedAn[y] === 0) { ann[y] = 0; continue; }
+              // Reconstruct per-BU revenues from annual outputs
+              const caasRev = yr.revenueDetail.caasAssessoria + yr.revenueDetail.caasEnterprise + yr.revenueDetail.caasCorporate + yr.revenueDetail.caasSetup;
+              const saasRev = yr.revenueDetail.saasOxy + yr.revenueDetail.saasOxyGenio + yr.revenueDetail.saasSetup;
+              const setupRev = yr.revenueDetail.caasSetup;
+              const revByBU: Record<string, number> = { caas: caasRev, saas: saasRev, setup: setupRev };
+              const dedBU = calcularDeducoesPorBU(revByBU, buConfs);
+              if (sdIdx === 0) ann[y] = Math.round(-dedBU.deducaoISSQN);
+              else if (sdIdx === 1) ann[y] = Math.round(-dedBU.deducaoPIS);
+              else ann[y] = Math.round(-dedBU.deducaoCOFINS);
             }
             return { code: sd.code, label: sd.label, annual: ann, monthly: allocMo(dedMo, ann, dedAn) };
           });
