@@ -179,50 +179,7 @@ function getChurnMonthly(key: SubProductKey, data: AssumptionsType): number {
   return 0;
 }
 
-function computeProjectedClients(
-  key: SubProductKey,
-  year: Year,
-  growthArr: number[],
-  monthlyChurn: number,
-  subProductClients: SubProductClients,
-  ticketPrices?: Partial<Record<SubProductKey, number>>,
-  monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
-): number[] {
-  const historicalMonths = getMonthlyClients(key, year, subProductClients, ticketPrices, monthlyClientOverrides as any).map(v => Math.round(v));
-
-  if (year === 2025) {
-    return historicalMonths;
-  }
-
-  let base: number;
-  if (year === 2026) {
-    base = historicalMonths[2]; // Mar 2026 (index 2) — last historical month
-  } else {
-    const prevYear = (year - 1) as Year;
-    base = Math.round(getMonthlyClients(key, prevYear, subProductClients, ticketPrices, monthlyClientOverrides as any)[11]);
-  }
-
-  // Check for overrides for this product/year
-  const overrides = monthlyClientOverrides?.[key]?.[year];
-
-  const result: number[] = [];
-  let prev = base;
-  for (let m = 0; m < 12; m++) {
-    // If there's a direct override for this month, use it
-    if (overrides && overrides[m] !== null && overrides[m] !== undefined) {
-      result.push(overrides[m]!);
-      prev = overrides[m]!;
-    } else if (isHistorical(year, m)) {
-      result.push(historicalMonths[m]);
-      prev = historicalMonths[m];
-    } else {
-      const next = Math.max(0, Math.round(prev * (1 + growthArr[m] - monthlyChurn)));
-      result.push(next);
-      prev = next;
-    }
-  }
-  return result;
-}
+// computeProjectedClients removed — display now uses getMonthlyClients directly
 
 // ─── PnL tree helper ───
 function findNodeInTree(code: string, nodes: PnlNode[]): PnlNode | undefined {
