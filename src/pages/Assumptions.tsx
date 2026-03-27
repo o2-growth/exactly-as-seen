@@ -1143,7 +1143,7 @@ export default function Assumptions() {
                   const totalChurn = Array(12).fill(0);
                   for (const row of allProducts) {
                     const rowKey = row.dataKey!;
-                    const churnRate = getChurnMonthly(rowKey, data);
+                    const churnRate = getChurnMonthly(rowKey, data, selectedYear);
                     const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
                     for (let i = 0; i < 12; i++) {
                       const prev = i === 0
