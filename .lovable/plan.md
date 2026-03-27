@@ -1,45 +1,51 @@
 
 
-# Fix: yearly target not syncing with monthly overrides
+# Restaurar valores originais de caasAssessoria
 
-## Problem
+## Problema
+Os valores de `caasAssessoria` foram alterados acidentalmente na UI (2025: 21→5, 2026: 78→19) e esses valores foram persistidos automaticamente no banco de dados e localStorage.
 
-The "Clientes por ano (target fim de ano)" box shows `subProductClients[key][2026] = 5`, but the monthly grid shows values growing from 5 to 15. This happens because:
+## Solução
+Limpar os dados persistidos e os overrides mensais de `caasAssessoria` para que o sistema volte a usar os valores padrão do `DEFAULT_ASSUMPTIONS`:
+- **2025**: 21
+- **2026**: 78
 
-- `handleApplyRow` (the "Aplicar" button) correctly updates both `monthlyClientOverrides` AND `subProductClients[key][year]` to the new Dec value
-- But `handleClientChange` (individual month edits) only updates `monthlyClientOverrides` — it does NOT sync the Dec target back
+### Alteração em `src/pages/Assumptions.tsx`
+Adicionar um `useEffect` temporário (ou chamar `resetAssumptions()` seletivamente) que:
+1. No mount, verifica se `subProductClients.caasAssessoria[2025] !== 21` ou `[2026] !== 78`
+2. Se sim, corrige os valores e limpa os `monthlyClientOverrides` de `caasAssessoria` para 2025 e 2026
 
-So the yearly target box gets out of sync with the actual monthly values.
+**Abordagem mais simples**: corrigir diretamente no `DEFAULT_ASSUMPTIONS` não resolve porque o valor persistido sobrescreve os defaults no load. Então vamos adicionar um one-time fix no `FinancialModelContext.tsx`:
 
-## Solution
-
-### `src/pages/Assumptions.tsx` — `handleClientChange`
-
-After setting the override, also update `subProductClients[key][year]` to reflect the December value (month index 11). If the edited month IS December, use the new value directly. Otherwise, compute December from the current overrides + geometric base.
+### `src/contexts/FinancialModelContext.tsx`
+Após o `loadSnapshots` no useEffect de mount, adicionar uma correção pontual:
 
 ```typescript
-const handleClientChange = (key, year, monthIdx, newCount) => {
-  // ... existing override logic ...
-  
-  // Sync Dec target: if month 11 was edited, use that value directly
-  // Otherwise, get Dec value from overrides or keep existing
-  const decValue = monthIdx === 11 
-    ? newCount 
-    : (yearArr[11] !== null ? yearArr[11] : prev.subProductClients[key][year]);
-  
-  setAssumptions(prev => ({
-    ...prev,
-    subProductClients: {
-      ...prev.subProductClients,
-      [key]: { ...prev.subProductClients[key], [year]: decValue },
-    },
-    monthlyClientOverrides: { ... },
-  }));
-};
+loadSnapshots().then(saved => {
+  if (saved) {
+    // One-time fix: restore accidentally changed caasAssessoria values
+    const fixed = { ...saved };
+    let needsFix = false;
+    if (fixed.subProductClients?.caasAssessoria?.[2025] === 5) {
+      fixed.subProductClients.caasAssessoria[2025] = 21;
+      needsFix = true;
+    }
+    if (fixed.subProductClients?.caasAssessoria?.[2026] === 19) {
+      fixed.subProductClients.caasAssessoria[2026] = 78;
+      needsFix = true;
+    }
+    // Also clear any monthly overrides for these years
+    if (needsFix && fixed.monthlyClientOverrides?.caasAssessoria) {
+      delete fixed.monthlyClientOverrides.caasAssessoria[2025];
+      delete fixed.monthlyClientOverrides.caasAssessoria[2026];
+    }
+    setAssumptions(fixed);
+  }
+});
 ```
 
-This ensures the yearly target box always reflects the December value, whether set by individual edit or by "Aplicar".
+Também limpar o localStorage para garantir consistência.
 
-### Files to change
-- `src/pages/Assumptions.tsx` — update `handleClientChange` to sync Dec target
+### Arquivos alterados
+- `src/contexts/FinancialModelContext.tsx` — one-time data fix no load
 
