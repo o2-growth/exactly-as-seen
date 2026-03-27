@@ -35,7 +35,7 @@ function generateId() {
 }
 
 function getNextVersion(versions: VersionSnapshot[]): string {
-  if (versions.length === 0) return '1.0';
+  if (versions.length === 0) return '1.1';
   const last = versions[versions.length - 1].version;
   const [major, minor] = last.split('.').map(Number);
   return `${major}.${minor + 1}`;
@@ -98,7 +98,7 @@ export function VersionHistoryProvider({ children }: { children: React.ReactNode
     // Initial version
     return [{
       id: 'v1-initial',
-      version: '1.0',
+      version: '1.1',
       timestamp: '2025-03-05T00:00:00.000Z',
       note: 'Modelo base (5 de Março 2025)',
       assumptions: DEFAULT_ASSUMPTIONS,
@@ -111,7 +111,7 @@ export function VersionHistoryProvider({ children }: { children: React.ReactNode
     localStorage.setItem(STORAGE_KEY, JSON.stringify(versions));
   }, [versions]);
 
-  const currentVersion = versions.length > 0 ? versions[versions.length - 1].version : '1.0';
+  const currentVersion = versions.length > 0 ? versions[versions.length - 1].version : '1.1';
 
   const saveVersion = useCallback((note: string, assumptions: Assumptions, scenario: Scenario) => {
     const newVersion: VersionSnapshot = {
