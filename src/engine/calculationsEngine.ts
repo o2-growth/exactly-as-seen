@@ -512,6 +512,33 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
   return { software, realestate };
 }
 
+// ─── LUCRO PRESUMIDO — TAX HELPERS ───
+
+function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
+  switch (tipoReceita) {
+    case 'revenda_mercadoria':
+    case 'material_didatico':
+      return { irpj: 0.08, csll: 0.12 };
+    default: // 'servico'
+      return { irpj: 0.32, csll: 0.32 };
+  }
+}
+
+function calcularDeducoesPorBU(
+  revenueByBU: Record<string, number>,
+  buConfigs: BUTaxConfig[]
+): { deducaoPIS: number; deducaoCOFINS: number; deducaoISSQN: number; deducoesTotal: number } {
+  let deducaoPIS = 0, deducaoCOFINS = 0, deducaoISSQN = 0;
+  for (const bu of buConfigs) {
+    const fat = revenueByBU[bu.buKey] || 0;
+    if (fat <= 0) continue;
+    deducaoPIS += fat * 0.0065;
+    deducaoCOFINS += fat * 0.03;
+    deducaoISSQN += fat * (bu.aliquotaIss / 100);
+  }
+  return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
+}
+
 // ─── COMPUTE FULL YEAR ───
 
 function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): AnnualOutput {
