@@ -88,27 +88,25 @@ export interface Assumptions {
   marketingEvents?: number;
   // Item 6: CAC per product (overrides sector-based CAC)
   cacPerProduct?: Partial<Record<TicketKey, number>>;
-  // Item 8: 15% cost rate on Education/Expansão revenue
+  // Item 8: legacy — replaced by cosConfig rates
   eduExpansaoTeamRate?: number;
-  // Item 7: Squad operation structure
+  // Item 7: legacy — replaced by cosConfig
   squadConfig?: {
-    // Squad CaaS: 1 Diretor + 1 CFO + 1 FP&A por squad. Cada squad aguenta N clientes CaaS.
     cfoSalary: number;
     cfoAnalistaSalary: number;
     cfoAnalistasPerSquad: number;
     cfoClientsPerSquad: number;
-    // CS: 1 CS a cada N clientes (geral) — inside Squad CaaS card
     csPerClients: number;
     csSalary: number;
-    // Squad Setup SaaS: 1 analista + 2 implementadores. Cada squad aguenta N novos setups/mês.
     setupAnalistaSalary: number;
     setupImplSalary: number;
     setupImplPerSquad: number;
     setupSetupsPerSquad: number;
-    // Líder Setup: 1 líder a cada N squads de setup. Custo dividido entre os squads que lidera.
     setupLiderSalary: number;
     setupSquadsPerLider: number;
   };
+  // COS Config — premissas de custos variáveis por categoria (3.1–3.6)
+  cosConfig?: CosConfig;
   // Editable Selic monthly rate (default 1.17% = 0.0117)
   selicMonthly?: number;
   // N/A flag for churn — products that are non-recurring don't have churn
