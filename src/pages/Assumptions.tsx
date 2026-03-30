@@ -926,18 +926,20 @@ export default function Assumptions() {
                                       <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
-                                        <input
+                                         <input
                                           type="number"
                                           step="0.1"
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowTicketGrowthPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowTicketGrowthPct(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
+                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          disabled={!editing}
                                         >
                                           Aplicar
                                         </button>
