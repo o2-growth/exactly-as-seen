@@ -632,25 +632,37 @@ export default function Assumptions() {
     const rate = pct / 100;
     const ticketVal = data.tickets[prodKey as TicketKey] ?? 0;
     const currentMonthlyTickets = data.monthlyTickets ?? {};
-    const yearArr = currentMonthlyTickets[prodKey]?.[year]
-      ? [...currentMonthlyTickets[prodKey]![year]!]
-      : Array(12).fill(ticketVal);
 
-    // Find first non-historical month as base
-    let baseTicket = ticketVal;
-    for (let m = 0; m < 12; m++) {
-      if (!isHistorical(year, m)) {
-        baseTicket = yearArr[m] ?? ticketVal;
-        break;
+    const yearsToApply = YEARS.filter(y => y >= year);
+    const allYearOverrides: Record<number, number[]> = {};
+    let prev = ticketVal as number; // float base
+
+    for (const y of yearsToApply) {
+      const yearArr = currentMonthlyTickets[prodKey]?.[y]
+        ? [...currentMonthlyTickets[prodKey]![y]!]
+        : Array(12).fill(ticketVal);
+
+      // For the first year, find the base from last value before projection
+      if (y === year) {
+        for (let m = 0; m < 12; m++) {
+          if (!isHistorical(y, m)) {
+            // Use the value just before the first projected month
+            prev = m > 0 ? (yearArr[m - 1] ?? ticketVal) : ticketVal;
+            break;
+          }
+        }
       }
-    }
 
-    // Apply compound growth to projected months
-    let compoundIdx = 0;
-    for (let m = 0; m < 12; m++) {
-      if (isHistorical(year, m)) continue;
-      yearArr[m] = Math.round(baseTicket * Math.pow(1 + rate, compoundIdx));
-      compoundIdx++;
+      for (let m = 0; m < 12; m++) {
+        if (isHistorical(y, m)) {
+          prev = yearArr[m] ?? ticketVal;
+          continue;
+        }
+        prev = prev * (1 + rate);
+        yearArr[m] = Math.round(prev);
+      }
+
+      allYearOverrides[y] = yearArr;
     }
 
     const updater = (prev: AssumptionsType) => ({
@@ -659,7 +671,7 @@ export default function Assumptions() {
         ...(prev.monthlyTickets ?? {}),
         [prodKey]: {
           ...((prev.monthlyTickets ?? {})[prodKey] ?? {}),
-          [year]: yearArr,
+          ...allYearOverrides,
         },
       },
     });
