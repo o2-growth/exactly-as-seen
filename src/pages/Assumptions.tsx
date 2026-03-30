@@ -407,10 +407,15 @@ export default function Assumptions() {
     // Read from the correct state source (editState when editing, assumptions otherwise)
     const source = editing ? editState : assumptions;
     const currentOverrides = source.monthlyClientOverrides ?? {};
+    const currentManualFlags = source.manualMonthlyClientOverrideFlags ?? {};
     const yearArr = currentOverrides[key as TicketKey]?.[year]
       ? [...currentOverrides[key as TicketKey]![year]!]
       : Array(12).fill(null);
+    const manualFlags = currentManualFlags[key as TicketKey]?.[year]
+      ? [...currentManualFlags[key as TicketKey]![year]!]
+      : Array(12).fill(false);
     yearArr[monthIdx] = newCount;
+    manualFlags[monthIdx] = true;
 
     // Determine Dec target
     const decValue = monthIdx === 11
@@ -449,6 +454,13 @@ export default function Assumptions() {
           [year]: yearArr,
         },
       },
+      manualMonthlyClientOverrideFlags: {
+        ...(prev.manualMonthlyClientOverrideFlags ?? {}),
+        [key]: {
+          ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}),
+          [year]: manualFlags,
+        },
+      },
     }));
   };
 
@@ -474,12 +486,13 @@ export default function Assumptions() {
           const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
           const churnRate = getChurnMonthly(k, data, y);
           const existingOverrides = data.monthlyClientOverrides?.[k]?.[y];
+          const manualFlags = data.manualMonthlyClientOverrideFlags?.[k]?.[y];
           let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
           const projected: (number | null)[] = Array(12).fill(null);
           for (let m = 0; m < 12; m++) {
             if (isHistorical(y, m)) {
               prev = Math.round(base[m]);
-            } else if (existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+            } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
               // Preserve manually entered value and use it as base for next month
               const manual = existingOverrides[m]!;
               projected[m] = manual;
@@ -502,8 +515,16 @@ export default function Assumptions() {
 
     const applyAllUpdater = (prev: AssumptionsType) => {
       const newSPC = { ...prev.subProductClients };
+      const nextManualFlags = { ...(prev.manualMonthlyClientOverrideFlags ?? {}) };
       for (const [k, yearMap] of Object.entries(decTargets)) {
         newSPC[k as SubProductKey] = { ...newSPC[k as SubProductKey], ...yearMap };
+        const existingProductFlags = nextManualFlags[k as TicketKey] ?? {};
+        const mergedYearFlags = { ...existingProductFlags };
+        for (const yearKey of Object.keys(yearMap)) {
+          const numericYear = Number(yearKey) as Year;
+          mergedYearFlags[numericYear] = Array(12).fill(false);
+        }
+        nextManualFlags[k as TicketKey] = mergedYearFlags;
       }
       return {
         ...prev,
@@ -512,6 +533,7 @@ export default function Assumptions() {
           ...(prev.monthlyClientOverrides ?? {}),
           ...overridesAccum,
         },
+        manualMonthlyClientOverrideFlags: nextManualFlags,
       };
     };
     if (editing) {
@@ -534,12 +556,13 @@ export default function Assumptions() {
     const base = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
     const churnRate = getChurnMonthly(key, data, year);
     const existingOverrides = data.monthlyClientOverrides?.[key]?.[year];
+    const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[year];
     let prev = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
     const projected: (number | null)[] = Array(12).fill(null);
     for (let m = 0; m < 12; m++) {
       if (isHistorical(year, m)) {
         prev = Math.round(base[m]);
-      } else if (existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+      } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
         // Preserve manually entered value and use it as base for next month
         const manual = existingOverrides[m]!;
         projected[m] = manual;
@@ -570,6 +593,13 @@ export default function Assumptions() {
         [key]: {
           ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
           [year]: projected,
+        },
+      },
+      manualMonthlyClientOverrideFlags: {
+        ...(prev.manualMonthlyClientOverrideFlags ?? {}),
+        [key]: {
+          ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}),
+          [year]: Array(12).fill(false),
         },
       },
     });
