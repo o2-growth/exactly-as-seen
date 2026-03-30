@@ -11,7 +11,7 @@ import {
   cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
   commercialExpenses2025, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
-  salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
+  salaryRanges, expectedOutputs, namedEmployees2025,
   financialItems2025, outrosExpenses2025,
 } from '@/data/modelData';
 import {
