@@ -1052,11 +1052,11 @@ export default function Assumptions() {
                                                 {monthly[i].toLocaleString('pt-BR')}
                                               </span>
                                             ) : (
-                                              <MonthlyClientInput
+                              <MonthlyClientInput
                                                 value={monthly[i]}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
-                                                readOnly={!editing}
+                                                readOnly={!editing || prodKey === 'saasSetup'}
                                               />
                                             )}
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>

@@ -740,17 +740,19 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const saasSubClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
       + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
 
-    // New Setup clients = new CaaS Enterprise/Corporate + new SaaS subscriptions this month
-    const prevCaasEnt = m > 0 ? getMonthlyClientCount('caas', 'enterprise', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'enterprise', 11, year - 1, assumptions) : 0);
-    const prevCaasCorp = m > 0 ? getMonthlyClientCount('caas', 'corporate', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'corporate', 11, year - 1, assumptions) : 0);
-    const prevSaasOxy = m > 0 ? getMonthlyClientCount('saas', 'oxy', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxy', 11, year - 1, assumptions) : 0);
-    const prevSaasOG = m > 0 ? getMonthlyClientCount('saas', 'oxyGenio', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxyGenio', 11, year - 1, assumptions) : 0);
-    const newSetupClients = Math.max(0,
-      (getMonthlyClientCount('caas', 'enterprise', m, year, assumptions) - prevCaasEnt) +
-      (getMonthlyClientCount('caas', 'corporate', m, year, assumptions) - prevCaasCorp) +
-      (getMonthlyClientCount('saas', 'oxy', m, year, assumptions) - prevSaasOxy) +
-      (getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions) - prevSaasOG)
-    );
+    // New Setup clients = new Enterprise + Corporate + Oxy + OxyGenio + OxyGenioEsp
+    const setupSourcesCOS: [string, string][] = [
+      ['caas', 'enterprise'], ['caas', 'corporate'],
+      ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
+    ];
+    let newSetupClients = 0;
+    for (const [sBu, sProd] of setupSourcesCOS) {
+      const curr = getMonthlyClientCount(sBu, sProd, m, year, assumptions);
+      const prev = m > 0
+        ? getMonthlyClientCount(sBu, sProd, m - 1, year, assumptions)
+        : (year > 2025 ? getMonthlyClientCount(sBu, sProd, 11, year - 1, assumptions) : 0);
+      newSetupClients += Math.max(0, curr - prev);
+    }
 
     // COS (Cost of Service) via config
     const cosBreakdown = calcCOSFromConfig(m, year, caasClientsForCOS, saasSubClientsM, newSetupClients, eduRev, baasRev, taxRev, assumptions);
