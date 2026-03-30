@@ -1129,10 +1129,10 @@ export default function Assumptions() {
                                     <div className="flex items-center gap-6 text-xs">
                                       {(() => {
                                         const totalAno = MONTHS.reduce((sum, _, i) => {
-                                          const mt = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                          const mt = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
                                           return sum + monthly[i] * mt;
                                         }, 0);
-                                        const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
+                                        const decTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         const mrrDez = monthly[11] * decTicket;
                                         return (
                                           <>
