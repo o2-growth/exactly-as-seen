@@ -1085,10 +1085,12 @@ export default function Assumptions() {
                                             })()}
                                             onClick={e => e.stopPropagation()}
                                             onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
+                                            disabled={!editing}
                                           />
                                           <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                           <button
-                                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
+                                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                            disabled={!editing}
                                             onClick={e => {
                                               e.stopPropagation();
                                               const pct = rowChurnPct[prodKey] ?? (() => {
