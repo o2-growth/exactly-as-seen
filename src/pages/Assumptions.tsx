@@ -1033,7 +1033,8 @@ export default function Assumptions() {
                                                 readOnly={!editing}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
-                                                  const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
+                                                  const src = editing ? editState : assumptions;
+                                                  const currentMonthlyTickets = src.monthlyTickets ?? {};
                                                   const yearArr = currentMonthlyTickets[prodKey]?.[selectedYear]
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
@@ -1051,7 +1052,7 @@ export default function Assumptions() {
                                                     }
                                                     yearArr[11] = decTicket;
                                                   }
-                                                  setAssumptions(prev => ({
+                                                  const updater = (prev: any) => ({
                                                     ...prev,
                                                     monthlyTickets: {
                                                       ...(prev.monthlyTickets ?? {}),
@@ -1060,7 +1061,9 @@ export default function Assumptions() {
                                                         [selectedYear]: yearArr,
                                                       },
                                                     },
-                                                  }));
+                                                  });
+                                                  if (editing) setEditState(updater);
+                                                  else setAssumptions(updater);
                                                 }}
                                               />
                                             )}
