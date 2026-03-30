@@ -1513,7 +1513,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Data Analyst (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.dataAnalystSalary} disabled={!editing} onChange={e => updateCos('dataAnalystSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.dataAnalystSalary} disabled={!editing} onChange={v => updateCos('dataAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analysts / squad</label>
