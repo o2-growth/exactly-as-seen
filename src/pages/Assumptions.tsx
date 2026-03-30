@@ -1174,7 +1174,7 @@ export default function Assumptions() {
                                                 const rate = getChurnMonthly(prodKey, data, selectedYear);
                                                 return Math.round(rate * 12 * 100 * 10) / 10;
                                               })();
-                                              setAssumptions(prev => ({
+                                              const updater = (prev: typeof assumptions) => ({
                                                 ...prev,
                                                 monthlyChurnRates: {
                                                   ...(prev.monthlyChurnRates ?? {}),
@@ -1183,7 +1183,8 @@ export default function Assumptions() {
                                                     [selectedYear]: pct,
                                                   },
                                                 },
-                                              }));
+                                              });
+                                              if (editing) setEditState(updater); else setAssumptions(updater);
                                             }}
                                           >
                                             Aplicar
