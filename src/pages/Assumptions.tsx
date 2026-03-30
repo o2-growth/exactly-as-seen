@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 /** Input with local state buffer — commits on blur/Enter, syncs when not focused */
-function MonthlyClientInput({ value, onCommit, className }: { value: number; onCommit: (v: number) => void; className?: string }) {
+function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: number; onCommit: (v: number) => void; className?: string; readOnly?: boolean }) {
   const [local, setLocal] = useState(value);
   const focused = useRef(false);
   useEffect(() => { if (!focused.current) setLocal(value); }, [value]);
   const commit = () => { focused.current = false; if (local !== value) onCommit(local); };
+  if (readOnly) {
+    return <span className={className}>{value.toLocaleString('pt-BR')}</span>;
+  }
   return (
     <input
       type="number"
