@@ -1570,7 +1570,7 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Analista/Impl (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} disabled={!editing} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Impl/squad</label>
