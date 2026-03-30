@@ -1092,7 +1092,7 @@ export default function Assumptions() {
 
                                   {/* Receita Bruta Total */}
                                   <div className="space-y-2 pt-1">
-                                    <p className="text-xs font-semibold text-muted-foreground">Receita Bruta (R$/mês) — {selectedYear}</p>
+                                    <p className="text-xs font-semibold text-muted-foreground">Nova Receita adicionada (R$/mês) — {selectedYear}</p>
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
