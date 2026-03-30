@@ -1,94 +1,46 @@
 
-# Ajustar lógica de Ticket Flat e Crescimento de Churn em toda a aba Revenue
 
-## O que está acontecendo hoje
-A tela de Revenue já propaga corretamente o crescimento de clientes até 2030, mas **ticket** e **churn** ainda seguem regras diferentes:
+# Adicionar "Churn Base (Flat)" — campo editável com projeção até 2030
 
-- **Ticket base (flat)** hoje só altera `tickets[prodKey]`, mas não reprojeta automaticamente os meses do modelo
-- **Aplicar crescimento do ticket** usa uma base incompleta e pode não respeitar o encadeamento esperado entre meses/anos
-- **Churn** hoje grava apenas um valor anual para o ano selecionado em `monthlyChurnRates`
-- O rótulo ainda está como **“Taxa de churn”**, mas você quer usar isso como um **crescimento de churn**
-- Precisa aceitar **percentual negativo**, para reduzir churn ao longo do tempo
-- Isso deve valer para **todas as categorias e subcategorias de receita**
+## Problema
+Hoje a seção de churn não tem um campo para definir o valor base. O usuário só vê "Crescimento de churn" e "Aplicar", mas não consegue definir o churn inicial por subproduto. Precisa de um campo "Churn base (flat)" idêntico ao "Ticket base (flat)".
 
-## Implementação proposta
+## Solução
 
-### 1. Ticket base (flat) passa a projetar todos os meses até 2030
-No bloco expandido de cada subcategoria em `src/pages/Assumptions.tsx`:
+### Arquivo: `src/pages/Assumptions.tsx`
 
-- transformar o campo **Ticket base (flat)** em origem de projeção mensal
-- ao editar esse campo:
-  - atualizar `tickets[prodKey]`
-  - recriar `monthlyTickets[prodKey]` de `selectedYear` até 2030
-  - preencher todos os meses futuros com o valor flat
-  - preservar meses históricos bloqueados
-  - usar o valor final de um ano como base do próximo, mantendo consistência com o resto do modelo
+**1. Adicionar campo "Churn base (flat)" na linha do churn (~L1168-1170)**
 
-Resultado esperado:
-- se eu mudar o flat de uma linha, o ticket mensal daquela subcategoria passa a refletir isso em todo o horizonte do modelo
+Inserir um input numérico antes do "Crescimento de churn", no mesmo `div` com `ml-auto`. Layout:
 
-### 2. Crescimento do ticket segue a mesma lógica de clientes
-Ajustar `handleApplyTicketGrowth` para seguir o mesmo padrão já usado em clientes:
+```
+Churn base (flat): [___] % a.a.  |  Crescimento de churn: [___] % a.a.  [Aplicar]
+```
 
-- iterar de `selectedYear` até 2030
-- manter `prev` como float
-- aplicar crescimento mês a mês
-- arredondar só no valor exibido/salvo do mês
-- usar o último mês do ano anterior como base do próximo ano
-- preservar qualquer valor mensal manual já inserido, usando esse manual como nova base
+- Input tipo `number`, `step="0.1"`, `disabled={!editing}`
+- Valor lido de `data.monthlyChurnRates?.[prodKey]?.[selectedYear]` (ou fallback para o default do `getChurnMonthly`)
+- Ao alterar (`onChange`), propagar o valor flat para todos os anos de `selectedYear` até 2030 em `monthlyChurnRates[prodKey][year]`
+- Usar o guard `if (editing) setEditState(...) else setAssumptions(...)`
 
-Assim o ticket terá comportamento consistente com:
-- crescimento acumulado real
-- propagação até fim do modelo
-- respeito a intervenções manuais
+**2. Lógica de projeção do flat**
 
-### 3. Churn vira “Crescimento de churn”
-No bloco de churn da mesma tela:
+Ao preencher o campo, aplicar o valor para todos os anos futuros:
+```ts
+const yearsToApply = YEARS.filter(y => y >= selectedYear);
+const newRates: Record<number, number> = {};
+for (const y of yearsToApply) {
+  newRates[y] = val; // mesmo valor flat para todos
+}
+// updater: merge em monthlyChurnRates[prodKey]
+```
 
-- renomear **“Taxa de churn”** para **“Crescimento de churn”**
-- manter o campo como percentual anual
-- permitir entrada de valores **negativos**
-- manter o botão **Aplicar**
+**3. "Crescimento de churn" usa o flat como base**
 
-### 4. Aplicar crescimento de churn até 2030
-Criar para churn a mesma lógica de propagação:
+O botão "Aplicar" do crescimento já lê `data.monthlyChurnRates?.[prodKey]?.[selectedYear]` como base — com o flat preenchido, isso funcionará automaticamente. O crescimento composto será aplicado a partir desse valor base.
 
-- ao clicar em **Aplicar**, em vez de salvar apenas `monthlyChurnRates[prodKey][selectedYear]`
-- projetar do ano selecionado até 2030
-- usar o churn atual daquele produto/ano como base
-- aplicar crescimento acumulado anual:
-  - exemplo: 5% com crescimento de churn de -10% vira 4.5 no próximo ano, depois 4.05, etc.
-- salvar os valores anuais projetados em `monthlyChurnRates[prodKey][year]`
+## Resultado
+- Campo "Churn base (flat)" editável por subproduto
+- Ao preencher, propaga o valor para todos os anos até 2030
+- "Crescimento de churn" + "Aplicar" aplica crescimento composto sobre essa base
+- Funciona para todas as categorias/subcategorias (mesmo loop `filteredProducts`)
 
-Importante:
-- o valor continua sendo um **churn anual armazenado por ano**
-- a visualização mensal continua derivada dele via `getChurnMonthly(...) / 12`
-- isso evita mexer no motor inteiro e mantém compatibilidade com o cálculo atual de perda de clientes
-
-### 5. Atualizar toda a UI dependente para usar `data`
-Há trechos que ainda usam `assumptions` direto em vez de `data` (que respeita `editState` enquanto edita). Vou alinhar isso no bloco de Revenue para evitar sensação de “não aplicou”:
-
-- MRR de Dez
-- Nova Receita adicionada
-- totais do ano
-- qualquer leitura de `monthlyTickets`/`monthlyChurnRates` dentro da expansão da linha
-
-Isso garante que as mudanças apareçam imediatamente no modo de edição.
-
-## Arquivo principal
-- `src/pages/Assumptions.tsx`
-
-## Detalhes técnicos
-- `monthlyTickets` continuará sendo override mensal por produto/ano
-- `monthlyChurnRates` continuará sendo override anual por produto/ano
-- `getChurnMonthly` não precisa mudar de estrutura; só passará a receber valores anuais já projetados até 2030
-- a propagação será aplicada automaticamente para todas as categorias porque a tela já renderiza tudo a partir de `CLIENTS_ROWS`
-
-## Resultado esperado
-Para qualquer subcategoria de receita, será possível:
-
-- definir um **ticket flat** e espalhar isso por todo o modelo
-- aplicar **crescimento de ticket** até 2030
-- aplicar **crescimento de churn** até 2030
-- usar **percentuais negativos** para reduzir churn
-- ver tudo refletido imediatamente na tela durante edição
