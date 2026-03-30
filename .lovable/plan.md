@@ -1,23 +1,42 @@
 
 
-# Corrigir "Aplicar Crescimento" para respeitar valores manuais
+# Corrigir cálculo de crescimento para números pequenos
 
 ## Problema
-Quando o usuário edita manualmente os clientes de Abr-Jun (ex: 3, 3, 3) e depois clica "Aplicar" com 4% de crescimento, o código **recalcula todos os meses não-históricos desde o último mês realizado**, ignorando os valores manuais já inseridos. Resultado: os valores de Abr-Jun são sobrescritos e zerados.
+Quando o usuário define Apr-Jun = 3 e aplica 6% de crescimento, o sistema usa `Math.round` em cada passo e **reatribui o valor arredondado como base** do próximo mês. Resultado: `3 × 1.06 = 3.18 → round → 3`, e `prev` volta para 3. O crescimento nunca acumula.
 
-## Causa raiz
-Em `handleApplyRow` (L529-541) e `handleApplyAll` (L474-486), a projeção sequencial usa como base o último mês histórico (`prev`) e aplica crescimento a **todos** os meses futuros. Os overrides manuais existentes são ignorados no cálculo.
+Antes de clicar "Aplicar", os meses Jul-Dec usam **interpolação geométrica** entre o último mês histórico e o target de Dezembro (que pode ser alto, ex: 80), gerando saltos como 3→5→9→15.
 
 ## Solução
-Alterar a lógica de projeção para **preservar meses que já possuem override manual** e só aplicar crescimento a partir do primeiro mês sem override.
+Manter `prev` como **float** (sem arredondar) durante o loop de crescimento. Arredondar apenas o valor salvo em `projected[m]`, sem reatribuir o arredondado ao `prev`.
 
-### Lógica corrigida (ambas funções):
-1. Ler os overrides atuais do subproduto: `currentOverrides = monthlyClientOverrides[key]?.[year]`
-2. Para cada mês não-histórico:
-   - Se o mês **já tem override manual** (valor não-null no array atual), manter esse valor e usá-lo como `prev` para o próximo mês
-   - Se o mês **não tem override**, aplicar crescimento: `prev * (1 + rate - churn)`
-3. Isso garante que Abr=3, Mai=3, Jun=3 ficam intactos e Jul em diante cresce a partir de 3
+### Antes (bug):
+```ts
+const next = Math.round(prev * (1 + rate - churn));
+projected[m] = next;
+prev = next; // ← prev perde a fração
+```
+
+### Depois (fix):
+```ts
+prev = prev * (1 + rate - churn); // prev mantém precisão float
+projected[m] = Math.max(0, Math.round(prev));
+// prev NÃO é reatribuído ao arredondado
+```
+
+Com 6% a partir de 3: Jul=3.18→3, Aug=3.37→3, Sep=3.57→4, Oct=3.78→4, Nov=4.01→4, Dec=4.25→4.
+Crescimento gradual e realista.
+
+Para overrides manuais, o `prev` assume o valor manual (float):
+```ts
+prev = manual; // usa o valor manual como base float para próximo mês
+```
+
+## Alterações
+- `src/pages/Assumptions.tsx`:
+  - `handleApplyRow` (~L548-552): separar `prev` float de `projected[m]` arredondado
+  - `handleApplyAll` (~L478-492): mesma correção
 
 ## Arquivo alterado
-- `src/pages/Assumptions.tsx` — `handleApplyRow` (~L528-541) e `handleApplyAll` (~L473-486)
+- `src/pages/Assumptions.tsx` — 2 blocos de ~5 linhas cada
 
