@@ -910,10 +910,11 @@ export default function Assumptions() {
                               }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              setAssumptions(prev => ({
+                              const updater = (prev: typeof assumptions) => ({
                                 ...prev,
                                 tickets: { ...prev.tickets, [prodKey]: val },
-                              }));
+                              });
+                              if (editing) setEditState(updater); else setAssumptions(updater);
                             };
                             return (
                             <tr className="border-b border-border/30">
@@ -1079,6 +1080,7 @@ export default function Assumptions() {
                                           value={ticketVal}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
+                                          disabled={!editing}
                                         />
                                       </div>
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
@@ -1135,13 +1137,14 @@ export default function Assumptions() {
                                         disabled={!editing}
                                         onClick={e => {
                                           e.stopPropagation();
-                                          setAssumptions(prev => ({
+                                          const updater = (prev: typeof assumptions) => ({
                                             ...prev,
                                             churnNotApplicable: {
                                               ...(prev.churnNotApplicable ?? {}),
                                               [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
                                             },
-                                          }));
+                                          });
+                                          if (editing) setEditState(updater); else setAssumptions(updater);
                                         }}
                                       >
                                         N/A
@@ -1171,7 +1174,7 @@ export default function Assumptions() {
                                                 const rate = getChurnMonthly(prodKey, data, selectedYear);
                                                 return Math.round(rate * 12 * 100 * 10) / 10;
                                               })();
-                                              setAssumptions(prev => ({
+                                              const updater = (prev: typeof assumptions) => ({
                                                 ...prev,
                                                 monthlyChurnRates: {
                                                   ...(prev.monthlyChurnRates ?? {}),
@@ -1180,7 +1183,8 @@ export default function Assumptions() {
                                                     [selectedYear]: pct,
                                                   },
                                                 },
-                                              }));
+                                              });
+                                              if (editing) setEditState(updater); else setAssumptions(updater);
                                             }}
                                           >
                                             Aplicar
