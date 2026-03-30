@@ -1019,7 +1019,7 @@ export default function Assumptions() {
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
-                                        const monthTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                        const monthTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
@@ -1033,7 +1033,8 @@ export default function Assumptions() {
                                                 readOnly={!editing}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
-                                                  const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
+                                                  const src = editing ? editState : assumptions;
+                                                  const currentMonthlyTickets = src.monthlyTickets ?? {};
                                                   const yearArr = currentMonthlyTickets[prodKey]?.[selectedYear]
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
                                                     : Array(12).fill(ticketVal);
@@ -1051,7 +1052,7 @@ export default function Assumptions() {
                                                     }
                                                     yearArr[11] = decTicket;
                                                   }
-                                                  setAssumptions(prev => ({
+                                                  const updater = (prev: any) => ({
                                                     ...prev,
                                                     monthlyTickets: {
                                                       ...(prev.monthlyTickets ?? {}),
@@ -1060,7 +1061,9 @@ export default function Assumptions() {
                                                         [selectedYear]: yearArr,
                                                       },
                                                     },
-                                                  }));
+                                                  });
+                                                  if (editing) setEditState(updater);
+                                                  else setAssumptions(updater);
                                                 }}
                                               />
                                             )}
