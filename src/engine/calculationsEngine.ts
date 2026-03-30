@@ -215,6 +215,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
     caas: caasTotal * scenarioMult,
     saasOxy: saasOxy * scenarioMult,
     saasOxyGenio: saasOxyGenio * scenarioMult,
+    saasOxyGenioEsp: saasOxyGenioEsp * scenarioMult,
     saasSetup: saasSetup * scenarioMult,
     saas: saasTotal * scenarioMult,
     education: eduTotal * scenarioMult,
