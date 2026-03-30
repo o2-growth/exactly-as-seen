@@ -1167,7 +1167,7 @@ export default function Assumptions() {
                                       </button>
                                       {!data.churnNotApplicable?.[prodKey] && (
                                         <div className="ml-auto flex items-center gap-2">
-                                          <span className="text-[10px] text-muted-foreground">Taxa de churn:</span>
+                                          <span className="text-[10px] text-muted-foreground">Crescimento de churn:</span>
                                           <input
                                             type="number"
                                             step="0.5"
