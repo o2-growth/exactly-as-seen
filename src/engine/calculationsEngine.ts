@@ -777,12 +777,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // Contribution margin (eduExpTeamTotal now included in COS)
     const cm = gp + totalComm + totalMkt;
 
-    // Calculate client counts by BU for headcount ratios
-    const caasClientsM = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
-      + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
-      + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
-    const saasClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
-      + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
+    // Reuse COS client counts for headcount
+    const caasClientsM = caasClientsForCOS;
+    const saasClientsM = saasSubClientsM;
     const caasSaasClientsM = caasClientsM + saasClientsM;
 
     // Headcount (uses CaaS-only for CFO/FP&A/PF, CaaS+SaaS for others)
