@@ -1,30 +1,31 @@
 
 
-# Corrigir cálculo do Setup: usar soma absoluta, não deltas
+# Corrigir exibição de clientes Setup na grid mensal
 
 ## Problema
-O código atual calcula Setup como a soma dos **deltas mensais** (novos clientes = mês atual - mês anterior) dos 5 produtos. Isso dá valores muito pequenos (ex: 3 em abril). O correto é que Setup = soma dos **valores absolutos de clientes** dos 5 produtos naquele mês.
+O motor de cálculos (`calculationsEngine.ts`) já calcula Setup como soma dos 5 produtos. Porém a **grid mensal na UI** usa `getMonthlyClients('saasSetup', ...)` de `monthlyData.ts`, que lê dados estáticos de `subProductClients.saasSetup` — não reflete o cálculo dinâmico.
 
-Exemplo abril: Enterprise(~10) + Corporate(~5) + Oxy(~25) + OxyGenio(~8) + OxyGenioEsp(~5) = ~53.
+## Solução
 
-## Alteração
-
-### `src/engine/calculationsEngine.ts` (linhas 183-196)
-
-Substituir a lógica de deltas pela soma direta:
+### `src/lib/monthlyData.ts` — função `getMonthlyClients`
+Adicionar lógica especial no início da função: quando `key === 'saasSetup'`, calcular o valor como soma dos clientes mensais dos 5 produtos fonte:
 
 ```ts
-// SaaS setup: sum of absolute client counts from 5 products
-const setupSources: [string, string][] = [
-  ['caas', 'enterprise'], ['caas', 'corporate'],
-  ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
-];
-let setupNewClients = 0;
-for (const [bu, prod] of setupSources) {
-  setupNewClients += getMonthlyClientCount(bu, prod, month, year, assumptions);
+if (key === 'saasSetup') {
+  const sources: SubProductKey[] = [
+    'caasEnterprise', 'caasCorporate', 
+    'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp'
+  ];
+  return Array.from({ length: 12 }, (_, m) => {
+    let total = 0;
+    for (const src of sources) {
+      const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
+      total += Math.round(srcMonthly[m]);
+    }
+    return total;
+  });
 }
-const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
 ```
 
-Remove o cálculo de `prev` e `Math.max(0, curr - prev)`. Simplesmente soma os clientes dos 5 produtos no mês.
+Isso garante que a grid de clientes do Setup mostre os mesmos valores que o motor usa para receita — a soma absoluta de Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp para cada mês.
 
