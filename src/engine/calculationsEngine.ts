@@ -893,8 +893,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     annualCapex += totalCapex;
     annualFinal += finalResult;
 
-    cogsD.caas += cogs.caas; cogsD.customerService += cogs.customerService;
-    cogsD.saas += cogs.saas; cogsD.education += cogs.education; cogsD.baas += cogs.baas;
+    cogsD.caas += cosBreakdown.caas; cogsD.customerService += cosBreakdown.customerSuccess;
+    cogsD.saas += cosBreakdown.saas; cogsD.education += cosBreakdown.education; cogsD.baas += cosBreakdown.expansao; cogsD.tax += cosBreakdown.tax;
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
     taxD.irpj += irpj; taxD.csll += csll;
