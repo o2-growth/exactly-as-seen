@@ -921,28 +921,27 @@ export default function Assumptions() {
                                 <div className="space-y-4">
                                   {/* Annual targets */}
                                   <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (target fim de ano)</p>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (soma)</p>
                                     <div className="grid grid-cols-6 gap-2">
-                                      {activeYears.map(y => (
-                                        <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
-                                          <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
-                                          <input
-                                            type="number"
-                                            className="w-full bg-transparent text-center text-sm tabular-nums font-bold text-foreground outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors"
-                                            value={assumptions.subProductClients[prodKey]?.[y] ?? 0}
-                                            onClick={e => e.stopPropagation()}
-                                            onChange={e => directUpdateClients(y, Number(e.target.value) || 0)}
-                                            disabled={!editing}
-                                          />
-                                        </div>
-                                      ))}
+                                      {activeYears.map(y => {
+                                        const yrMonthly = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.monthlyTickets ? Object.fromEntries(Object.entries(data.monthlyTickets).map(([k, v]) => [k, v?.[y]?.[0] ?? 0])) : undefined, data.monthlyClientOverrides);
+                                        const yrSum = yrMonthly.reduce((a, b) => a + b, 0);
+                                        return (
+                                          <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
+                                            <span className="block w-full text-center text-sm tabular-nums font-bold text-foreground">
+                                              {Math.round(yrSum).toLocaleString('pt-BR')}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
 
                                   {/* Monthly breakdown */}
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-semibold text-muted-foreground">Clientes mensais — {selectedYear}</p>
+                                      <p className="text-xs font-semibold text-muted-foreground">Novos clientes mensais — {selectedYear}</p>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
                                         <input
@@ -1093,7 +1092,7 @@ export default function Assumptions() {
 
                                   {/* Receita Bruta Total */}
                                   <div className="space-y-2 pt-1">
-                                    <p className="text-xs font-semibold text-muted-foreground">Receita Bruta (R$/mês) — {selectedYear}</p>
+                                    <p className="text-xs font-semibold text-muted-foreground">Nova Receita adicionada (R$/mês) — {selectedYear}</p>
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
