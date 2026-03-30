@@ -1403,15 +1403,19 @@ export default function Assumptions() {
                                   const cellValue = cfg[rowDef.field] as number;
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="20"
-                                        className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                        value={cellValue}
-                                        onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
-                                      />
+                                      {editing ? (
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          min="0"
+                                          max="20"
+                                          className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={cellValue}
+                                          onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
+                                        />
+                                      ) : (
+                                        <span className="text-xs tabular-nums">{cellValue.toFixed(2).replace('.', ',')}%</span>
+                                      )}
                                     </td>
                                   );
                                 }
