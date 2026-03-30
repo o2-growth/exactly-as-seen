@@ -116,6 +116,19 @@ describe('Financial Data: Default Assumptions', () => {
     expect(sq.setupSquadsPerLider).toBe(2);
   });
 
+  it('cosConfig has all required fields with correct defaults', () => {
+    const cos = a.cosConfig!;
+    expect(cos.pfdClientsPerOne).toBe(100);
+    expect(cos.pfdSalary).toBe(30000);
+    expect(cos.cfoClientsPerOne).toBe(15);
+    expect(cos.cfoSalary).toBe(20000);
+    expect(cos.fpaClientsPerOne).toBe(7.5);
+    expect(cos.fpaSalary).toBe(8000);
+    expect(cos.eduCostRate).toBe(0.15);
+    expect(cos.expansaoCostRate).toBe(0.15);
+    expect(cos.taxCostRate).toBe(0.15);
+  });
+
   it('headcountRatios are all positive', () => {
     const r = a.headcountRatios;
     expect(r.clientsPerCFO).toBeGreaterThan(0);
