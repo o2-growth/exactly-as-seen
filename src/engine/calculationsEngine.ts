@@ -269,6 +269,67 @@ function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baas
   };
 }
 
+// ─── COS FROM CONFIG (3.1–3.6) ───
+
+export interface COSBreakdown {
+  caas: number;          // 3.1
+  saas: number;          // 3.2 (assinatura + setup)
+  education: number;     // 3.3
+  customerSuccess: number; // 3.4
+  expansao: number;      // 3.5
+  tax: number;           // 3.6
+  total: number;
+}
+
+function calcCOSFromConfig(
+  month: number,
+  year: number,
+  caasClients: number,
+  saasSubClients: number,
+  newSetupClients: number,
+  eduRevenue: number,
+  expansaoRevenue: number,
+  taxRevenue: number,
+  assumptions: Assumptions
+): COSBreakdown {
+  const cfg = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+
+  // 3.1 CaaS: PFD + CFO + FP&A
+  const numPFD = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.pfdClientsPerOne)));
+  const numCFO = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.cfoClientsPerOne)));
+  const numFPA = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.fpaClientsPerOne)));
+  const caasCost = -(numPFD * cfg.pfdSalary + numCFO * cfg.cfoSalary + numFPA * cfg.fpaSalary) / 1000;
+
+  // 3.2 SaaS — Assinatura: Dev Sr + CS
+  const numDevSr = Math.max(0, Math.ceil(saasSubClients / Math.max(1, cfg.devSrClientsPerOne)));
+  const numCSSaaS = Math.max(0, Math.ceil(saasSubClients / Math.max(1, cfg.csClientsPerOne)));
+  const saasSubCost = -(numDevSr * cfg.devSrSalary + numCSSaaS * cfg.csSaaSalary) / 1000;
+
+  // 3.2 Setup — Squad by new clients/month
+  const numSetupSquads = newSetupClients > 0 ? Math.max(1, Math.ceil(newSetupClients / Math.max(1, cfg.setupClientsPerSquad))) : 0;
+  const setupSquadCost = numSetupSquads * (cfg.dataAnalystPerSquad * cfg.dataAnalystSalary + cfg.processAnalystPerSquad * cfg.processAnalystSalary);
+  const numHeadData = newSetupClients > 0 ? Math.max(1, Math.ceil(newSetupClients / Math.max(1, cfg.headDataClientsPerOne))) : 0;
+  const setupCost = -(setupSquadCost + numHeadData * cfg.headDataSalary) / 1000;
+  const saasTotalCost = saasSubCost + setupCost;
+
+  // 3.3 Education — % receita bruta
+  const eduCost = -Math.abs(eduRevenue) * cfg.eduCostRate;
+
+  // 3.4 Customer Success — CX Analyst por clientes CaaS
+  const numCX = Math.max(0, Math.ceil(caasClients / Math.max(1, cfg.cxAnalystClientsPerOne)));
+  const csCost = -(numCX * cfg.cxAnalystSalary) / 1000;
+
+  // 3.5 Expansão — % receita bruta
+  const expansaoCost = -Math.abs(expansaoRevenue) * cfg.expansaoCostRate;
+
+  // 3.6 Tax — % receita bruta
+  const taxCost = -Math.abs(taxRevenue) * cfg.taxCostRate;
+
+  const total = caasCost + saasTotalCost + eduCost + csCost + expansaoCost + taxCost;
+
+  return { caas: caasCost, saas: saasTotalCost, education: eduCost, customerSuccess: csCost, expansao: expansaoCost, tax: taxCost, total };
+}
+
 // ─── SG&A ───
 
 // Helper: get value from SGA item (array or scalar) for a given month
