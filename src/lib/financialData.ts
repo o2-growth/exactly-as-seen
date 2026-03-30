@@ -360,6 +360,8 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   },
   // COS Config (new)
   cosConfig: { ...DEFAULT_COS_CONFIG },
+  // Editable Selic monthly rate (default 1.17%)
+  selicMonthly: 0.0117,
   // Lucro Presumido — tax config per BU
   buTaxConfigs: [
     { buKey: 'caas',  tipoReceita: 'servico', aliquotaIss: 5 },
