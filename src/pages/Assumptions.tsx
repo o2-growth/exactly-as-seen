@@ -881,11 +881,13 @@ export default function Assumptions() {
                                           value={rowApplyPct[rowKey] ?? 6}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          disabled={!editing}
                                         >
                                           Aplicar
                                         </button>
