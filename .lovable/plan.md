@@ -1,27 +1,19 @@
 
 
-# Replicar crescimento % do ticket até 2030
+# Corrigir botão "Aplicar" do Ticket — leitura/escrita ignorando editState
 
 ## Problema
-`handleApplyTicketGrowth` aplica o crescimento apenas ao ano selecionado. Precisa propagar até 2030, igual ao que já funciona para número de clientes em `handleApplyRow`.
+O `handleApplyTicketGrowth` atualiza corretamente o `editState`, mas a **exibição dos valores do ticket** (linha 1022) lê de `assumptions` em vez de `data` (que aponta para `editState` quando em modo de edição). Resultado: o estado é atualizado internamente mas a UI não reflete a mudança, parecendo que o botão "não funciona".
+
+Além disso, o `onCommit` do input manual do ticket (linhas 1036-1060) também lê/escreve direto em `assumptions`, ignorando `editState`.
 
 ## Solução
-Modificar `handleApplyTicketGrowth` para iterar de `year` até 2030, encadeando o valor do ticket de Dezembro como base de Janeiro do ano seguinte. Manter `prev` como float para precisão, arredondando apenas o valor salvo.
+Alterar 3 pontos no bloco de ticket mensal (~linhas 1019-1065):
 
-### Lógica
-```text
-Para cada ano Y de [year ... 2030]:
-  - Se Y > year: baseTicket = prev (float do último mês do ano anterior)
-  - Para cada mês M de 0..11:
-    - Se histórico: prev = valor atual do mês
-    - Senão: prev = prev * (1 + rate), yearArr[m] = round(prev)
-  - Salva monthlyTickets[prodKey][Y] = yearArr
-```
+1. **Linha 1022**: Trocar `assumptions.monthlyTickets` → `data.monthlyTickets`
+2. **Linhas 1036-1038**: Trocar `assumptions.monthlyTickets` → `data.monthlyTickets` no `onCommit`
+3. **Linha 1054**: Usar a mesma lógica de guarda `if (editing) setEditState(...) else setAssumptions(...)` no `onCommit`
 
-### Alteração
-- `src/pages/Assumptions.tsx` — `handleApplyTicketGrowth` (~L630-671):
-  - Adicionar loop `for (const y of YEARS.filter(y => y >= year))`
-  - Manter `prev` (baseTicket) como float entre anos
-  - Usar `prev = prev * (1 + rate)` e `yearArr[m] = Math.round(prev)` (sem reatribuir o arredondado ao prev)
-  - Acumular todos os `monthlyTickets` overrides e aplicar no updater de uma vez
+## Arquivo alterado
+- `src/pages/Assumptions.tsx` — bloco de ticket mensal (~linhas 1022-1065)
 
