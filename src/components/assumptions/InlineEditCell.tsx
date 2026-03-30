@@ -6,9 +6,10 @@ interface InlineEditCellProps {
   format?: (v: number) => string;
   className?: string;
   step?: number;
+  disabled?: boolean;
 }
 
-export function InlineEditCell({ value, onChange, format, className = '', step = 1 }: InlineEditCellProps) {
+export function InlineEditCell({ value, onChange, format, className = '', step = 1, disabled = false }: InlineEditCellProps) {
   const [editing, setEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
