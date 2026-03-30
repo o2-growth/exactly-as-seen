@@ -830,7 +830,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       financialResult = jurosChEsp + iof + jurosEmp + boleto + antecipacao + recFinanceira;
     } else {
       // BaaS boleto only for later years
-      const boleto = -(baasClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
+      const baasClientsForBoleto = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
+      const boleto = -(baasClientsForBoleto * revenueTaxes.baasBoletoPerClient) / 1000;
       financialResult = boleto;
     }
 
