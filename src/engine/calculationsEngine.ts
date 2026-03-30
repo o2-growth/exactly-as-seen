@@ -860,7 +860,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const totalDebtPmt = debt.loans + debt.suppliers;
 
     // Capex
-    const capex = calcMonthlyCapex(m, year, cogs.saas);
+    const capex = calcMonthlyCapex(m, year, cosBreakdown.saas);
     const totalCapex = capex.software + capex.realestate;
 
     // Final result
