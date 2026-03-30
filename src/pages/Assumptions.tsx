@@ -1059,7 +1059,8 @@ export default function Assumptions() {
                                     <div className="flex items-center gap-4">
                                       <p className="text-xs font-semibold text-negative">Churn (clientes/mês) — {selectedYear}</p>
                                       <button
-                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                        disabled={!editing}
                                         onClick={e => {
                                           e.stopPropagation();
                                           setAssumptions(prev => ({
