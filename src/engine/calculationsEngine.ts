@@ -577,7 +577,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let annualEBITDA = 0, annualFinancial = 0, annualEBT = 0, annualTaxes = 0, annualNI = 0;
   let annualDebt = 0, annualCapex = 0, annualFinal = 0;
 
-  let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0 };
+  let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0, tax: 0 };
   let hcD = { salaries: 0, benefits: 0 };
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
   let taxD = { irpj: 0, csll: 0 };
