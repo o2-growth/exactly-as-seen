@@ -60,6 +60,8 @@ export interface Assumptions {
   monthlyTickets?: Partial<Record<TicketKey, Partial<Record<Year, number[]>>>>;
   // Monthly client overrides — direct per-month client counts that bypass geometric interpolation
   monthlyClientOverrides?: Partial<Record<TicketKey, Partial<Record<Year, (number | null)[]>>>>;
+  // Flags which monthly client overrides were manually edited by the user vs auto-generated previews
+  manualMonthlyClientOverrideFlags?: Partial<Record<TicketKey, Partial<Record<Year, boolean[]>>>>;
   // Monthly churn rates per sub-product per year (annual % stored, converted to monthly in engine)
   monthlyChurnRates?: Partial<Record<TicketKey, Partial<Record<Year, number>>>>;
   churnCaas: number;
@@ -279,6 +281,7 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     taxRT: 3500,
     taxDTC: 2500,
   },
+  manualMonthlyClientOverrideFlags: {},
   churnCaas: 5,
   churnSaas: 5,
   churnBaas: 0,
