@@ -1311,17 +1311,7 @@ export default function Assumptions() {
                                                 newRates[y] = base;
                                               }
                                             }
-                                            const updater = (prev: typeof assumptions) => ({
-                                              ...prev,
-                                              monthlyChurnRates: {
-                                                ...(prev.monthlyChurnRates ?? {}),
-                                                [prodKey]: {
-                                                  ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
-                                                  ...newRates,
-                                                },
-                                              },
-                                            });
-                                            if (editing) setEditState(updater); else setAssumptions(updater);
+                                            reprojectWithChurn(prodKey, newRates);
                                           }}
                                         >
                                           Aplicar
