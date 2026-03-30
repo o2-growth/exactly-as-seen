@@ -180,6 +180,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * getTicketForMonth('saasOxy', month, year, assumptions);
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * getTicketForMonth('saasOxyGenio', month, year, assumptions);
+  const saasOxyGenioEsp = getMonthlyClientCount('saas', 'oxyGenioEsp', month, year, assumptions) * getTicketForMonth('saasOxyGenioEsp', month, year, assumptions);
   // SaaS setup: sum of absolute client counts from 5 products
   const setupSources: [string, string][] = [
     ['caas', 'enterprise'], ['caas', 'corporate'],
@@ -190,7 +191,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
     setupNewClients += getMonthlyClientCount(bu, prod, month, year, assumptions);
   }
   const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
-  const saasTotal = saasOxy + saasOxyGenio + saasSetup;
+  const saasTotal = saasOxy + saasOxyGenio + saasOxyGenioEsp + saasSetup;
 
   const eduDonoCfo = getMonthlyClientCount('education', 'donoCfo', month, year, assumptions) * getTicketForMonth('educationDonoCFO', month, year, assumptions);
   const eduTotal = eduDonoCfo;
@@ -214,6 +215,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
     caas: caasTotal * scenarioMult,
     saasOxy: saasOxy * scenarioMult,
     saasOxyGenio: saasOxyGenio * scenarioMult,
+    saasOxyGenioEsp: saasOxyGenioEsp * scenarioMult,
     saasSetup: saasSetup * scenarioMult,
     saas: saasTotal * scenarioMult,
     education: eduTotal * scenarioMult,
@@ -707,7 +709,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       saasOxyGenio: rev.saasOxyGenio / 1000,
       saasSetup: rev.saasSetup / 1000,
       saasParceiros: 0,
-      saasOxyGenioEsp: 0,
+      saasOxyGenioEsp: rev.saasOxyGenioEsp / 1000,
       educationDonoCFO: rev.educationDonoCfo / 1000,
       educationEN: 0,
       educationFR: 0,
