@@ -1137,13 +1137,14 @@ export default function Assumptions() {
                                         disabled={!editing}
                                         onClick={e => {
                                           e.stopPropagation();
-                                          setAssumptions(prev => ({
+                                          const updater = (prev: typeof assumptions) => ({
                                             ...prev,
                                             churnNotApplicable: {
                                               ...(prev.churnNotApplicable ?? {}),
                                               [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
                                             },
-                                          }));
+                                          });
+                                          if (editing) setEditState(updater); else setAssumptions(updater);
                                         }}
                                       >
                                         N/A
