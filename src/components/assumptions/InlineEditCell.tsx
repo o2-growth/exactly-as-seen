@@ -35,9 +35,9 @@ export function InlineEditCell({ value, onChange, format, className = '', step =
   if (!editing) {
     return (
       <span
-        className={`cursor-pointer hover:bg-primary/10 rounded px-1.5 py-0.5 transition-colors tabular-nums ${className}`}
-        onClick={() => setEditing(true)}
-        title="Clique para editar"
+        className={`${disabled ? '' : 'cursor-pointer hover:bg-primary/10'} rounded px-1.5 py-0.5 transition-colors tabular-nums ${className}`}
+        onClick={() => { if (!disabled) setEditing(true); }}
+        title={disabled ? undefined : "Clique para editar"}
       >
         {format ? format(value) : value.toLocaleString('pt-BR')}
       </span>
