@@ -107,6 +107,21 @@ export function getMonthlyClients(
   ticketPrices?: Partial<Record<SubProductKey, number>>,
   monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
 ): number[] {
+  // Setup = sum of absolute client counts from 5 source products
+  if (key === 'saasSetup') {
+    const sources: SubProductKey[] = [
+      'caasEnterprise', 'caasCorporate',
+      'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp',
+    ];
+    return Array.from({ length: 12 }, (_, m) => {
+      let total = 0;
+      for (const src of sources) {
+        const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
+        total += Math.round(srcMonthly[m]);
+      }
+      return total;
+    });
+  }
   // Determine the ticket price for this sub-product
   const STATIC_TICKET_FALLBACK: Record<SubProductKey, number> = {
     caasAssessoria:   25000,
