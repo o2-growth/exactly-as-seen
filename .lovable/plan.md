@@ -1,42 +1,27 @@
 
 
-# Corrigir cálculo de crescimento para números pequenos
+# Propagar crescimento % até 2030 ao aplicar por linha
 
 ## Problema
-Quando o usuário define Apr-Jun = 3 e aplica 6% de crescimento, o sistema usa `Math.round` em cada passo e **reatribui o valor arredondado como base** do próximo mês. Resultado: `3 × 1.06 = 3.18 → round → 3`, e `prev` volta para 3. O crescimento nunca acumula.
+`handleApplyRow` aplica o crescimento apenas ao ano selecionado. O usuário espera que ao definir 6% de crescimento a partir de Jul/2025, o modelo progrida automaticamente até Dez/2030.
 
-Antes de clicar "Aplicar", os meses Jul-Dec usam **interpolação geométrica** entre o último mês histórico e o target de Dezembro (que pode ser alto, ex: 80), gerando saltos como 3→5→9→15.
+## Nota
+`handleApplyAll` já itera todos os anos (`for (const y of YEARS)`), então já funciona corretamente. A correção é necessária apenas em `handleApplyRow`.
 
 ## Solução
-Manter `prev` como **float** (sem arredondar) durante o loop de crescimento. Arredondar apenas o valor salvo em `projected[m]`, sem reatribuir o arredondado ao `prev`.
+Modificar `handleApplyRow` para iterar de `year` até 2030 (inclusive), encadeando o `prev` do último mês de cada ano como base do primeiro mês do ano seguinte.
 
-### Antes (bug):
-```ts
-const next = Math.round(prev * (1 + rate - churn));
-projected[m] = next;
-prev = next; // ← prev perde a fração
+### Lógica
+```text
+Para cada ano Y de [year ... 2030]:
+  - Se Y > year: prev = último valor projetado do ano anterior
+  - Para cada mês M de 0..11:
+    - Se histórico: prev = base[m]
+    - Se manual flag: preserva valor, prev = manual
+    - Senão: prev *= (1 + rate - churn), projected[m] = round(prev)
+  - Salva overrides[key][Y] e decTarget[key][Y]
 ```
 
-### Depois (fix):
-```ts
-prev = prev * (1 + rate - churn); // prev mantém precisão float
-projected[m] = Math.max(0, Math.round(prev));
-// prev NÃO é reatribuído ao arredondado
-```
-
-Com 6% a partir de 3: Jul=3.18→3, Aug=3.37→3, Sep=3.57→4, Oct=3.78→4, Nov=4.01→4, Dec=4.25→4.
-Crescimento gradual e realista.
-
-Para overrides manuais, o `prev` assume o valor manual (float):
-```ts
-prev = manual; // usa o valor manual como base float para próximo mês
-```
-
-## Alterações
-- `src/pages/Assumptions.tsx`:
-  - `handleApplyRow` (~L548-552): separar `prev` float de `projected[m]` arredondado
-  - `handleApplyAll` (~L478-492): mesma correção
-
-## Arquivo alterado
-- `src/pages/Assumptions.tsx` — 2 blocos de ~5 linhas cada
+### Alteração
+- `src/pages/Assumptions.tsx` — `handleApplyRow` (~L546-611): envolver o bloco de projeção num loop `for (const y of yearsToApply)` onde `yearsToApply = YEARS.filter(y => y >= year)`, acumulando overrides e decTargets para todos os anos, similar ao que `handleApplyAll` já faz.
 
