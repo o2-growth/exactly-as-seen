@@ -1521,7 +1521,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analyst (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.processAnalystSalary} disabled={!editing} onChange={e => updateCos('processAnalystSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.processAnalystSalary} disabled={!editing} onChange={v => updateCos('processAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Head of Data — 1 a cada N novos/mês</label>
