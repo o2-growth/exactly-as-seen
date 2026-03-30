@@ -119,7 +119,7 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
   const keyMap: Record<string, string> = {
     'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
     'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
-    'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio',
+    'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio', 'saas.oxyGenioEsp': 'saasOxyGenioEsp',
     'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
     'tax.at': 'taxAT', 'tax.gpt': 'taxGPT', 'tax.rct': 'taxRCT',
     'tax.rt': 'taxRT', 'tax.dtc': 'taxDTC',
