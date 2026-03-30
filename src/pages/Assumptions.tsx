@@ -1465,6 +1465,7 @@ export default function Assumptions() {
                     setAssumptions({ ...assumptions, eduExpansaoTeamRate: v });
                   }
                 }}
+                disabled={!editing}
               />
               <span className="text-xs text-muted-foreground">% do faturamento</span>
             </div>
