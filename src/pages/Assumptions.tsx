@@ -1186,17 +1186,33 @@ export default function Assumptions() {
                                             disabled={!editing}
                                             onClick={e => {
                                               e.stopPropagation();
-                                              const pct = rowChurnPct[prodKey] ?? (() => {
-                                                const rate = getChurnMonthly(prodKey, data, selectedYear);
-                                                return Math.round(rate * 12 * 100 * 10) / 10;
-                                              })();
+                                              const growthPct = rowChurnPct[prodKey] ?? 0;
+                                              const growthRate = growthPct / 100;
+                                              // Get current churn rate for this product/year as base
+                                              const currentChurnAnnual = data.monthlyChurnRates?.[prodKey]?.[selectedYear]
+                                                ?? (() => {
+                                                  const r = getChurnMonthly(prodKey, data, selectedYear);
+                                                  return Math.round(r * 12 * 100 * 10) / 10;
+                                                })();
+                                              // Propagate churn with growth until 2030
+                                              const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                              const newRates: Record<number, number> = {};
+                                              let base = currentChurnAnnual;
+                                              for (const y of yearsToApply) {
+                                                if (y === selectedYear) {
+                                                  newRates[y] = base;
+                                                } else {
+                                                  base = Math.round(base * (1 + growthRate) * 100) / 100;
+                                                  newRates[y] = base;
+                                                }
+                                              }
                                               const updater = (prev: typeof assumptions) => ({
                                                 ...prev,
                                                 monthlyChurnRates: {
                                                   ...(prev.monthlyChurnRates ?? {}),
                                                   [prodKey]: {
                                                     ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
-                                                    [selectedYear]: pct,
+                                                    ...newRates,
                                                   },
                                                 },
                                               });
