@@ -1174,66 +1174,6 @@ export default function Assumptions() {
                 ))}
 
 
-                {/* ── Totais: Novos Clientes e Churn ── */}
-                {(() => {
-                  const allProducts = CLIENTS_ROWS.flatMap(g => g.items.filter(r => r.dataKey));
-                  const totalNew = Array(12).fill(0);
-                  const totalChurn = Array(12).fill(0);
-                  for (const row of allProducts) {
-                    const rowKey = row.dataKey!;
-                    const churnRate = getChurnMonthly(rowKey, data, selectedYear);
-                    const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
-                    for (let i = 0; i < 12; i++) {
-                      const prev = i === 0
-                        ? (selectedYear === 2025 ? 0 : selectedYear === 2026
-                          ? Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11])
-                          : Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]))
-                        : monthly[i - 1];
-                      totalNew[i] += Math.max(0, monthly[i] - prev);
-                      totalChurn[i] += Math.round(prev * churnRate);
-                    }
-                  }
-                  return (
-                    <>
-                      <tr className="bg-primary/5 border-b border-border font-bold">
-                        <td className="p-2 text-xs text-emerald-500 italic">Novos Clientes</td>
-                        {MONTHS.map((_, i) => {
-                          const cutoff = selectedYear === 2026 && i === 2;
-                          return (
-                            <React.Fragment key={i}>
-                              <td className={`text-right px-1 py-1 tabular-nums text-xs font-bold text-emerald-500${cutoff ? ' border-l-2 border-primary/40' : ''}`}>
-                                {totalNew[i] || '—'}
-                              </td>
-                              {showGrowthPct && <td />}
-                            </React.Fragment>
-                          );
-                        })}
-                        <td className="text-right px-2 py-1 tabular-nums text-xs font-bold text-emerald-500 bg-primary/5">
-                          {totalNew.reduce((s: number, v: number) => s + v, 0).toLocaleString('pt-BR')}
-                        </td>
-                        {showGrowthPct && <td />}
-                      </tr>
-                      <tr className="bg-primary/5 border-b border-border font-bold">
-                        <td className="p-2 text-xs text-negative italic">Churn</td>
-                        {MONTHS.map((_, i) => {
-                          const cutoff = selectedYear === 2026 && i === 2;
-                          return (
-                            <React.Fragment key={i}>
-                              <td className={`text-right px-1 py-1 tabular-nums text-xs font-bold text-negative${cutoff ? ' border-l-2 border-primary/40' : ''}`}>
-                                {totalChurn[i] || '—'}
-                              </td>
-                              {showGrowthPct && <td />}
-                            </React.Fragment>
-                          );
-                        })}
-                        <td className="text-right px-2 py-1 tabular-nums text-xs font-bold text-negative bg-primary/5">
-                          {totalChurn.reduce((s: number, v: number) => s + v, 0).toLocaleString('pt-BR')}
-                        </td>
-                        {showGrowthPct && <td />}
-                      </tr>
-                    </>
-                  );
-                })()}
               </tbody>
             </table>
           </div>
