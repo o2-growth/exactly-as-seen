@@ -1537,27 +1537,27 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Diretor (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} disabled={!editing} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} disabled={!editing} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CFO + FP&A / squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} disabled={!editing} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Clientes CaaS/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} disabled={!editing} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} disabled={!editing} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Clientes/CS</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} disabled={!editing} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
@@ -1574,15 +1574,15 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Impl/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} disabled={!editing} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Setups/squad/mês</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} disabled={!editing} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Líder (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} disabled={!editing} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
