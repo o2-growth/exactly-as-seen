@@ -37,6 +37,7 @@ import { namedEmployees as hcNamedEmployees, payrollFaturamento, payrollGrossRev
 import { historicalCosts, historicalExpenses, historicalExpenseItems, historicalFinancial, HISTORICAL_PERIODS } from '@/data/historicalData';
 import { PnlNode } from '@/lib/pnlData';
 import { ExpandableMonthTable } from '@/components/assumptions/ExpandableMonthRow';
+import { CurrencyInput } from '@/components/assumptions/CurrencyInput';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
