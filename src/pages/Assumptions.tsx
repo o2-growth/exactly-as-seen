@@ -910,10 +910,26 @@ export default function Assumptions() {
                               }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              const updater = (prev: typeof assumptions) => ({
-                                ...prev,
-                                tickets: { ...prev.tickets, [prodKey]: val },
-                              });
+                              // Update flat ticket AND project all months from selectedYear to 2030
+                              const updater = (prev: typeof assumptions) => {
+                                const newMonthlyTickets = { ...(prev.monthlyTickets ?? {}) };
+                                const prevProdTickets = { ...(newMonthlyTickets[prodKey] ?? {}) };
+                                for (const y of YEARS.filter(yr => yr >= selectedYear)) {
+                                  const yearArr = prevProdTickets[y] ? [...prevProdTickets[y]!] : Array(12).fill(val);
+                                  for (let m = 0; m < 12; m++) {
+                                    if (!isHistorical(y, m)) {
+                                      yearArr[m] = val;
+                                    }
+                                  }
+                                  prevProdTickets[y] = yearArr;
+                                }
+                                newMonthlyTickets[prodKey] = prevProdTickets;
+                                return {
+                                  ...prev,
+                                  tickets: { ...prev.tickets, [prodKey]: val },
+                                  monthlyTickets: newMonthlyTickets,
+                                };
+                              };
                               if (editing) setEditState(updater); else setAssumptions(updater);
                             };
                             return (
