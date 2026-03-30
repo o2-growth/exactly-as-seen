@@ -1,19 +1,30 @@
 
 
-# Corrigir botão "Aplicar" do Ticket — leitura/escrita ignorando editState
+# Atualizar labels e cálculo anual de clientes nas categorias de receita
 
-## Problema
-O `handleApplyTicketGrowth` atualiza corretamente o `editState`, mas a **exibição dos valores do ticket** (linha 1022) lê de `assumptions` em vez de `data` (que aponta para `editState` quando em modo de edição). Resultado: o estado é atualizado internamente mas a UI não reflete a mudança, parecendo que o botão "não funciona".
+## Alterações
 
-Além disso, o `onCommit` do input manual do ticket (linhas 1036-1060) também lê/escreve direto em `assumptions`, ignorando `editState`.
+### 1. "Clientes por ano" → soma dos 12 meses (não target de Dezembro)
+**Linha ~932**: Trocar o valor exibido de `assumptions.subProductClients[prodKey]?.[y]` para a **soma dos 12 meses** do array de overrides/projeções daquele ano. Tornar esse campo **somente leitura** (exibição, não input), pois é um valor derivado.
 
-## Solução
-Alterar 3 pontos no bloco de ticket mensal (~linhas 1019-1065):
+### 2. Renomear labels
+- **Linha ~924**: `"Clientes por ano (target fim de ano)"` → `"Clientes por ano (soma)"`
+- **Linha ~945**: `"Clientes mensais"` → `"Novos clientes mensais"`
+- **Linha ~1096**: `"Receita Bruta (R$/mês)"` → `"Nova Receita adicionada (R$/mês)"`
 
-1. **Linha 1022**: Trocar `assumptions.monthlyTickets` → `data.monthlyTickets`
-2. **Linhas 1036-1038**: Trocar `assumptions.monthlyTickets` → `data.monthlyTickets` no `onCommit`
-3. **Linha 1054**: Usar a mesma lógica de guarda `if (editing) setEditState(...) else setAssumptions(...)` no `onCommit`
+### 3. Aplicar para todas as categorias/subcategorias
+Estas alterações estão dentro do bloco que itera `filteredProducts`, então se aplicam automaticamente a todos os subprodutos.
+
+### Lógica da soma anual
+```ts
+// Para cada ano, somar os 12 meses do array de clientes mensais
+const monthlyArr = data.monthlyClientOverrides?.[prodKey]?.[y];
+const baseMonthly = model.years[y]?.monthlyData;
+const sum = Array.from({length: 12}, (_, i) => 
+  monthlyArr?.[i] ?? baseMonthly?.[i]?.clients?.[prodKey] ?? 0
+).reduce((a, b) => a + b, 0);
+```
 
 ## Arquivo alterado
-- `src/pages/Assumptions.tsx` — bloco de ticket mensal (~linhas 1022-1065)
+- `src/pages/Assumptions.tsx` — 4 alterações de texto + 1 mudança de lógica (input → span com soma)
 
