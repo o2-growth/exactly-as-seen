@@ -720,10 +720,30 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // Net revenue
     const netRev = grossRev + ded;
 
-    // COGS (pass BaaS clients for BaaS COGS calculation)
-    const baasClientsM = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
-    const cogs = calcMonthlyCOGS(m, year, revenueScale, baasClientsM);
-    const totalCogs = cogs.caas + cogs.customerService + cogs.saas + cogs.education + cogs.baas;
+    // CaaS clients for COS calc
+    const caasClientsForCOS = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
+
+    // SaaS subscription clients (Oxy + OxyGenio + OxyGenioEsp)
+    const saasSubClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
+      + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
+
+    // New Setup clients = new CaaS Enterprise/Corporate + new SaaS subscriptions this month
+    const prevCaasEnt = m > 0 ? getMonthlyClientCount('caas', 'enterprise', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'enterprise', 11, year - 1, assumptions) : 0);
+    const prevCaasCorp = m > 0 ? getMonthlyClientCount('caas', 'corporate', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'corporate', 11, year - 1, assumptions) : 0);
+    const prevSaasOxy = m > 0 ? getMonthlyClientCount('saas', 'oxy', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxy', 11, year - 1, assumptions) : 0);
+    const prevSaasOG = m > 0 ? getMonthlyClientCount('saas', 'oxyGenio', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxyGenio', 11, year - 1, assumptions) : 0);
+    const newSetupClients = Math.max(0,
+      (getMonthlyClientCount('caas', 'enterprise', m, year, assumptions) - prevCaasEnt) +
+      (getMonthlyClientCount('caas', 'corporate', m, year, assumptions) - prevCaasCorp) +
+      (getMonthlyClientCount('saas', 'oxy', m, year, assumptions) - prevSaasOxy) +
+      (getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions) - prevSaasOG)
+    );
+
+    // COS (Cost of Service) via config
+    const cosBreakdown = calcCOSFromConfig(m, year, caasClientsForCOS, saasSubClientsM, newSetupClients, eduRev, baasRev, taxRev, assumptions);
+    const totalCogs = cosBreakdown.total;
 
     // Gross profit
     const gp = netRev + totalCogs;
@@ -735,13 +755,11 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const totalComm = commCaas + commSaas + commEdu;
 
     // Marketing (CAC × new clients + HC costs)
-    // Item 6: Use per-product CAC when available
     const totalClientsM = calcTotalClients(m, year, assumptions);
     const prevClients = m > 0 ? calcTotalClients(m - 1, year, assumptions) :
       (year > 2025 ? calcTotalClients(11, year - 1, assumptions) : 0);
     const newClients = Math.max(0, totalClientsM - prevClients);
 
-    // Item 6: Per-product CAC (use cacPerProduct if set, fallback to sector CAC)
     const cpc = assumptions.cacPerProduct;
     const cacCaas = cpc?.caasAssessoria ?? cacPerClient.caas;
     const cacSaas = cpc?.saasOxy ?? cacPerClient.saas;
@@ -752,19 +770,12 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const mktSaas = (-newClients * 0.35 * cacSaas) / 1000;
     const mktEdu = (-newClients * 0.15 * cacEdu) / 1000;
     const mktBaas = (-newClients * 0.10 * cacBaasVal) / 1000;
-    // Item 5: PR and Events monthly costs
     const mktPR = -(assumptions.marketingPR ?? 0) / 1000;
     const mktEvents = -(assumptions.marketingEvents ?? 0) / 1000;
     const totalMkt = mktCaas + mktSaas + mktEdu + mktBaas + mktPR + mktEvents;
 
-    // Item 8: 15% cost on Education/Expansão revenue (added to COGS)
-    const eduExpRate = assumptions.eduExpansaoTeamRate ?? 0;
-    const eduTeamCost = -Math.abs(eduRev) * eduExpRate;
-    const expansaoTeamCost = -Math.abs(baasRev) * eduExpRate;
-    const eduExpTeamTotal = eduTeamCost + expansaoTeamCost;
-
-    // Contribution margin
-    const cm = gp + totalComm + totalMkt + eduExpTeamTotal;
+    // Contribution margin (eduExpTeamTotal now included in COS)
+    const cm = gp + totalComm + totalMkt;
 
     // Calculate client counts by BU for headcount ratios
     const caasClientsM = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
