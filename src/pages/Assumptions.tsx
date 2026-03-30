@@ -485,9 +485,8 @@ export default function Assumptions() {
               projected[m] = manual;
               prev = manual;
             } else {
-              const next = Math.max(0, Math.round(prev * (1 + arr[m] - churnRate)));
-              projected[m] = next;
-              prev = next;
+              prev = prev * (1 + arr[m] - churnRate);
+              projected[m] = Math.max(0, Math.round(prev));
             }
           }
           if (!overridesAccum[k]) overridesAccum[k] = {};
