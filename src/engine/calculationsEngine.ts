@@ -180,6 +180,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * getTicketForMonth('saasOxy', month, year, assumptions);
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * getTicketForMonth('saasOxyGenio', month, year, assumptions);
+  const saasOxyGenioEsp = getMonthlyClientCount('saas', 'oxyGenioEsp', month, year, assumptions) * getTicketForMonth('saasOxyGenioEsp', month, year, assumptions);
   // SaaS setup: sum of absolute client counts from 5 products
   const setupSources: [string, string][] = [
     ['caas', 'enterprise'], ['caas', 'corporate'],
