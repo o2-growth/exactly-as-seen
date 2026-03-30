@@ -154,6 +154,78 @@ export function getSubProductTaxRate(key: TicketKey, assumptions: Assumptions): 
 
 export type TicketKey = keyof Assumptions['tickets'];
 
+// ─── COS CONFIG (Premissas de Custos Variáveis 3.1–3.6) ───
+
+export interface CosConfig {
+  // 3.1 Custos CaaS — Squad por clientes CaaS
+  pfdClientsPerOne: number;    // Project Finance Director: 1 a cada N clientes CaaS
+  pfdSalary: number;
+  cfoClientsPerOne: number;    // CFO: 1 a cada N clientes CaaS
+  cfoSalary: number;
+  fpaClientsPerOne: number;    // FP&A Analyst: 1 a cada N clientes CaaS
+  fpaSalary: number;
+
+  // 3.2 Custos SaaS — Assinatura
+  devSrClientsPerOne: number;  // Dev Senior: 1 a cada N clientes SaaS assinatura
+  devSrSalary: number;
+  csClientsPerOne: number;     // Customer Success: 1 a cada N clientes SaaS assinatura
+  csSaaSalary: number;
+
+  // 3.2 Setup — Squad por novos clientes/mês
+  setupClientsPerSquad: number;      // 1 squad a cada N novos clientes/mês
+  dataAnalystPerSquad: number;       // Data Analysts por squad
+  dataAnalystSalary: number;
+  processAnalystPerSquad: number;    // Process Analysts por squad
+  processAnalystSalary: number;
+  headDataClientsPerOne: number;     // Head of Data: 1 a cada N novos clientes/mês
+  headDataSalary: number;
+
+  // 3.3 Education — % da receita bruta
+  eduCostRate: number;
+
+  // 3.4 Customer Success — CX Analyst por clientes CaaS
+  cxAnalystClientsPerOne: number;
+  cxAnalystSalary: number;
+
+  // 3.5 Expansão — % da receita bruta
+  expansaoCostRate: number;
+
+  // 3.6 Tax — % da receita bruta
+  taxCostRate: number;
+}
+
+export const DEFAULT_COS_CONFIG: CosConfig = {
+  // 3.1 CaaS
+  pfdClientsPerOne: 100,
+  pfdSalary: 30000,
+  cfoClientsPerOne: 15,
+  cfoSalary: 20000,
+  fpaClientsPerOne: 7.5,
+  fpaSalary: 8000,
+  // 3.2 SaaS Assinatura
+  devSrClientsPerOne: 100,
+  devSrSalary: 10000,
+  csClientsPerOne: 100,
+  csSaaSalary: 5000,
+  // 3.2 Setup
+  setupClientsPerSquad: 32,
+  dataAnalystPerSquad: 2,
+  dataAnalystSalary: 8000,
+  processAnalystPerSquad: 1,
+  processAnalystSalary: 5000,
+  headDataClientsPerOne: 64,
+  headDataSalary: 15000,
+  // 3.3 Education
+  eduCostRate: 0.15,
+  // 3.4 Customer Success
+  cxAnalystClientsPerOne: 100,
+  cxAnalystSalary: 5000,
+  // 3.5 Expansão
+  expansaoCostRate: 0.15,
+  // 3.6 Tax
+  taxCostRate: 0.15,
+};
+
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   caasClients: { 2025: 167, 2026: 272, 2027: 768, 2028: 2136, 2029: 4171, 2030: 6472 },
   saasClients: { 2025: 226, 2026: 631, 2027: 2293, 2028: 7992, 2029: 19471, 2030: 37918 },
