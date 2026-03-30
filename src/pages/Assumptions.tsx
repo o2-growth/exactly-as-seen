@@ -470,14 +470,20 @@ export default function Assumptions() {
           }
           yearRates[k] = arr;
 
-          // Build sequential projection to get monthly values with growth
+          // Build sequential projection — preserve existing manual overrides
           const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
           const churnRate = getChurnMonthly(k, data, y);
+          const existingOverrides = data.monthlyClientOverrides?.[k]?.[y];
           let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
           const projected: (number | null)[] = Array(12).fill(null);
           for (let m = 0; m < 12; m++) {
             if (isHistorical(y, m)) {
               prev = Math.round(base[m]);
+            } else if (existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+              // Preserve manually entered value and use it as base for next month
+              const manual = existingOverrides[m]!;
+              projected[m] = manual;
+              prev = manual;
             } else {
               const next = Math.max(0, Math.round(prev * (1 + arr[m] - churnRate)));
               projected[m] = next;
@@ -525,14 +531,20 @@ export default function Assumptions() {
       if (!isHistorical(year, m)) arr[m] = rate;
     }
 
-    // Build sequential projection with growth rates and save as full overrides
+    // Build sequential projection — preserve existing manual overrides
     const base = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
     const churnRate = getChurnMonthly(key, data, year);
+    const existingOverrides = data.monthlyClientOverrides?.[key]?.[year];
     let prev = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
     const projected: (number | null)[] = Array(12).fill(null);
     for (let m = 0; m < 12; m++) {
       if (isHistorical(year, m)) {
         prev = Math.round(base[m]);
+      } else if (existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+        // Preserve manually entered value and use it as base for next month
+        const manual = existingOverrides[m]!;
+        projected[m] = manual;
+        prev = manual;
       } else {
         const next = Math.max(0, Math.round(prev * (1 + arr[m] - churnRate)));
         projected[m] = next;
