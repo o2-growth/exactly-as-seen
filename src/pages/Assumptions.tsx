@@ -1080,6 +1080,7 @@ export default function Assumptions() {
                                           value={ticketVal}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
+                                          disabled={!editing}
                                         />
                                       </div>
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
