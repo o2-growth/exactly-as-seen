@@ -1,37 +1,30 @@
 
 
-# Automatizar Setup = soma dos novos clientes de 5 produtos
+# Corrigir cálculo do Setup: usar soma absoluta, não deltas
 
-## Produtos que entram na soma
-- Enterprise (`caasEnterprise`)
-- Corporate (`caasCorporate`)
-- Oxy (`saasOxy`)
-- Oxy + Gênio (`saasOxyGenio`)
-- Oxy + Gênio + Especialista (`saasOxyGenioEsp`)
+## Problema
+O código atual calcula Setup como a soma dos **deltas mensais** (novos clientes = mês atual - mês anterior) dos 5 produtos. Isso dá valores muito pequenos (ex: 3 em abril). O correto é que Setup = soma dos **valores absolutos de clientes** dos 5 produtos naquele mês.
 
-## Alterações
+Exemplo abril: Enterprise(~10) + Corporate(~5) + Oxy(~25) + OxyGenio(~8) + OxyGenioEsp(~5) = ~53.
 
-### 1. `src/engine/calculationsEngine.ts`
-Criar helper `getNewClientsInMonth(subKey, month, year, assumptions)` que calcula `Math.max(0, clientesMêsAtual - clientesMêsAnterior)` para um subproduto.
+## Alteração
 
-Setup mensal = soma dos novos clientes dos 5 produtos acima:
-```text
-setup[m] = newClients('caasEnterprise', m) 
-         + newClients('caasCorporate', m) 
-         + newClients('saasOxy', m) 
-         + newClients('saasOxyGenio', m) 
-         + newClients('saasOxyGenioEsp', m)
+### `src/engine/calculationsEngine.ts` (linhas 183-196)
+
+Substituir a lógica de deltas pela soma direta:
+
+```ts
+// SaaS setup: sum of absolute client counts from 5 products
+const setupSources: [string, string][] = [
+  ['caas', 'enterprise'], ['caas', 'corporate'],
+  ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
+];
+let setupNewClients = 0;
+for (const [bu, prod] of setupSources) {
+  setupNewClients += getMonthlyClientCount(bu, prod, month, year, assumptions);
+}
+const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
 ```
 
-Janeiro compara com dezembro do ano anterior. Valores negativos (perda de clientes) são ignorados (`Math.max(0, ...)`).
-
-### 2. `src/pages/Assumptions.tsx`
-Tornar a linha de clientes do Setup **somente leitura** — o valor é derivado, não editável.
-
-### 3. Defaults
-Ignorar valores fixos de `saasSetupClients` em `modelData.ts` para anos projetados — usar sempre o cálculo dinâmico.
-
-## Resultado
-- Setup sempre reflete a soma dos novos clientes dos 5 produtos
-- Qualquer mudança em Enterprise, Corporate, Oxy, Oxy+Gênio ou Oxy+Gênio+Especialista atualiza Setup automaticamente
+Remove o cálculo de `prev` e `Math.max(0, curr - prev)`. Simplesmente soma os clientes dos 5 produtos no mês.
 
