@@ -24,7 +24,7 @@ function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: n
 }
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig } from '@/lib/financialData';
+import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG } from '@/lib/financialData';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
 import { Lock, Unlock, Save, X, RotateCcw, Scale, Receipt, Landmark, Info, BadgePercent, UserCheck, Pencil, ChevronDown, ChevronRight, Plus } from 'lucide-react';
@@ -1342,417 +1342,303 @@ export default function Assumptions() {
         {/* ─── BLOCO 3: COS (Cost of Service) ─── */}
         <TabsContent value="cos" className="space-y-6 mt-4">
 
-          {/* Custo Equipe Education/Expansão */}
-          <div className="gradient-card p-5 space-y-4">
-            <h3 className="text-sm font-semibold">Custos Operacionais Diretos</h3>
-            <div className="flex items-center gap-3">
-              <label className="text-xs text-muted-foreground whitespace-nowrap">Custo Equipe Education/Expansão (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                value={((data.eduExpansaoTeamRate ?? 0.15) * 100).toFixed(0)}
-                onChange={e => {
-                  const v = (Number(e.target.value) || 0) / 100;
-                  if (editing) {
-                    setEditState(prev => ({ ...prev, eduExpansaoTeamRate: v }));
-                  } else {
-                    setAssumptions({ ...assumptions, eduExpansaoTeamRate: v });
-                  }
-                }}
-                disabled={!editing}
-              />
-              <span className="text-xs text-muted-foreground">% do faturamento</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pt-2">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">CAPEX % do COGS SaaS</p>
-                <p className="text-sm font-semibold">50% (2025–26) → 30% (2027+)</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">BaaS COGS/cliente</p>
-                <p className="text-sm font-semibold">R$ 25/mês (a partir de 2025)</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">PDD (Provisão p/ Devedores)</p>
-                <p className="text-sm font-semibold">2% da receita bruta</p>
-              </div>
-            </div>
-          </div>
+          {(() => {
+            const data = editing ? editState : assumptions;
+            const cos = data.cosConfig ?? DEFAULT_COS_CONFIG;
 
-          {/* Squad Operação Config */}
-          <div className="gradient-card p-5 space-y-4">
-            {(() => {
-              const rawSq = data.squadConfig ?? DEFAULT_ASSUMPTIONS.squadConfig!;
-              const defaults = DEFAULT_ASSUMPTIONS.squadConfig!;
-              const sq = Object.fromEntries(
-                Object.keys(defaults).map(k => [k, (rawSq as Record<string, number>)[k] != null && !Number.isNaN((rawSq as Record<string, number>)[k]) ? (rawSq as Record<string, number>)[k] : (defaults as Record<string, number>)[k]])
-              ) as typeof defaults;
-              const updateSquad = (field: string, val: number) => {
-                const newSq = { ...sq, [field]: val };
-                if (editing) {
-                  setEditState(prev => ({ ...prev, squadConfig: newSq }));
-                } else {
-                  setAssumptions(prev => ({ ...prev, squadConfig: newSq }));
-                }
+            const updateCos = (field: keyof CosConfig, val: number) => {
+              const newCos = { ...cos, [field]: val };
+              if (editing) {
+                setEditState(prev => ({ ...prev, cosConfig: newCos }));
+              } else {
+                setAssumptions(prev => ({ ...prev, cosConfig: newCos }));
+              }
+            };
+
+            // Compute yearly impact
+            const yearImpact = activeYears.map(y => {
+              const yr = model.years[y];
+              const caasEnd = data.caasClients[y] ?? 0;
+
+              // 3.1 CaaS
+              const numPFD = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.pfdClientsPerOne)));
+              const numCFO = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.cfoClientsPerOne)));
+              const numFPA = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.fpaClientsPerOne)));
+              const caasCost = (numPFD * cos.pfdSalary + numCFO * cos.cfoSalary + numFPA * cos.fpaSalary);
+
+              // 3.2 SaaS assinatura
+              const saasSubEnd = (data.subProductClients.saasOxy?.[y] ?? 0)
+                + (data.subProductClients.saasOxyGenio?.[y] ?? 0);
+              const numDevSr = Math.max(0, Math.ceil(saasSubEnd / Math.max(1, cos.devSrClientsPerOne)));
+              const numCSSaaS = Math.max(0, Math.ceil(saasSubEnd / Math.max(1, cos.csClientsPerOne)));
+              const saasSubCost = numDevSr * cos.devSrSalary + numCSSaaS * cos.csSaaSalary;
+
+              // Setup — novos clientes/mês
+              const prevSaasSub = y > 2025
+                ? (data.subProductClients.saasOxy?.[(y - 1) as Year] ?? 0)
+                  + (data.subProductClients.saasOxyGenio?.[(y - 1) as Year] ?? 0)
+                : 0;
+              const prevCaasEntCorp = y > 2025
+                ? (data.subProductClients.caasEnterprise?.[(y - 1) as Year] ?? 0)
+                  + (data.subProductClients.caasCorporate?.[(y - 1) as Year] ?? 0)
+                : 0;
+              const caasEntCorpEnd = (data.subProductClients.caasEnterprise?.[y] ?? 0)
+                + (data.subProductClients.caasCorporate?.[y] ?? 0);
+              const newPerMonth = Math.max(0, ((saasSubEnd - prevSaasSub) + (caasEntCorpEnd - prevCaasEntCorp)) / 12);
+              const numSetupSquads = newPerMonth > 0 ? Math.max(1, Math.ceil(newPerMonth / Math.max(1, cos.setupClientsPerSquad))) : 0;
+              const numHeadData = newPerMonth > 0 ? Math.max(1, Math.ceil(newPerMonth / Math.max(1, cos.headDataClientsPerOne))) : 0;
+              const setupCost = numSetupSquads * (cos.dataAnalystPerSquad * cos.dataAnalystSalary + cos.processAnalystPerSquad * cos.processAnalystSalary)
+                + numHeadData * cos.headDataSalary;
+
+              // 3.3 Education
+              const eduRev = yr.educationRevenue;
+              const eduCost = Math.abs(eduRev) * cos.eduCostRate;
+
+              // 3.4 Customer Success
+              const numCX = Math.max(0, Math.ceil(caasEnd / Math.max(1, cos.cxAnalystClientsPerOne)));
+              const csCost = numCX * cos.cxAnalystSalary;
+
+              // 3.5 Expansão
+              const expansaoRev = yr.baasRevenue;
+              const expansaoCost = Math.abs(expansaoRev) * cos.expansaoCostRate;
+
+              // 3.6 Tax
+              const taxRev = yr.taxRevenue;
+              const taxCost = Math.abs(taxRev) * cos.taxCostRate;
+
+              const totalMonthly = caasCost + saasSubCost + setupCost + csCost;
+              const totalPercentage = eduCost + expansaoCost + taxCost;
+              const grandTotal = totalMonthly * 12 + totalPercentage;
+              const pctRev = yr.grossRevenue > 0 ? (grandTotal / 1000 / yr.grossRevenue * 100) : 0;
+
+              return {
+                year: y, caasEnd, numPFD, numCFO, numFPA, caasCost,
+                saasSubEnd, numDevSr, numCSSaaS, saasSubCost,
+                newPerMonth: Math.round(newPerMonth), numSetupSquads, numHeadData, setupCost,
+                eduCost, numCX, csCost, expansaoCost, taxCost,
+                totalMonthly, totalPercentage, grandTotal, pctRev,
               };
+            });
 
-              const cfoSquadCost = sq.cfoSalary + sq.cfoAnalistasPerSquad * sq.cfoAnalistaSalary;
-              const setupSquadCost = sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary + (sq.setupLiderSalary / sq.setupSquadsPerLider);
+            const inputCls = "w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary";
 
-              const yearImpact = activeYears.map(y => {
-                const yr = model.years[y];
-                const caasEnd = data.caasClients[y] ?? 0;
-                const numCfoSquads = Math.max(1, Math.ceil(caasEnd / Math.max(1, sq.cfoClientsPerSquad)));
-                const cfoTotal = numCfoSquads * cfoSquadCost;
-                const cfoHC = numCfoSquads * (1 + sq.cfoAnalistasPerSquad);
-                const numCS = Math.max(1, Math.ceil(yr.totalClients / Math.max(1, sq.csPerClients)));
-                const csTotal = numCS * sq.csSalary;
-                const saasThis = (data.subProductClients.saasOxy?.[y] ?? 0) + (data.subProductClients.saasOxyGenio?.[y] ?? 0);
-                const saasPrev = y > 2025 ? (data.subProductClients.saasOxy?.[(y - 1) as Year] ?? 0) + (data.subProductClients.saasOxyGenio?.[(y - 1) as Year] ?? 0) : 0;
-                const newSaasMonth = Math.max(0, (saasThis - saasPrev) / 12);
-                const numSetupSquads = Math.max(1, Math.ceil(newSaasMonth / Math.max(1, sq.setupSetupsPerSquad)));
-                const setupTotal = numSetupSquads * (sq.setupAnalistaSalary + sq.setupImplPerSquad * sq.setupImplSalary);
-                const setupHC = numSetupSquads * (1 + sq.setupImplPerSquad);
-                const numLideres = Math.max(1, Math.ceil(numSetupSquads / Math.max(1, sq.setupSquadsPerLider)));
-                const liderTotal = numLideres * sq.setupLiderSalary;
-                const monthCost = cfoTotal + csTotal + setupTotal + liderTotal;
-                const totalHC = cfoHC + numCS + setupHC + numLideres;
-                return { year: y, caasEnd, clients: yr.totalClients, numCfoSquads, cfoHC, numCS, numSetupSquads, setupHC, numLideres, totalHC, monthCost, annualCost: monthCost * 12, newSaasMonth: Math.round(newSaasMonth) };
-              });
+            return (
+              <>
+                {/* 3.1 Custos CaaS */}
+                <div className="gradient-card p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary">3.1</span>
+                    <h3 className="text-sm font-semibold">Custos CaaS — Squad por Clientes</h3>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Squad = 1 CFO + 2 FP&A Analysts. Project Finance Director supervisiona ~6-7 squads (100 clientes).</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">Project Finance Director</p>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
+                        <input type="number" className={inputCls} value={cos.pfdClientsPerOne} disabled={!editing} onChange={e => updateCos('pfdClientsPerOne', Number(e.target.value) || 1)} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
+                        <input type="number" className={inputCls} value={cos.pfdSalary} disabled={!editing} onChange={e => updateCos('pfdSalary', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">CFO</p>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
+                        <input type="number" step="0.5" className={inputCls} value={cos.cfoClientsPerOne} disabled={!editing} onChange={e => updateCos('cfoClientsPerOne', Number(e.target.value) || 1)} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
+                        <input type="number" className={inputCls} value={cos.cfoSalary} disabled={!editing} onChange={e => updateCos('cfoSalary', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">FP&A Analyst</p>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
+                        <input type="number" step="0.5" className={inputCls} value={cos.fpaClientsPerOne} disabled={!editing} onChange={e => updateCos('fpaClientsPerOne', Number(e.target.value) || 1)} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
+                        <input type="number" className={inputCls} value={cos.fpaSalary} disabled={!editing} onChange={e => updateCos('fpaSalary', Number(e.target.value) || 0)} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-              return (
-                <>
+                {/* 3.2 Custos SaaS */}
+                <div className="gradient-card p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary">3.2</span>
+                    <h3 className="text-sm font-semibold">Custos SaaS — Equipe + Setup</h3>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Squad CaaS */}
-                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">SQUAD CAAS</p>
-                      <p className="text-[10px] text-muted-foreground">1 Diretor + 1 CFO + 1 FP&A Analista por squad, cada squad aguenta {sq.cfoClientsPerSquad} clientes CaaS</p>
-                      <p className="text-[10px] text-muted-foreground">Custo squad: {formatCurrencyFull(cfoSquadCost)}/mês | CS: 1 a cada {sq.csPerClients} clientes @ {formatCurrencyFull(sq.csSalary)}/mês</p>
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                    {/* Assinatura */}
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">SAAS ASSINATURAS (Oxy + Oxy+Gênio + Esp.)</p>
+                      <p className="text-[9px] text-muted-foreground">Headcount escala com base ativa de assinantes</p>
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Diretor (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} disabled={!editing} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Dev Senior — 1 a cada N clientes</label>
+                          <input type="number" className={inputCls} value={cos.devSrClientsPerOne} disabled={!editing} onChange={e => updateCos('devSrClientsPerOne', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} disabled={!editing} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Dev Senior (R$/mês)</label>
+                          <input type="number" className={inputCls} value={cos.devSrSalary} disabled={!editing} onChange={e => updateCos('devSrSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">CFO + FP&A / squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} disabled={!editing} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Clientes CaaS/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} disabled={!editing} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Customer Success — 1 a cada N clientes</label>
+                          <input type="number" className={inputCls} value={cos.csClientsPerOne} disabled={!editing} onChange={e => updateCos('csClientsPerOne', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} disabled={!editing} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
-                        </div>
-                        <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Clientes/CS</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} disabled={!editing} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
+                          <input type="number" className={inputCls} value={cos.csSaaSalary} disabled={!editing} onChange={e => updateCos('csSaaSalary', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
-
-                    {/* Squad Setup SaaS */}
-                    <div className="bg-secondary/30 rounded-lg p-4 space-y-2">
-                      <p className="text-xs font-bold text-foreground/80 uppercase tracking-wide">SQUAD SETUP SAAS</p>
-                      <p className="text-[10px] text-muted-foreground">1 analista + {sq.setupImplPerSquad} impl = {formatCurrencyFull(setupSquadCost)}/mês por squad</p>
-                      <p className="text-[10px] text-muted-foreground">Cada squad aguenta {sq.setupSetupsPerSquad} setups/mês. Líder cuida de {sq.setupSquadsPerLider} squads.</p>
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                    {/* Setup */}
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">SETUP (1.2.3)</p>
+                      <p className="text-[9px] text-muted-foreground">Novos = CaaS Enterprise + Corporate + SaaS Assinaturas. Não acumula.</p>
+                      <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Analista/Impl (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} disabled={!editing} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
+                          <label className="text-[9px] text-muted-foreground">Novos clientes / squad</label>
+                          <input type="number" className={inputCls} value={cos.setupClientsPerSquad} disabled={!editing} onChange={e => updateCos('setupClientsPerSquad', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Impl/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} disabled={!editing} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Data Analysts / squad</label>
+                          <input type="number" className={inputCls} value={cos.dataAnalystPerSquad} disabled={!editing} onChange={e => updateCos('dataAnalystPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Setups/squad/mês</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} disabled={!editing} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Data Analyst (R$/mês)</label>
+                          <input type="number" className={inputCls} value={cos.dataAnalystSalary} disabled={!editing} onChange={e => updateCos('dataAnalystSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
-                          <label className="text-[9px] text-muted-foreground">Líder (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} disabled={!editing} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
+                          <label className="text-[9px] text-muted-foreground">Process Analysts / squad</label>
+                          <input type="number" className={inputCls} value={cos.processAnalystPerSquad} disabled={!editing} onChange={e => updateCos('processAnalystPerSquad', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Process Analyst (R$/mês)</label>
+                          <input type="number" className={inputCls} value={cos.processAnalystSalary} disabled={!editing} onChange={e => updateCos('processAnalystSalary', Number(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Head of Data — 1 a cada N novos/mês</label>
+                          <input type="number" className={inputCls} value={cos.headDataClientsPerOne} disabled={!editing} onChange={e => updateCos('headDataClientsPerOne', Number(e.target.value) || 1)} />
+                        </div>
+                        <div className="space-y-0.5">
+                          <label className="text-[9px] text-muted-foreground">Head of Data (R$/mês)</label>
+                          <input type="number" className={inputCls} value={cos.headDataSalary} disabled={!editing} onChange={e => updateCos('headDataSalary', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Impact per year table */}
-                  <div className="pt-3">
-                    <h4 className="text-xs font-semibold text-muted-foreground mb-2">Impacto por Ano</h4>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left px-2 py-2 text-muted-foreground font-medium">Ano</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Clientes CaaS</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Squads CFO</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Total Clientes</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Nº CS</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Novos SaaS/mês</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Squads Setup</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Líderes</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">HC Total</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Custo/Mês</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">Custo/Ano</th>
-                            <th className="text-right px-2 py-2 text-muted-foreground font-medium">% Receita</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {yearImpact.map(yi => {
-                            const revPct = model.years[yi.year].grossRevenue > 0
-                              ? ((yi.annualCost / 1000) / model.years[yi.year].grossRevenue * 100).toFixed(1)
-                              : '—';
-                            return (
-                              <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
-                                <td className="px-2 py-2 font-medium">{yi.year}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.caasEnd.toLocaleString('pt-BR')}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.numCfoSquads}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.clients.toLocaleString('pt-BR')}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.numCS}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.newSaasMonth}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.numSetupSquads}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{yi.numLideres}</td>
-                                <td className="text-right px-2 py-2 tabular-nums font-medium">{yi.totalHC}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">{formatCurrencyFull(yi.monthCost)}</td>
-                                <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.annualCost)}</td>
-                                <td className="text-right px-2 py-2 tabular-nums">
-                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                    Number(revPct) > 10 ? 'bg-red-500/15 text-red-400' :
-                                    Number(revPct) > 5 ? 'bg-amber-500/15 text-amber-500' :
-                                    'bg-emerald-500/15 text-emerald-500'
-                                  }`}>{revPct}%</span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-
-          {/* Headcount Projetado por Área */}
-          {(() => {
-            const data = editing ? editState : assumptions;
-            const hcData = editing ? editState : assumptions;
-            const ratios = hcData.headcountRatios;
-            const salaries = hcData.salaryRanges;
-
-            const subProductKeys = Object.keys(hcData.subProductClients) as SubProductKey[];
-            const monthlyTotals: number[] = Array.from({ length: 12 }, (_, m) => {
-              return subProductKeys.reduce((sum, key) => {
-                const monthly = getMonthlyClients(key, selectedYear, hcData.subProductClients);
-                return sum + monthly[m];
-              }, 0);
-            });
-
-            const PROJECTED_ROLES = [
-              { key: 'cfos', label: 'CFOs', bu: 'CaaS', ratioKey: 'clientsPerCFO' as const, salaryKey: 'CFO', baseCount: namedEmployees2025.filter(e => e.role === 'CFO').length },
-              { key: 'fpa', label: 'FP&A Analysts', bu: 'CaaS', ratioKey: 'clientsPerFPA' as const, salaryKey: 'FP&A Analyst', baseCount: namedEmployees2025.filter(e => e.role === 'FP&A').length },
-              { key: 'pf', label: 'Project Finance Directors', bu: 'CaaS', ratioKey: 'clientsPerPF' as const, salaryKey: 'Project Finance Director', baseCount: 0 },
-              { key: 'projectAnalyst', label: 'Project Analysts', bu: 'CaaS', ratioKey: 'clientsPerProjectAnal' as const, salaryKey: 'Project Analyst', baseCount: 0 },
-              { key: 'dataAnalyst', label: 'Data Analysts', bu: 'SaaS', ratioKey: 'clientsPerDataAnal' as const, salaryKey: 'Data Processes Analyst', baseCount: 0 },
-              { key: 'csm', label: 'Customer Service', bu: 'Operations', ratioKey: 'clientsPerCSM' as const, salaryKey: 'Customer Service', baseCount: namedEmployees2025.filter(e => e.role === 'Customer Svc').length },
-              { key: 'sdr', label: 'SDRs', bu: 'Commercial', ratioKey: 'clientsPerSDR' as const, salaryKey: 'SDR', baseCount: namedEmployees2025.filter(e => e.role === 'SDR').length },
-              { key: 'head', label: 'Head Comercial', bu: 'Commercial', ratioKey: 'clientsPerCommercialHead' as const, salaryKey: 'Head Comercial', baseCount: namedEmployees2025.filter(e => e.role === 'Commercial').length },
-            ];
-
-            const computeQty = (role: typeof PROJECTED_ROLES[0], totalClients: number) => {
-              const ratio = ratios[role.ratioKey];
-              return Math.max(role.baseCount, Math.ceil(totalClients / ratio));
-            };
-
-            return (
-              <div className="gradient-card p-5">
-                <div className="flex items-center justify-between mb-4">
+                {/* 3.3, 3.5, 3.6 — % da Receita Bruta */}
+                <div className="gradient-card p-5 space-y-3">
                   <div className="flex items-center gap-2">
-                    <UserCheck className="h-4 w-4 text-primary" />
-                    <h3 className="text-sm font-semibold">Headcount Projetado por Área — {selectedYear}</h3>
+                    <span className="text-xs font-bold text-primary">3.3 / 3.5 / 3.6</span>
+                    <h3 className="text-sm font-semibold">Custos Percentuais da Receita Bruta</h3>
                   </div>
-                  <div className="flex items-center gap-1 bg-secondary rounded-lg p-0.5">
-                    <button
-                      onClick={() => setHcViewMode('people')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${hcViewMode === 'people' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Pessoas
-                    </button>
-                    <button
-                      onClick={() => setHcViewMode('cost')}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${hcViewMode === 'cost' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                    >
-                      Custo
-                    </button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.3 Education</p>
+                      <div className="flex items-center gap-2">
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.eduCostRate * 100)} disabled={!editing} onChange={e => updateCos('eduCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <span className="text-xs text-muted-foreground">% da receita bruta</span>
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.5 Expansão</p>
+                      <div className="flex items-center gap-2">
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.expansaoCostRate * 100)} disabled={!editing} onChange={e => updateCos('expansaoCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <span className="text-xs text-muted-foreground">% da receita bruta</span>
+                      </div>
+                    </div>
+                    <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.6 Tax</p>
+                      <div className="flex items-center gap-2">
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.taxCostRate * 100)} disabled={!editing} onChange={e => updateCos('taxCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <span className="text-xs text-muted-foreground">% da receita bruta</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="sticky left-0 z-10 bg-card text-left px-3 py-2 text-muted-foreground font-medium text-xs min-w-[180px]">Cargo</th>
-                        <th className="text-left px-2 py-2 text-muted-foreground font-medium text-xs min-w-[80px]">BU</th>
-                        {MONTHS.map(m => (
-                          <th key={m} className="text-right px-2 py-2 text-muted-foreground font-medium text-xs min-w-[64px]">{m}</th>
-                        ))}
-                        <th className="text-right px-3 py-2 text-muted-foreground font-medium text-xs min-w-[80px]">Média</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {PROJECTED_ROLES.map(role => {
-                        const monthlyQty = monthlyTotals.map(t => computeQty(role, t));
-                        const salary = salaries[role.salaryKey] ?? 0;
-                        const avg = Math.round(monthlyQty.reduce((a, b) => a + b, 0) / 12);
-                        return (
-                          <tr key={role.key} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                            <td className="sticky left-0 z-10 bg-card px-3 py-1.5 font-medium text-xs">{role.label}</td>
-                            <td className="px-2 py-1.5 text-xs text-muted-foreground">{role.bu}</td>
-                            {monthlyQty.map((qty, i) => (
-                              <td key={i} className="text-right px-2 py-1.5 tabular-nums text-xs">
-                                {hcViewMode === 'people' ? qty : formatCurrencyFull(qty * salary)}
-                              </td>
-                            ))}
-                            <td className="text-right px-3 py-1.5 tabular-nums text-xs font-medium">
-                              {hcViewMode === 'people' ? avg : formatCurrencyFull(avg * salary)}
+
+                {/* 3.4 Customer Success */}
+                <div className="gradient-card p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-primary">3.4</span>
+                    <h3 className="text-sm font-semibold">Custos Customer Success</h3>
+                  </div>
+                  <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5 max-w-xs">
+                    <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">Customer Experience Analyst</p>
+                    <div className="space-y-0.5">
+                      <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
+                      <input type="number" className={inputCls} value={cos.cxAnalystClientsPerOne} disabled={!editing} onChange={e => updateCos('cxAnalystClientsPerOne', Number(e.target.value) || 1)} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
+                      <input type="number" className={inputCls} value={cos.cxAnalystSalary} disabled={!editing} onChange={e => updateCos('cxAnalystSalary', Number(e.target.value) || 0)} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Impacto por Ano */}
+                <div className="gradient-card p-5 space-y-3">
+                  <h3 className="text-sm font-semibold">Impacto COS por Ano</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left px-2 py-2 text-muted-foreground font-medium">Ano</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.1 CaaS</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.2 SaaS</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.2 Setup</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.3 Education</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.4 CS</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.5 Expansão</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.6 Tax</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">Total/Ano</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">% Receita</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {yearImpact.map(yi => (
+                          <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
+                            <td className="px-2 py-2 font-medium">{yi.year}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.caasCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.saasSubCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.setupCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.eduCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.csCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.expansaoCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.taxCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.grandTotal)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                yi.pctRev > 25 ? 'bg-destructive/15 text-destructive' :
+                                yi.pctRev > 15 ? 'bg-amber-500/15 text-amber-500' :
+                                'bg-emerald-500/15 text-emerald-500'
+                              }`}>{yi.pctRev.toFixed(1)}%</span>
                             </td>
                           </tr>
-                        );
-                      })}
-                      <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                        <td className="sticky left-0 z-10 bg-primary/5 px-3 py-2 text-xs" colSpan={2}>Total</td>
-                        {MONTHS.map((_, i) => {
-                          const totalQty = PROJECTED_ROLES.reduce((s, role) => s + computeQty(role, monthlyTotals[i]), 0);
-                          const totalCost = PROJECTED_ROLES.reduce((s, role) => {
-                            const qty = computeQty(role, monthlyTotals[i]);
-                            return s + qty * (salaries[role.salaryKey] ?? 0);
-                          }, 0);
-                          return (
-                            <td key={i} className="text-right px-2 py-2 tabular-nums text-xs">
-                              {hcViewMode === 'people' ? totalQty : formatCurrencyFull(totalCost)}
-                            </td>
-                          );
-                        })}
-                        <td className="text-right px-3 py-2 tabular-nums text-xs">
-                          {(() => {
-                            const avgTotal = Math.round(MONTHS.reduce((s, _, i) => s + PROJECTED_ROLES.reduce((ss, role) => ss + computeQty(role, monthlyTotals[i]), 0), 0) / 12);
-                            const avgCost = Math.round(MONTHS.reduce((s, _, i) => s + PROJECTED_ROLES.reduce((ss, role) => ss + computeQty(role, monthlyTotals[i]) * (salaries[role.salaryKey] ?? 0), 0), 0) / 12);
-                            return hcViewMode === 'people' ? avgTotal : formatCurrencyFull(avgCost);
-                          })()}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span>Custos CaaS/SaaS/CS = headcount mensal × 12. Education/Expansão/Tax = % aplicado sobre receita bruta anual.</span>
+                  </div>
                 </div>
-              </div>
+              </>
             );
           })()}
 
-          {/* Regras de Contratação */}
-          <div className="gradient-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <UserCheck className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Regras de Contratação (Headcount)</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Proporção por clientes ativos</p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-1.5 text-muted-foreground font-medium text-xs">Função</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium text-xs">1 por cada</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {([
-                      { label: 'CFO', ratioKey: 'clientsPerCFO' as const },
-                      { label: 'FP&A Analyst', ratioKey: 'clientsPerFPA' as const },
-                      { label: 'Project Finance Director', ratioKey: 'clientsPerPF' as const },
-                      { label: 'Project Analyst', ratioKey: 'clientsPerProjectAnal' as const },
-                      { label: 'Data Processes Analyst', ratioKey: 'clientsPerDataAnal' as const },
-                      { label: 'Customer Service Manager', ratioKey: 'clientsPerCSM' as const },
-                      { label: 'SDR', ratioKey: 'clientsPerSDR' as const },
-                      { label: 'Head Comercial', ratioKey: 'clientsPerCommercialHead' as const },
-                    ] as const).map(row => {
-                      const data = editing ? editState : assumptions;
-                      const val = data.headcountRatios[row.ratioKey];
-                      return (
-                        <tr key={row.label} className="border-b border-border/30">
-                          <td className="py-1.5 text-xs font-medium">{row.label}</td>
-                          <td className="py-1.5 text-right text-xs tabular-nums">
-                            {editing ? (
-                              <input
-                                type="number"
-                                className="w-20 bg-secondary border border-primary/30 rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                value={val}
-                                onChange={e => {
-                                  const v = Number(e.target.value) || 1;
-                                  setEditState(prev => ({
-                                    ...prev,
-                                    headcountRatios: { ...prev.headcountRatios, [row.ratioKey]: v },
-                                  }));
-                                }}
-                              />
-                            ) : (
-                              <>{val} clientes</>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Faixas salariais para novas contratações</p>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-1.5 text-muted-foreground font-medium text-xs">Cargo</th>
-                      <th className="text-right py-1.5 text-muted-foreground font-medium text-xs">Salário/mês</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries((editing ? editState : assumptions).salaryRanges).map(([role, salary]) => (
-                      <tr key={role} className="border-b border-border/30">
-                        <td className="py-1.5 text-xs font-medium">{role}</td>
-                        <td className="py-1.5 text-right text-xs tabular-nums">
-                          {editing ? (
-                            <input
-                              type="number"
-                              className="w-24 bg-secondary border border-primary/30 rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                              value={salary}
-                              onChange={e => {
-                                const v = Number(e.target.value) || 0;
-                                setEditState(prev => ({
-                                  ...prev,
-                                  salaryRanges: { ...prev.salaryRanges, [role]: v },
-                                }));
-                              }}
-                            />
-                          ) : (
-                            formatCurrencyFull(salary as number)
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
         </TabsContent>
-
-        {/* ─── BLOCO 4: SG&A ─── */}
         <TabsContent value="sga" className="space-y-6 mt-4">
 
           {/* Marketing Planejado vs Realizado */}

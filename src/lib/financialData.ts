@@ -88,27 +88,25 @@ export interface Assumptions {
   marketingEvents?: number;
   // Item 6: CAC per product (overrides sector-based CAC)
   cacPerProduct?: Partial<Record<TicketKey, number>>;
-  // Item 8: 15% cost rate on Education/Expansão revenue
+  // Item 8: legacy — replaced by cosConfig rates
   eduExpansaoTeamRate?: number;
-  // Item 7: Squad operation structure
+  // Item 7: legacy — replaced by cosConfig
   squadConfig?: {
-    // Squad CaaS: 1 Diretor + 1 CFO + 1 FP&A por squad. Cada squad aguenta N clientes CaaS.
     cfoSalary: number;
     cfoAnalistaSalary: number;
     cfoAnalistasPerSquad: number;
     cfoClientsPerSquad: number;
-    // CS: 1 CS a cada N clientes (geral) — inside Squad CaaS card
     csPerClients: number;
     csSalary: number;
-    // Squad Setup SaaS: 1 analista + 2 implementadores. Cada squad aguenta N novos setups/mês.
     setupAnalistaSalary: number;
     setupImplSalary: number;
     setupImplPerSquad: number;
     setupSetupsPerSquad: number;
-    // Líder Setup: 1 líder a cada N squads de setup. Custo dividido entre os squads que lidera.
     setupLiderSalary: number;
     setupSquadsPerLider: number;
   };
+  // COS Config — premissas de custos variáveis por categoria (3.1–3.6)
+  cosConfig?: CosConfig;
   // Editable Selic monthly rate (default 1.17% = 0.0117)
   selicMonthly?: number;
   // N/A flag for churn — products that are non-recurring don't have churn
@@ -155,6 +153,78 @@ export function getSubProductTaxRate(key: TicketKey, assumptions: Assumptions): 
 }
 
 export type TicketKey = keyof Assumptions['tickets'];
+
+// ─── COS CONFIG (Premissas de Custos Variáveis 3.1–3.6) ───
+
+export interface CosConfig {
+  // 3.1 Custos CaaS — Squad por clientes CaaS
+  pfdClientsPerOne: number;    // Project Finance Director: 1 a cada N clientes CaaS
+  pfdSalary: number;
+  cfoClientsPerOne: number;    // CFO: 1 a cada N clientes CaaS
+  cfoSalary: number;
+  fpaClientsPerOne: number;    // FP&A Analyst: 1 a cada N clientes CaaS
+  fpaSalary: number;
+
+  // 3.2 Custos SaaS — Assinatura
+  devSrClientsPerOne: number;  // Dev Senior: 1 a cada N clientes SaaS assinatura
+  devSrSalary: number;
+  csClientsPerOne: number;     // Customer Success: 1 a cada N clientes SaaS assinatura
+  csSaaSalary: number;
+
+  // 3.2 Setup — Squad por novos clientes/mês
+  setupClientsPerSquad: number;      // 1 squad a cada N novos clientes/mês
+  dataAnalystPerSquad: number;       // Data Analysts por squad
+  dataAnalystSalary: number;
+  processAnalystPerSquad: number;    // Process Analysts por squad
+  processAnalystSalary: number;
+  headDataClientsPerOne: number;     // Head of Data: 1 a cada N novos clientes/mês
+  headDataSalary: number;
+
+  // 3.3 Education — % da receita bruta
+  eduCostRate: number;
+
+  // 3.4 Customer Success — CX Analyst por clientes CaaS
+  cxAnalystClientsPerOne: number;
+  cxAnalystSalary: number;
+
+  // 3.5 Expansão — % da receita bruta
+  expansaoCostRate: number;
+
+  // 3.6 Tax — % da receita bruta
+  taxCostRate: number;
+}
+
+export const DEFAULT_COS_CONFIG: CosConfig = {
+  // 3.1 CaaS
+  pfdClientsPerOne: 100,
+  pfdSalary: 30000,
+  cfoClientsPerOne: 15,
+  cfoSalary: 20000,
+  fpaClientsPerOne: 7.5,
+  fpaSalary: 8000,
+  // 3.2 SaaS Assinatura
+  devSrClientsPerOne: 100,
+  devSrSalary: 10000,
+  csClientsPerOne: 100,
+  csSaaSalary: 5000,
+  // 3.2 Setup
+  setupClientsPerSquad: 32,
+  dataAnalystPerSquad: 2,
+  dataAnalystSalary: 8000,
+  processAnalystPerSquad: 1,
+  processAnalystSalary: 5000,
+  headDataClientsPerOne: 64,
+  headDataSalary: 15000,
+  // 3.3 Education
+  eduCostRate: 0.15,
+  // 3.4 Customer Success
+  cxAnalystClientsPerOne: 100,
+  cxAnalystSalary: 5000,
+  // 3.5 Expansão
+  expansaoCostRate: 0.15,
+  // 3.6 Tax
+  taxCostRate: 0.15,
+};
 
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   caasClients: { 2025: 167, 2026: 272, 2027: 768, 2028: 2136, 2029: 4171, 2030: 6472 },
@@ -271,27 +341,25 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     taxRT: 5000,
     taxDTC: 5000,
   },
-  // Item 8: 15% Education/Expansão team rate
+  // Item 8: legacy rate
   eduExpansaoTeamRate: 0.15,
-  // Item 7: Squad config
+  // Item 7: legacy Squad config
   squadConfig: {
-    // Squad CaaS: 1 Diretor (R$15k) + 2 (CFO + FP&A) (R$8k cada) = R$31k/squad, aguenta 15 clientes
     cfoSalary: 15000,
     cfoAnalistaSalary: 8000,
     cfoAnalistasPerSquad: 2,
     cfoClientsPerSquad: 15,
-    // CS: 1 CS (R$5k) a cada 100 clientes — inside Squad CaaS
     csPerClients: 100,
     csSalary: 5000,
-    // Squad Setup: 1 analista (R$8k) + 2 implementadores (R$8k cada) = R$24k/squad, aguenta 16 setups/mês
     setupAnalistaSalary: 8000,
     setupImplSalary: 8000,
     setupImplPerSquad: 2,
     setupSetupsPerSquad: 16,
-    // Líder: R$12k, cuida de 2 squads (custo dividido = R$6k por squad → total R$30k/squad)
     setupLiderSalary: 12000,
     setupSquadsPerLider: 2,
   },
+  // COS Config (new)
+  cosConfig: { ...DEFAULT_COS_CONFIG },
   // Editable Selic monthly rate (default 1.17%)
   selicMonthly: 0.0117,
   // Lucro Presumido — tax config per BU

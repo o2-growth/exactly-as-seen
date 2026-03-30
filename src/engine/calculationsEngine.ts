@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
@@ -62,7 +62,7 @@ export interface AnnualOutput {
   dedDetail: { pis: number; cofins: number; iss: number; csllRetido: number; pisRetido: number; icms: number; irrfRetido: number; cofinsRetido: number };
   netRevenue: number;
   cogs: number;
-  cogsDetail: { caas: number; customerService: number; saas: number; education: number; baas: number };
+  cogsDetail: { caas: number; customerService: number; saas: number; education: number; baas: number; tax: number };
   grossProfit: number;
   grossMarginPct: number;
   commissions: number;
@@ -267,6 +267,67 @@ function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baas
     education: base.education * yearMult,
     baas: baasCogs,
   };
+}
+
+// ─── COS FROM CONFIG (3.1–3.6) ───
+
+export interface COSBreakdown {
+  caas: number;          // 3.1
+  saas: number;          // 3.2 (assinatura + setup)
+  education: number;     // 3.3
+  customerSuccess: number; // 3.4
+  expansao: number;      // 3.5
+  tax: number;           // 3.6
+  total: number;
+}
+
+function calcCOSFromConfig(
+  month: number,
+  year: number,
+  caasClients: number,
+  saasSubClients: number,
+  newSetupClients: number,
+  eduRevenue: number,
+  expansaoRevenue: number,
+  taxRevenue: number,
+  assumptions: Assumptions
+): COSBreakdown {
+  const cfg = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+
+  // 3.1 CaaS: PFD + CFO + FP&A
+  const numPFD = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.pfdClientsPerOne)));
+  const numCFO = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.cfoClientsPerOne)));
+  const numFPA = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.fpaClientsPerOne)));
+  const caasCost = -(numPFD * cfg.pfdSalary + numCFO * cfg.cfoSalary + numFPA * cfg.fpaSalary) / 1000;
+
+  // 3.2 SaaS — Assinatura: Dev Sr + CS
+  const numDevSr = Math.max(0, Math.ceil(saasSubClients / Math.max(1, cfg.devSrClientsPerOne)));
+  const numCSSaaS = Math.max(0, Math.ceil(saasSubClients / Math.max(1, cfg.csClientsPerOne)));
+  const saasSubCost = -(numDevSr * cfg.devSrSalary + numCSSaaS * cfg.csSaaSalary) / 1000;
+
+  // 3.2 Setup — Squad by new clients/month
+  const numSetupSquads = newSetupClients > 0 ? Math.max(1, Math.ceil(newSetupClients / Math.max(1, cfg.setupClientsPerSquad))) : 0;
+  const setupSquadCost = numSetupSquads * (cfg.dataAnalystPerSquad * cfg.dataAnalystSalary + cfg.processAnalystPerSquad * cfg.processAnalystSalary);
+  const numHeadData = newSetupClients > 0 ? Math.max(1, Math.ceil(newSetupClients / Math.max(1, cfg.headDataClientsPerOne))) : 0;
+  const setupCost = -(setupSquadCost + numHeadData * cfg.headDataSalary) / 1000;
+  const saasTotalCost = saasSubCost + setupCost;
+
+  // 3.3 Education — % receita bruta
+  const eduCost = -Math.abs(eduRevenue) * cfg.eduCostRate;
+
+  // 3.4 Customer Success — CX Analyst por clientes CaaS
+  const numCX = Math.max(0, Math.ceil(caasClients / Math.max(1, cfg.cxAnalystClientsPerOne)));
+  const csCost = -(numCX * cfg.cxAnalystSalary) / 1000;
+
+  // 3.5 Expansão — % receita bruta
+  const expansaoCost = -Math.abs(expansaoRevenue) * cfg.expansaoCostRate;
+
+  // 3.6 Tax — % receita bruta
+  const taxCost = -Math.abs(taxRevenue) * cfg.taxCostRate;
+
+  const total = caasCost + saasTotalCost + eduCost + csCost + expansaoCost + taxCost;
+
+  return { caas: caasCost, saas: saasTotalCost, education: eduCost, customerSuccess: csCost, expansao: expansaoCost, tax: taxCost, total };
 }
 
 // ─── SG&A ───
@@ -577,7 +638,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let annualEBITDA = 0, annualFinancial = 0, annualEBT = 0, annualTaxes = 0, annualNI = 0;
   let annualDebt = 0, annualCapex = 0, annualFinal = 0;
 
-  let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0 };
+  let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0, tax: 0 };
   let hcD = { salaries: 0, benefits: 0 };
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
   let taxD = { irpj: 0, csll: 0 };
@@ -659,10 +720,30 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // Net revenue
     const netRev = grossRev + ded;
 
-    // COGS (pass BaaS clients for BaaS COGS calculation)
-    const baasClientsM = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
-    const cogs = calcMonthlyCOGS(m, year, revenueScale, baasClientsM);
-    const totalCogs = cogs.caas + cogs.customerService + cogs.saas + cogs.education + cogs.baas;
+    // CaaS clients for COS calc
+    const caasClientsForCOS = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
+      + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
+
+    // SaaS subscription clients (Oxy + OxyGenio + OxyGenioEsp)
+    const saasSubClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
+      + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
+
+    // New Setup clients = new CaaS Enterprise/Corporate + new SaaS subscriptions this month
+    const prevCaasEnt = m > 0 ? getMonthlyClientCount('caas', 'enterprise', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'enterprise', 11, year - 1, assumptions) : 0);
+    const prevCaasCorp = m > 0 ? getMonthlyClientCount('caas', 'corporate', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'corporate', 11, year - 1, assumptions) : 0);
+    const prevSaasOxy = m > 0 ? getMonthlyClientCount('saas', 'oxy', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxy', 11, year - 1, assumptions) : 0);
+    const prevSaasOG = m > 0 ? getMonthlyClientCount('saas', 'oxyGenio', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxyGenio', 11, year - 1, assumptions) : 0);
+    const newSetupClients = Math.max(0,
+      (getMonthlyClientCount('caas', 'enterprise', m, year, assumptions) - prevCaasEnt) +
+      (getMonthlyClientCount('caas', 'corporate', m, year, assumptions) - prevCaasCorp) +
+      (getMonthlyClientCount('saas', 'oxy', m, year, assumptions) - prevSaasOxy) +
+      (getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions) - prevSaasOG)
+    );
+
+    // COS (Cost of Service) via config
+    const cosBreakdown = calcCOSFromConfig(m, year, caasClientsForCOS, saasSubClientsM, newSetupClients, eduRev, baasRev, taxRev, assumptions);
+    const totalCogs = cosBreakdown.total;
 
     // Gross profit
     const gp = netRev + totalCogs;
@@ -674,13 +755,11 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const totalComm = commCaas + commSaas + commEdu;
 
     // Marketing (CAC × new clients + HC costs)
-    // Item 6: Use per-product CAC when available
     const totalClientsM = calcTotalClients(m, year, assumptions);
     const prevClients = m > 0 ? calcTotalClients(m - 1, year, assumptions) :
       (year > 2025 ? calcTotalClients(11, year - 1, assumptions) : 0);
     const newClients = Math.max(0, totalClientsM - prevClients);
 
-    // Item 6: Per-product CAC (use cacPerProduct if set, fallback to sector CAC)
     const cpc = assumptions.cacPerProduct;
     const cacCaas = cpc?.caasAssessoria ?? cacPerClient.caas;
     const cacSaas = cpc?.saasOxy ?? cacPerClient.saas;
@@ -691,26 +770,16 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const mktSaas = (-newClients * 0.35 * cacSaas) / 1000;
     const mktEdu = (-newClients * 0.15 * cacEdu) / 1000;
     const mktBaas = (-newClients * 0.10 * cacBaasVal) / 1000;
-    // Item 5: PR and Events monthly costs
     const mktPR = -(assumptions.marketingPR ?? 0) / 1000;
     const mktEvents = -(assumptions.marketingEvents ?? 0) / 1000;
     const totalMkt = mktCaas + mktSaas + mktEdu + mktBaas + mktPR + mktEvents;
 
-    // Item 8: 15% cost on Education/Expansão revenue (added to COGS)
-    const eduExpRate = assumptions.eduExpansaoTeamRate ?? 0;
-    const eduTeamCost = -Math.abs(eduRev) * eduExpRate;
-    const expansaoTeamCost = -Math.abs(baasRev) * eduExpRate;
-    const eduExpTeamTotal = eduTeamCost + expansaoTeamCost;
+    // Contribution margin (eduExpTeamTotal now included in COS)
+    const cm = gp + totalComm + totalMkt;
 
-    // Contribution margin
-    const cm = gp + totalComm + totalMkt + eduExpTeamTotal;
-
-    // Calculate client counts by BU for headcount ratios
-    const caasClientsM = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
-      + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
-      + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
-    const saasClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
-      + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
+    // Reuse COS client counts for headcount
+    const caasClientsM = caasClientsForCOS;
+    const saasClientsM = saasSubClientsM;
     const caasSaasClientsM = caasClientsM + saasClientsM;
 
     // Headcount (uses CaaS-only for CFO/FP&A/PF, CaaS+SaaS for others)
@@ -758,7 +827,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       financialResult = jurosChEsp + iof + jurosEmp + boleto + antecipacao + recFinanceira;
     } else {
       // BaaS boleto only for later years
-      const boleto = -(baasClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
+      const baasClientsForBoleto = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
+      const boleto = -(baasClientsForBoleto * revenueTaxes.baasBoletoPerClient) / 1000;
       financialResult = boleto;
     }
 
@@ -787,7 +857,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const totalDebtPmt = debt.loans + debt.suppliers;
 
     // Capex
-    const capex = calcMonthlyCapex(m, year, cogs.saas);
+    const capex = calcMonthlyCapex(m, year, cosBreakdown.saas);
     const totalCapex = capex.software + capex.realestate;
 
     // Final result
@@ -820,8 +890,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     annualCapex += totalCapex;
     annualFinal += finalResult;
 
-    cogsD.caas += cogs.caas; cogsD.customerService += cogs.customerService;
-    cogsD.saas += cogs.saas; cogsD.education += cogs.education; cogsD.baas += cogs.baas;
+    cogsD.caas += cosBreakdown.caas; cogsD.customerService += cosBreakdown.customerSuccess;
+    cogsD.saas += cosBreakdown.saas; cogsD.education += cosBreakdown.education; cogsD.baas += cosBreakdown.expansao; cogsD.tax += cosBreakdown.tax;
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
     taxD.irpj += irpj; taxD.csll += csll;
@@ -867,7 +937,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     educationRevenue: r(annualEdu), baasRevenue: r(annualBaas), taxRevenue: r(annualTaxRev),
     deductions: r(annualDeductions), netRevenue: r(annualNetRevenue),
     dedDetail: { pis: r(dedD.pis), cofins: r(dedD.cofins), iss: r(dedD.iss), csllRetido: r(dedD.csllRetido), pisRetido: r(dedD.pisRetido), icms: r(dedD.icms), irrfRetido: r(dedD.irrfRetido), cofinsRetido: r(dedD.cofinsRetido) },
-    cogs: r(annualCogs), cogsDetail: { caas: r(cogsD.caas), customerService: r(cogsD.customerService), saas: r(cogsD.saas), education: r(cogsD.education), baas: r(cogsD.baas) },
+    cogs: r(annualCogs), cogsDetail: { caas: r(cogsD.caas), customerService: r(cogsD.customerService), saas: r(cogsD.saas), education: r(cogsD.education), baas: r(cogsD.baas), tax: r(cogsD.tax) },
     grossProfit: r(annualGrossProfit),
     grossMarginPct: annualNetRevenue !== 0 ? Number(((annualGrossProfit / annualNetRevenue) * 100).toFixed(1)) : 0,
     commissions: r(annualCommissions),

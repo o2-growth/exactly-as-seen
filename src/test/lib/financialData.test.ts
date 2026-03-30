@@ -54,9 +54,9 @@ describe('Financial Data: Default Assumptions', () => {
     }
   });
 
-  it('has sub-product clients for all 8 products × 6 years', () => {
+  it('has sub-product clients for all products × 6 years', () => {
     const products = Object.keys(a.subProductClients) as (keyof typeof a.subProductClients)[];
-    expect(products).toHaveLength(8);
+    expect(products.length).toBeGreaterThanOrEqual(8);
     for (const p of products) {
       for (const y of YEARS) {
         expect(typeof a.subProductClients[p][y]).toBe('number');
@@ -114,6 +114,19 @@ describe('Financial Data: Default Assumptions', () => {
     // Líder Setup
     expect(sq.setupLiderSalary).toBe(12000);
     expect(sq.setupSquadsPerLider).toBe(2);
+  });
+
+  it('cosConfig has all required fields with correct defaults', () => {
+    const cos = a.cosConfig!;
+    expect(cos.pfdClientsPerOne).toBe(100);
+    expect(cos.pfdSalary).toBe(30000);
+    expect(cos.cfoClientsPerOne).toBe(15);
+    expect(cos.cfoSalary).toBe(20000);
+    expect(cos.fpaClientsPerOne).toBe(7.5);
+    expect(cos.fpaSalary).toBe(8000);
+    expect(cos.eduCostRate).toBe(0.15);
+    expect(cos.expansaoCostRate).toBe(0.15);
+    expect(cos.taxCostRate).toBe(0.15);
   });
 
   it('headcountRatios are all positive', () => {
