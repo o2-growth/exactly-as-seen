@@ -180,9 +180,20 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * getTicketForMonth('saasOxy', month, year, assumptions);
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * getTicketForMonth('saasOxyGenio', month, year, assumptions);
-  // SaaS setup: use monthly setup clients from model data
-  const saasSetupArr = saasSetupClients[year] || saasSetupClients[2025];
-  const saasSetup   = (saasSetupArr[month] || 0) * avgTicket.saas.setup;
+  // SaaS setup: dynamic — sum of new clients from Enterprise, Corporate, Oxy, OxyGenio, OxyGenioEsp
+    const setupSources: [string, string][] = [
+      ['caas', 'enterprise'], ['caas', 'corporate'],
+      ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
+    ];
+    let setupNewClients = 0;
+    for (const [bu, prod] of setupSources) {
+      const curr = getMonthlyClientCount(bu, prod, month, year, assumptions);
+      const prev = month > 0
+        ? getMonthlyClientCount(bu, prod, month - 1, year, assumptions)
+        : (year > 2025 ? getMonthlyClientCount(bu, prod, 11, year - 1, assumptions) : 0);
+      setupNewClients += Math.max(0, curr - prev);
+    }
+    const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
   const saasTotal = saasOxy + saasOxyGenio + saasSetup;
 
   const eduDonoCfo = getMonthlyClientCount('education', 'donoCfo', month, year, assumptions) * getTicketForMonth('educationDonoCFO', month, year, assumptions);
