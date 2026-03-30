@@ -910,10 +910,11 @@ export default function Assumptions() {
                               }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              setAssumptions(prev => ({
+                              const updater = (prev: typeof assumptions) => ({
                                 ...prev,
                                 tickets: { ...prev.tickets, [prodKey]: val },
-                              }));
+                              });
+                              if (editing) setEditState(updater); else setAssumptions(updater);
                             };
                             return (
                             <tr className="border-b border-border/30">
