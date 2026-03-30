@@ -1167,6 +1167,40 @@ export default function Assumptions() {
                                       </button>
                                       {!data.churnNotApplicable?.[prodKey] && (
                                         <div className="ml-auto flex items-center gap-2">
+                                          <span className="text-[10px] text-muted-foreground">Churn base (flat):</span>
+                                          <input
+                                            type="number"
+                                            step="0.1"
+                                            className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                            value={data.monthlyChurnRates?.[prodKey]?.[selectedYear]
+                                              ?? (() => {
+                                                const r = getChurnMonthly(prodKey, data, selectedYear);
+                                                return Math.round(r * 12 * 100 * 10) / 10;
+                                              })()}
+                                            onClick={e => e.stopPropagation()}
+                                            onChange={e => {
+                                              const val = Number(e.target.value) || 0;
+                                              const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                              const newRates: Record<number, number> = {};
+                                              for (const y of yearsToApply) {
+                                                newRates[y] = val;
+                                              }
+                                              const updater = (prev: typeof assumptions) => ({
+                                                ...prev,
+                                                monthlyChurnRates: {
+                                                  ...(prev.monthlyChurnRates ?? {}),
+                                                  [prodKey]: {
+                                                    ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
+                                                    ...newRates,
+                                                  },
+                                                },
+                                              });
+                                              if (editing) setEditState(updater); else setAssumptions(updater);
+                                            }}
+                                            disabled={!editing}
+                                          />
+                                          <span className="text-[10px] text-muted-foreground">% a.a.</span>
+                                          <span className="text-muted-foreground/30">|</span>
                                           <span className="text-[10px] text-muted-foreground">Crescimento de churn:</span>
                                           <input
                                             type="number"
