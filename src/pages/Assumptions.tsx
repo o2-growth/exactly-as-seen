@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 /** Input with local state buffer — commits on blur/Enter, syncs when not focused */
-function MonthlyClientInput({ value, onCommit, className }: { value: number; onCommit: (v: number) => void; className?: string }) {
+function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: number; onCommit: (v: number) => void; className?: string; readOnly?: boolean }) {
   const [local, setLocal] = useState(value);
   const focused = useRef(false);
   useEffect(() => { if (!focused.current) setLocal(value); }, [value]);
   const commit = () => { focused.current = false; if (local !== value) onCommit(local); };
+  if (readOnly) {
+    return <span className={className}>{value.toLocaleString('pt-BR')}</span>;
+  }
   return (
     <input
       type="number"
@@ -859,6 +862,7 @@ export default function Assumptions() {
                                             value={assumptions.subProductClients[prodKey]?.[y] ?? 0}
                                             onClick={e => e.stopPropagation()}
                                             onChange={e => directUpdateClients(y, Number(e.target.value) || 0)}
+                                            disabled={!editing}
                                           />
                                         </div>
                                       ))}
@@ -878,11 +882,13 @@ export default function Assumptions() {
                                           value={rowApplyPct[rowKey] ?? 6}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          disabled={!editing}
                                         >
                                           Aplicar
                                         </button>
@@ -903,6 +909,7 @@ export default function Assumptions() {
                                                 value={monthly[i]}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
+                                                readOnly={!editing}
                                               />
                                             )}
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
@@ -920,18 +927,20 @@ export default function Assumptions() {
                                       <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
-                                        <input
+                                         <input
                                           type="number"
                                           step="0.1"
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowTicketGrowthPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowTicketGrowthPct(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
+                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors"
+                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                          disabled={!editing}
                                         >
                                           Aplicar
                                         </button>
@@ -951,6 +960,7 @@ export default function Assumptions() {
                                             ) : (
                                               <MonthlyClientInput
                                                 value={monthTicket}
+                                                readOnly={!editing}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
                                                   const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
@@ -1049,7 +1059,8 @@ export default function Assumptions() {
                                     <div className="flex items-center gap-4">
                                       <p className="text-xs font-semibold text-negative">Churn (clientes/mês) — {selectedYear}</p>
                                       <button
-                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                        disabled={!editing}
                                         onClick={e => {
                                           e.stopPropagation();
                                           setAssumptions(prev => ({
@@ -1076,10 +1087,12 @@ export default function Assumptions() {
                                             })()}
                                             onClick={e => e.stopPropagation()}
                                             onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
+                                            disabled={!editing}
                                           />
                                           <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                           <button
-                                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
+                                            className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                            disabled={!editing}
                                             onClick={e => {
                                               e.stopPropagation();
                                               const pct = rowChurnPct[prodKey] ?? (() => {
@@ -1390,15 +1403,19 @@ export default function Assumptions() {
                                   const cellValue = cfg[rowDef.field] as number;
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
-                                      <input
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="20"
-                                        className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                        value={cellValue}
-                                        onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
-                                      />
+                                      {editing ? (
+                                        <input
+                                          type="number"
+                                          step="0.1"
+                                          min="0"
+                                          max="20"
+                                          className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                          value={cellValue}
+                                          onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
+                                        />
+                                      ) : (
+                                        <span className="text-xs tabular-nums">{cellValue.toFixed(2).replace('.', ',')}%</span>
+                                      )}
                                     </td>
                                   );
                                 }
@@ -1448,6 +1465,7 @@ export default function Assumptions() {
                     setAssumptions({ ...assumptions, eduExpansaoTeamRate: v });
                   }
                 }}
+                disabled={!editing}
               />
               <span className="text-xs text-muted-foreground">% do faturamento</span>
             </div>
@@ -1519,27 +1537,27 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Diretor (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoSalary} disabled={!editing} onChange={e => updateSquad('cfoSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CFO (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistaSalary} disabled={!editing} onChange={e => updateSquad('cfoAnalistaSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CFO + FP&A / squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoAnalistasPerSquad} disabled={!editing} onChange={e => updateSquad('cfoAnalistasPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Clientes CaaS/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.cfoClientsPerSquad} disabled={!editing} onChange={e => updateSquad('cfoClientsPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csSalary} disabled={!editing} onChange={e => updateSquad('csSalary', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Clientes/CS</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.csPerClients} disabled={!editing} onChange={e => updateSquad('csPerClients', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
@@ -1552,19 +1570,19 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2 pt-1">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Analista/Impl (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplSalary} disabled={!editing} onChange={e => { updateSquad('setupImplSalary', Number(e.target.value) || 0); updateSquad('setupAnalistaSalary', Number(e.target.value) || 0); }} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Impl/squad</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupImplPerSquad} disabled={!editing} onChange={e => updateSquad('setupImplPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Setups/squad/mês</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupSetupsPerSquad} disabled={!editing} onChange={e => updateSquad('setupSetupsPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Líder (R$/mês)</label>
-                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
+                          <input type="number" className="w-full bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={sq.setupLiderSalary} disabled={!editing} onChange={e => updateSquad('setupLiderSalary', Number(e.target.value) || 0)} />
                         </div>
                       </div>
                     </div>
