@@ -910,10 +910,26 @@ export default function Assumptions() {
                               }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              const updater = (prev: typeof assumptions) => ({
-                                ...prev,
-                                tickets: { ...prev.tickets, [prodKey]: val },
-                              });
+                              // Update flat ticket AND project all months from selectedYear to 2030
+                              const updater = (prev: typeof assumptions) => {
+                                const newMonthlyTickets = { ...(prev.monthlyTickets ?? {}) };
+                                const prevProdTickets = { ...(newMonthlyTickets[prodKey] ?? {}) };
+                                for (const y of YEARS.filter(yr => yr >= selectedYear)) {
+                                  const yearArr = prevProdTickets[y] ? [...prevProdTickets[y]!] : Array(12).fill(val);
+                                  for (let m = 0; m < 12; m++) {
+                                    if (!isHistorical(y, m)) {
+                                      yearArr[m] = val;
+                                    }
+                                  }
+                                  prevProdTickets[y] = yearArr;
+                                }
+                                newMonthlyTickets[prodKey] = prevProdTickets;
+                                return {
+                                  ...prev,
+                                  tickets: { ...prev.tickets, [prodKey]: val },
+                                  monthlyTickets: newMonthlyTickets,
+                                };
+                              };
                               if (editing) setEditState(updater); else setAssumptions(updater);
                             };
                             return (
@@ -1086,7 +1102,7 @@ export default function Assumptions() {
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
                                       <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
                                       {(() => {
-                                        const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
+                                        const decTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         return <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * decTicket)}</strong></span>;
                                       })()}
                                     </div>
@@ -1098,7 +1114,7 @@ export default function Assumptions() {
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
-                                        const monthTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                        const monthTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
                                         const grossRevenue = monthly[i] * monthTicket;
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-accent/20 border border-accent/30'}`}>
@@ -1113,10 +1129,10 @@ export default function Assumptions() {
                                     <div className="flex items-center gap-6 text-xs">
                                       {(() => {
                                         const totalAno = MONTHS.reduce((sum, _, i) => {
-                                          const mt = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                          const mt = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
                                           return sum + monthly[i] * mt;
                                         }, 0);
-                                        const decTicket = assumptions.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
+                                        const decTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         const mrrDez = monthly[11] * decTicket;
                                         return (
                                           <>
@@ -1151,7 +1167,7 @@ export default function Assumptions() {
                                       </button>
                                       {!data.churnNotApplicable?.[prodKey] && (
                                         <div className="ml-auto flex items-center gap-2">
-                                          <span className="text-[10px] text-muted-foreground">Taxa de churn:</span>
+                                          <span className="text-[10px] text-muted-foreground">Crescimento de churn:</span>
                                           <input
                                             type="number"
                                             step="0.5"
@@ -1170,17 +1186,33 @@ export default function Assumptions() {
                                             disabled={!editing}
                                             onClick={e => {
                                               e.stopPropagation();
-                                              const pct = rowChurnPct[prodKey] ?? (() => {
-                                                const rate = getChurnMonthly(prodKey, data, selectedYear);
-                                                return Math.round(rate * 12 * 100 * 10) / 10;
-                                              })();
+                                              const growthPct = rowChurnPct[prodKey] ?? 0;
+                                              const growthRate = growthPct / 100;
+                                              // Get current churn rate for this product/year as base
+                                              const currentChurnAnnual = data.monthlyChurnRates?.[prodKey]?.[selectedYear]
+                                                ?? (() => {
+                                                  const r = getChurnMonthly(prodKey, data, selectedYear);
+                                                  return Math.round(r * 12 * 100 * 10) / 10;
+                                                })();
+                                              // Propagate churn with growth until 2030
+                                              const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                              const newRates: Record<number, number> = {};
+                                              let base = currentChurnAnnual;
+                                              for (const y of yearsToApply) {
+                                                if (y === selectedYear) {
+                                                  newRates[y] = base;
+                                                } else {
+                                                  base = Math.round(base * (1 + growthRate) * 100) / 100;
+                                                  newRates[y] = base;
+                                                }
+                                              }
                                               const updater = (prev: typeof assumptions) => ({
                                                 ...prev,
                                                 monthlyChurnRates: {
                                                   ...(prev.monthlyChurnRates ?? {}),
                                                   [prodKey]: {
                                                     ...((prev.monthlyChurnRates ?? {})[prodKey] ?? {}),
-                                                    [selectedYear]: pct,
+                                                    ...newRates,
                                                   },
                                                 },
                                               });
