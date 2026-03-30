@@ -37,6 +37,7 @@ import { namedEmployees as hcNamedEmployees, payrollFaturamento, payrollGrossRev
 import { historicalCosts, historicalExpenses, historicalExpenseItems, historicalFinancial, HISTORICAL_PERIODS } from '@/data/historicalData';
 import { PnlNode } from '@/lib/pnlData';
 import { ExpandableMonthTable } from '@/components/assumptions/ExpandableMonthRow';
+import { CurrencyInput } from '@/components/assumptions/CurrencyInput';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -1440,7 +1441,7 @@ export default function Assumptions() {
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <input type="number" className={inputCls} value={cos.pfdSalary} disabled={!editing} onChange={e => updateCos('pfdSalary', Number(e.target.value) || 0)} />
+                        <CurrencyInput value={cos.pfdSalary} disabled={!editing} onChange={v => updateCos('pfdSalary', v)} />
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
@@ -1451,7 +1452,7 @@ export default function Assumptions() {
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <input type="number" className={inputCls} value={cos.cfoSalary} disabled={!editing} onChange={e => updateCos('cfoSalary', Number(e.target.value) || 0)} />
+                        <CurrencyInput value={cos.cfoSalary} disabled={!editing} onChange={v => updateCos('cfoSalary', v)} />
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
@@ -1462,7 +1463,7 @@ export default function Assumptions() {
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <input type="number" className={inputCls} value={cos.fpaSalary} disabled={!editing} onChange={e => updateCos('fpaSalary', Number(e.target.value) || 0)} />
+                        <CurrencyInput value={cos.fpaSalary} disabled={!editing} onChange={v => updateCos('fpaSalary', v)} />
                       </div>
                     </div>
                   </div>
@@ -1486,7 +1487,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Dev Senior (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.devSrSalary} disabled={!editing} onChange={e => updateCos('devSrSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.devSrSalary} disabled={!editing} onChange={v => updateCos('devSrSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Customer Success — 1 a cada N clientes</label>
@@ -1494,7 +1495,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.csSaaSalary} disabled={!editing} onChange={e => updateCos('csSaaSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.csSaaSalary} disabled={!editing} onChange={v => updateCos('csSaaSalary', v)} />
                         </div>
                       </div>
                     </div>
@@ -1513,7 +1514,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Data Analyst (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.dataAnalystSalary} disabled={!editing} onChange={e => updateCos('dataAnalystSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.dataAnalystSalary} disabled={!editing} onChange={v => updateCos('dataAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analysts / squad</label>
@@ -1521,7 +1522,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analyst (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.processAnalystSalary} disabled={!editing} onChange={e => updateCos('processAnalystSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.processAnalystSalary} disabled={!editing} onChange={v => updateCos('processAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Head of Data — 1 a cada N novos/mês</label>
@@ -1529,7 +1530,7 @@ export default function Assumptions() {
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Head of Data (R$/mês)</label>
-                          <input type="number" className={inputCls} value={cos.headDataSalary} disabled={!editing} onChange={e => updateCos('headDataSalary', Number(e.target.value) || 0)} />
+                          <CurrencyInput value={cos.headDataSalary} disabled={!editing} onChange={v => updateCos('headDataSalary', v)} />
                         </div>
                       </div>
                     </div>
@@ -1581,7 +1582,7 @@ export default function Assumptions() {
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                      <input type="number" className={inputCls} value={cos.cxAnalystSalary} disabled={!editing} onChange={e => updateCos('cxAnalystSalary', Number(e.target.value) || 0)} />
+                      <CurrencyInput value={cos.cxAnalystSalary} disabled={!editing} onChange={v => updateCos('cxAnalystSalary', v)} />
                     </div>
                   </div>
                 </div>
