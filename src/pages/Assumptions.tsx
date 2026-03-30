@@ -1173,51 +1173,6 @@ export default function Assumptions() {
                   </React.Fragment>
                 ))}
 
-                {/* ── Novos Clientes por produto ── */}
-                <tr className="bg-secondary/40 border-b border-border/50">
-                  <td colSpan={showGrowthPct ? 27 : 15} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
-                    Novos Clientes
-                  </td>
-                </tr>
-                {CLIENTS_ROWS.flatMap(group => group.items.filter(r => r.dataKey)).map(row => {
-                  const rowKey = row.dataKey!;
-                  const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
-                  const churn = getChurnMonthly(rowKey, data, selectedYear);
-                  const monthly = getMonthlyClients(rowKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v));
-                  const newClients = monthly.map((val, i) => {
-                    if (i === 0) {
-                      let prevBase: number;
-                      if (selectedYear === 2025) prevBase = 0;
-                      else if (selectedYear === 2026) prevBase = Math.round(getMonthlyClients(rowKey, 2025, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
-                      else prevBase = Math.round(getMonthlyClients(rowKey, (selectedYear - 1) as Year, data.subProductClients, undefined, data.monthlyClientOverrides)[11]);
-                      return Math.max(0, val - prevBase);
-                    }
-                    return Math.max(0, val - monthly[i - 1]);
-                  });
-                  return (
-                    <tr key={`new-${rowKey}`} className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                      <td className="p-2 pl-5 font-medium text-xs text-emerald-500">{row.label}</td>
-                      {MONTHS.map((_, i) => {
-                        const hist = isHistorical(selectedYear, i);
-                        const cutoff = selectedYear === 2026 && i === 2;
-                        return (
-                          <React.Fragment key={i}>
-                            <td className={`text-right px-1 py-1 tabular-nums text-xs text-emerald-500/80${cutoff ? ' border-l-2 border-primary/40' : ''}${hist ? ' bg-secondary/30' : ''}`}>
-                              {newClients[i] || '—'}
-                            </td>
-                            {showGrowthPct && <td className="text-right px-1 py-1" />}
-                          </React.Fragment>
-                        );
-                      })}
-                      <td className="text-right px-2 py-1 tabular-nums text-xs font-semibold text-emerald-500 bg-primary/5">
-                        {newClients.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}
-                      </td>
-                      {showGrowthPct && <td />}
-                    </tr>
-                  );
-                })}
-
-
 
                 {/* ── Totais: Novos Clientes e Churn ── */}
                 {(() => {
