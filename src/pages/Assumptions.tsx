@@ -862,6 +862,7 @@ export default function Assumptions() {
                                             value={assumptions.subProductClients[prodKey]?.[y] ?? 0}
                                             onClick={e => e.stopPropagation()}
                                             onChange={e => directUpdateClients(y, Number(e.target.value) || 0)}
+                                            disabled={!editing}
                                           />
                                         </div>
                                       ))}
