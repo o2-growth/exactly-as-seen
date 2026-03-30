@@ -941,7 +941,7 @@ export default function Assumptions() {
                                   {/* Monthly breakdown */}
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-semibold text-muted-foreground">Clientes mensais — {selectedYear}</p>
+                                      <p className="text-xs font-semibold text-muted-foreground">Novos clientes mensais — {selectedYear}</p>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
                                         <input
