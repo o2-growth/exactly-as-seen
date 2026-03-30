@@ -1019,7 +1019,11 @@ export default function Assumptions() {
                                   {/* Monthly breakdown */}
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-semibold text-muted-foreground">Novos clientes mensais — {selectedYear}</p>
+                                      <p className="text-xs font-semibold text-muted-foreground">
+                                        Novos clientes mensais — {selectedYear}
+                                        {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
+                                      </p>
+                                      {prodKey !== 'saasSetup' && (
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
                                         <input
@@ -1040,6 +1044,7 @@ export default function Assumptions() {
                                           Aplicar
                                         </button>
                                       </div>
+                                      )}
                                     </div>
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
