@@ -11,7 +11,7 @@ import {
   cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
   commercialExpenses2025, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
-  salaryRanges, expectedOutputs, saasSetupClients, namedEmployees2025,
+  salaryRanges, expectedOutputs, namedEmployees2025,
   financialItems2025, outrosExpenses2025,
 } from '@/data/modelData';
 import {
@@ -119,7 +119,7 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
   const keyMap: Record<string, string> = {
     'caas.assessoria': 'caasAssessoria', 'caas.enterprise': 'caasEnterprise',
     'caas.corporate': 'caasCorporate', 'caas.setup': 'caasSetup',
-    'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio',
+    'saas.oxy': 'saasOxy', 'saas.oxyGenio': 'saasOxyGenio', 'saas.oxyGenioEsp': 'saasOxyGenioEsp',
     'education.donoCfo': 'educationDonoCFO', 'baas.assinatura': 'baas',
     'tax.at': 'taxAT', 'tax.gpt': 'taxGPT', 'tax.rct': 'taxRCT',
     'tax.rt': 'taxRT', 'tax.dtc': 'taxDTC',
@@ -180,9 +180,20 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
 
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * getTicketForMonth('saasOxy', month, year, assumptions);
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * getTicketForMonth('saasOxyGenio', month, year, assumptions);
-  // SaaS setup: use monthly setup clients from model data
-  const saasSetupArr = saasSetupClients[year] || saasSetupClients[2025];
-  const saasSetup   = (saasSetupArr[month] || 0) * avgTicket.saas.setup;
+  // SaaS setup: dynamic — sum of new clients from Enterprise, Corporate, Oxy, OxyGenio, OxyGenioEsp
+    const setupSources: [string, string][] = [
+      ['caas', 'enterprise'], ['caas', 'corporate'],
+      ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
+    ];
+    let setupNewClients = 0;
+    for (const [bu, prod] of setupSources) {
+      const curr = getMonthlyClientCount(bu, prod, month, year, assumptions);
+      const prev = month > 0
+        ? getMonthlyClientCount(bu, prod, month - 1, year, assumptions)
+        : (year > 2025 ? getMonthlyClientCount(bu, prod, 11, year - 1, assumptions) : 0);
+      setupNewClients += Math.max(0, curr - prev);
+    }
+    const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
   const saasTotal = saasOxy + saasOxyGenio + saasSetup;
 
   const eduDonoCfo = getMonthlyClientCount('education', 'donoCfo', month, year, assumptions) * getTicketForMonth('educationDonoCFO', month, year, assumptions);
@@ -729,17 +740,19 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     const saasSubClientsM = getMonthlyClientCount('saas', 'oxy', m, year, assumptions)
       + getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions);
 
-    // New Setup clients = new CaaS Enterprise/Corporate + new SaaS subscriptions this month
-    const prevCaasEnt = m > 0 ? getMonthlyClientCount('caas', 'enterprise', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'enterprise', 11, year - 1, assumptions) : 0);
-    const prevCaasCorp = m > 0 ? getMonthlyClientCount('caas', 'corporate', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('caas', 'corporate', 11, year - 1, assumptions) : 0);
-    const prevSaasOxy = m > 0 ? getMonthlyClientCount('saas', 'oxy', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxy', 11, year - 1, assumptions) : 0);
-    const prevSaasOG = m > 0 ? getMonthlyClientCount('saas', 'oxyGenio', m - 1, year, assumptions) : (year > 2025 ? getMonthlyClientCount('saas', 'oxyGenio', 11, year - 1, assumptions) : 0);
-    const newSetupClients = Math.max(0,
-      (getMonthlyClientCount('caas', 'enterprise', m, year, assumptions) - prevCaasEnt) +
-      (getMonthlyClientCount('caas', 'corporate', m, year, assumptions) - prevCaasCorp) +
-      (getMonthlyClientCount('saas', 'oxy', m, year, assumptions) - prevSaasOxy) +
-      (getMonthlyClientCount('saas', 'oxyGenio', m, year, assumptions) - prevSaasOG)
-    );
+    // New Setup clients = new Enterprise + Corporate + Oxy + OxyGenio + OxyGenioEsp
+    const setupSourcesCOS: [string, string][] = [
+      ['caas', 'enterprise'], ['caas', 'corporate'],
+      ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
+    ];
+    let newSetupClients = 0;
+    for (const [sBu, sProd] of setupSourcesCOS) {
+      const curr = getMonthlyClientCount(sBu, sProd, m, year, assumptions);
+      const prev = m > 0
+        ? getMonthlyClientCount(sBu, sProd, m - 1, year, assumptions)
+        : (year > 2025 ? getMonthlyClientCount(sBu, sProd, 11, year - 1, assumptions) : 0);
+      newSetupClients += Math.max(0, curr - prev);
+    }
 
     // COS (Cost of Service) via config
     const cosBreakdown = calcCOSFromConfig(m, year, caasClientsForCOS, saasSubClientsM, newSetupClients, eduRev, baasRev, taxRev, assumptions);
