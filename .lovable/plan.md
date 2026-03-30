@@ -1,39 +1,61 @@
 
+Objetivo: manter “Crescimento de churn” acima, como você pediu, e corrigir a lógica para que qualquer mudança de churn reflita imediatamente no mês a mês.
 
-# Mover controles de Churn para baixo dos meses e corrigir projeção
+Diagnóstico
+- O problema não é mais de layout.
+- Hoje o churn altera `monthlyChurnRates`, mas a grade mensal exibida vem de `monthlyClientOverrides`/`subProductClients`.
+- Como essa projeção de clientes não é recalculada quando o churn muda, o valor do churn muda internamente, porém o mês a mês continua igual.
 
-## Problema
-1. Os controles "Churn base (flat)", "Crescimento de churn" e "Aplicar" estão **acima** da grade mensal — o padrão das outras seções (ticket) é colocá-los **abaixo**
-2. O valor flat não está refletindo nos meses — provavelmente porque o input `value` usa uma IIFE como fallback que pode causar problemas de re-render
+Implementação proposta
 
-## Solução
+1. Centralizar a reprojeção de clientes quando churn mudar
+- Arquivo: `src/pages/Assumptions.tsx`
+- Criar um helper local para um subproduto:
+  - ler a base do ano anterior
+  - ler overrides manuais existentes
+  - aplicar crescimento mensal já salvo em `growthRates`
+  - aplicar o churn atualizado
+  - regenerar `monthlyClientOverrides[prodKey][year]`
+  - atualizar também `subProductClients[prodKey][year]` com o valor de dezembro
+- Rodar isso de `selectedYear` até 2030, encadeando dezembro de um ano no próximo.
 
-### Arquivo: `src/pages/Assumptions.tsx`
+2. Fazer o “Churn base (flat)” disparar essa reprojeção
+- Manter o campo acima dos meses.
+- Ao editar o valor:
+  - continuar salvando em `monthlyChurnRates`
+  - em seguida recalcular as projeções mensais do subproduto do ano selecionado até 2030
+- Isso fará a grade mensal mudar na hora.
 
-**1. Reposicionar controles (L1169-1257 → mover para depois de L1287)**
+3. Fazer “Aplicar” do crescimento de churn também reprojetar
+- O botão continuará atualizando `monthlyChurnRates` com crescimento anual composto.
+- Depois disso, aplicar a mesma reprojeção mensal para todos os anos afetados.
+- Percentuais negativos continuam permitidos.
 
-Mover todo o bloco `{!data.churnNotApplicable?.[prodKey] && (<div className="flex flex-wrap ...">` para **depois** da grade de meses (depois do `</div>` do grid em L1286), seguindo o mesmo padrão do ticket onde os controles ficam abaixo dos meses.
+4. Preservar entradas manuais do usuário
+- A reprojeção deve seguir o mesmo padrão já usado em `handleApplyRow`:
+  - respeitar `manualMonthlyClientOverrideFlags`
+  - manter meses editados manualmente como seed
+  - recalcular só os meses automáticos à frente
+- Assim o churn passa a influenciar o modelo sem apagar ajustes manuais.
 
-Ordem final:
+5. Ajustar os pontos que hoje leem apenas o valor derivado
+- Garantir que:
+  - a grade de churn continue lendo `getChurnMonthly(prodKey, data, selectedYear)`
+  - a grade de clientes use os overrides recém-recalculados
+  - o total anual de churn também reflita a nova base mensal imediatamente
+
+Resultado esperado
+- “Crescimento de churn” permanece acima.
+- Alterar “Churn base (flat)” muda o mês a mês de clientes.
+- Clicar em “Aplicar” no churn reprojeta do ano selecionado até 2030.
+- Funciona para todas as categorias e subcategorias já renderizadas na aba Revenue.
+
+Detalhe técnico
+- Hoje existem dois fluxos separados:
+  - churn: altera `monthlyChurnRates`
+  - clientes mensais: exibidos a partir de `monthlyClientOverrides` + `subProductClients`
+- A correção é ligar esses dois fluxos, reutilizando a mesma fórmula já existente em `handleApplyRow`:
+```text
+prev = prev * (1 + growth - churnRate)
 ```
-Título "Churn (clientes/mês)" + [N/A]
-Grid 12 meses (ou N/A)
-Churn base (flat): [___]  |  Crescimento de churn: [___]  [Aplicar]
-Total ano: X clientes perdidos
-```
-
-**2. Corrigir value do input "Churn base (flat)"**
-
-O `value` atual usa uma IIFE como fallback que pode não atualizar corretamente. Trocar para uma variável calculada antes do JSX:
-
-```ts
-const currentChurnFlat = data.monthlyChurnRates?.[prodKey]?.[selectedYear] 
-  ?? Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
-```
-
-E usar `value={currentChurnFlat}` no input — mais limpo e garante re-render correto.
-
-**3. Condicionar exibição dos controles**
-
-Só mostrar os controles de flat+crescimento quando `!data.churnNotApplicable?.[prodKey]`, mantendo a lógica atual mas na nova posição (abaixo do grid).
-
+- Só que agora essa reprojeção também será chamada quando o churn mudar, e não apenas quando o crescimento de clientes for aplicado.
