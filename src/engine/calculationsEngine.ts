@@ -709,7 +709,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       saasOxyGenio: rev.saasOxyGenio / 1000,
       saasSetup: rev.saasSetup / 1000,
       saasParceiros: 0,
-      saasOxyGenioEsp: 0,
+      saasOxyGenioEsp: rev.saasOxyGenioEsp / 1000,
       educationDonoCFO: rev.educationDonoCfo / 1000,
       educationEN: 0,
       educationFR: 0,
