@@ -1,49 +1,75 @@
 
 
-# Corrigir botão "Edit Assumptions" e persistência de alterações
+# Refazer bloco COS nas Assumptions — Premissas de Custos Variáveis por Categoria
 
-## Problemas identificados
+## Resumo
+Substituir o bloco COS atual por um sistema de premissas completo com 6 categorias (3.1–3.6), onde CaaS e Setup usam lógica de **squad por clientes** e Education, Expansão e Tax usam **% da receita bruta**. Inclui também ajuste automático de clientes Setup (1.2.3).
 
-1. **Campos editáveis sem clicar "Edit Assumptions"**: Os componentes `MonthlyClientInput` e `InlineEditCell` (usados nos subprodutos, tickets, churn, tax) **não verificam** o estado `editing`. Apenas o antigo `CellInput` respeita esse flag. Resultado: tudo é editável mesmo com "Cells are locked".
+## Estrutura das premissas
 
-2. **Alterações não salvas no histórico**: Quando se edita sem o modo edit, as mudanças vão direto para `assumptions` via `setAssumptions` (auto-save com debounce de 2s). Porém, o auto-save usa `saveAssumptions` do persistence hook, que **não cria uma versão no histórico** — apenas grava no localStorage/Supabase. Somente `confirmSave` (botão Save) chama `saveVersion`. Resultado: alterações feitas fora do modo edit podem ser perdidas se o snapshot for sobrescrito.
+```text
+3.1 Custos CaaS — Squad por clientes CaaS
+  • Project Finance Director: 1 a cada 100 clientes (R$ 30.000)
+  • CFO: 1 a cada 15 clientes (R$ 20.000)
+  • FP&A Analyst: 1 a cada 7,5 clientes (R$ 8.000)
+  → Squad = 1 CFO + 2 FP&A. Diretor cobre ~6-7 squads.
 
-## Solução
+3.2 Custos SaaS — Squad por clientes SaaS (assinatura)
+  • Dev Senior: 1 a cada 100 clientes assinatura (R$ 10.000)
+  • Customer Success: 1 a cada 100 clientes assinatura (R$ 5.000)
+  Assinaturas = saasOxy + saasOxyGenio + saasOxyGenioEsp
 
-### 1. Bloquear inputs quando `editing = false`
+3.2 (Setup — subcategoria) — Squad por novos clientes/mês
+  • Data Analyst: 2 a cada 32 novos clientes/mês (R$ 8.000)
+  • Process Analyst: 1 a cada 32 novos clientes/mês (R$ 5.000)
+  • Head of Data: 1 a cada 64 novos clientes/mês (R$ 15.000)
+  Novos = novos CaaS Enterprise/Corporate + novos SaaS assinatura
 
-**Arquivo: `src/pages/Assumptions.tsx`**
+3.3 Custos Education — 15% receita bruta Education
+3.4 Custos Customer Success — Customer Experience Analyst
+  • 1 a cada 100 clientes CaaS (R$ 5.000)
+3.5 Custos Expansão — 15% receita bruta Expansão
+3.6 Custos Tax — 15% receita bruta Tax
+```
 
-- Passar prop `editing` para `MonthlyClientInput` — quando `false`, renderizar `<span>` read-only em vez de `<input>`
-- Fazer o mesmo para todas as ocorrências de `InlineEditCell` — adicionar prop `disabled` ou `readOnly`
-- Bloquear campos de taxa de crescimento, churn, ticket base, e tax rates quando `editing = false`
-- Bloquear botões "Aplicar" de crescimento/churn quando `editing = false`
+## Ajuste Setup (1.2.3) — clientes automáticos
+Clientes Setup de cada mês = novos clientes CaaS Enterprise + CaaS Corporate + SaaS Oxy + SaaS Oxy+Gênio + SaaS Oxy+Gênio+Especialista daquele mês. Setup não acumula (não é recorrente).
 
-Componentes afetados:
-- `MonthlyClientInput` (~15 usos) — adicionar prop `readOnly`
-- `InlineEditCell` — já tem prop `className`, adicionar `disabled?: boolean`
-- Inputs de taxa de crescimento/churn (inputs diretos com `onChange`)
-- Inputs de tax rates (inputs na tabela de deduções)
-- Botões "Aplicar" (crescimento e churn)
+## Alterações por arquivo
 
-### 2. Auto-salvar no histórico a cada edição confirmada
+### 1. `src/lib/financialData.ts`
+- Substituir `squadConfig` por novo `cosConfig` com toda a estrutura:
+  - CaaS squad: `pfdClientsPerOne`, `pfdSalary`, `cfoClientsPerOne`, `cfoSalary`, `fpaClientsPerOne`, `fpaSalary`
+  - SaaS assinatura: `devSrClientsPerOne`, `devSrSalary`, `csClientsPerOne`, `csSalary`
+  - Setup squad: `setupClientsPerSquad`, `dataAnalystPerSquad`, `dataAnalystSalary`, `processAnalystPerSquad`, `processAnalystSalary`, `headDataClientsPerOne`, `headDataSalary`
+  - Customer Success: `cxAnalystClientsPerOne`, `cxAnalystSalary`
+  - Education/Expansão/Tax: `eduCostRate`, `expansaoCostRate`, `taxCostRate`
+- Remover `eduExpansaoTeamRate` (substituído pelos rates individuais)
+- Manter `squadConfig` no tipo para migração, mas defaults usam `cosConfig`
 
-**Arquivo: `src/pages/Assumptions.tsx`**
+### 2. `src/engine/calculationsEngine.ts`
+- Criar `calcCOSFromConfig()` que substitui `calcMonthlyCOGS`:
+  - **3.1 CaaS**: PFD + CFO + FP&A baseado em clientes CaaS acumulados do mês
+  - **3.2 SaaS**: Dev Sr + CS baseado em clientes SaaS assinatura acumulados; Setup squad baseado em novos clientes/mês
+  - **3.3 Education**: `eduCostRate × receita Education do mês`
+  - **3.4 Customer Success**: CX Analyst baseado em clientes CaaS
+  - **3.5 Expansão**: `expansaoCostRate × receita Expansão`
+  - **3.6 Tax**: `taxCostRate × receita Tax`
+- Ajustar cálculo de clientes Setup (1.2.3): novos = delta mensal de CaaS Enterprise + Corporate + SaaS assinaturas
+- Atualizar `cogsDetail` para incluir `tax` (hoje é zero)
+- Remover referência a `eduExpansaoTeamRate` na margem de contribuição
 
-- No `confirmSave`, manter o fluxo atual (modal com nota obrigatória + `saveVersion`)
-- Este é o comportamento correto — cada Save cria uma versão
-
-**Arquivo: `src/contexts/FinancialModelContext.tsx`**
-
-- O auto-save (debounce 2s) já persiste no backend/localStorage — isso garante que mudanças não se percam entre sessões
-- Garantir que o `loadSnapshots` no mount não sobrescreve edições feitas na sessão atual (o `hasLoaded` ref já previne isso)
-
-### 3. Garantir consistência do estado
-
-- Remover o caminho `else` do `updateModel` que faz `setAssumptions(updater(assumptions))` direto — todas as edições devem passar pelo modo editing
-- Quando `editing = false`, nenhum handler de mudança deve ser chamado
+### 3. `src/pages/Assumptions.tsx`
+- Substituir todo o bloco COS (L1342–1542) por:
+  - **Cards por categoria** (3.1 a 3.6) com inputs editáveis para cada parâmetro
+  - Cards CaaS/SaaS/CS: inputs de "1 a cada N clientes" + salário, com tabela de impacto por ano
+  - Cards Education/Expansão/Tax: input de % da receita bruta
+  - Tabela resumo com custo total COS por ano e % da receita
+- Manter lógica de `editing` gate em todos os inputs
+- Remover seções "Headcount Projetado por Área" e "Regras de Contratação" duplicadas (se existirem separadamente)
 
 ## Arquivos alterados
-1. `src/pages/Assumptions.tsx` — gate de `editing` em todos os inputs
-2. `src/components/assumptions/InlineEditCell.tsx` — prop `disabled`
+1. `src/lib/financialData.ts` — novo `CosConfig` + defaults
+2. `src/engine/calculationsEngine.ts` — novo cálculo COS por categoria + Setup automático
+3. `src/pages/Assumptions.tsx` — novo bloco COS completo
 
