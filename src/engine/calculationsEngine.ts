@@ -191,7 +191,7 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
     setupNewClients += getMonthlyClientCount(bu, prod, month, year, assumptions);
   }
   const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
-  const saasTotal = saasOxy + saasOxyGenio + saasSetup;
+  const saasTotal = saasOxy + saasOxyGenio + saasOxyGenioEsp + saasSetup;
 
   const eduDonoCfo = getMonthlyClientCount('education', 'donoCfo', month, year, assumptions) * getTicketForMonth('educationDonoCFO', month, year, assumptions);
   const eduTotal = eduDonoCfo;
