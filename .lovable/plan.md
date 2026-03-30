@@ -1,32 +1,39 @@
 
 
-# Corrigir visibilidade do campo "Churn base (flat)" e controles de crescimento
+# Mover controles de Churn para baixo dos meses e corrigir projeção
 
 ## Problema
-Os controles de churn (campo "Churn base flat", "Crescimento de churn" e botão "Aplicar") estão todos numa única linha horizontal com `ml-auto`, o que faz com que em viewports de ~993px eles saiam da área visível ou fiquem cortados. O usuário não consegue ver nem interagir com esses campos.
+1. Os controles "Churn base (flat)", "Crescimento de churn" e "Aplicar" estão **acima** da grade mensal — o padrão das outras seções (ticket) é colocá-los **abaixo**
+2. O valor flat não está refletindo nos meses — provavelmente porque o input `value` usa uma IIFE como fallback que pode causar problemas de re-render
 
 ## Solução
 
-### Arquivo: `src/pages/Assumptions.tsx` (~L1148-1260)
+### Arquivo: `src/pages/Assumptions.tsx`
 
-**Quebrar o layout do bloco de churn em múltiplas linhas**, igual ao padrão usado no bloco de ticket:
+**1. Reposicionar controles (L1169-1257 → mover para depois de L1287)**
 
-1. **Linha do título + N/A**: manter na primeira linha
-2. **Churn base (flat) + Crescimento de churn + Aplicar**: mover para uma segunda linha abaixo do título, usando `flex flex-wrap items-center gap-2` em vez de `ml-auto` numa única linha
+Mover todo o bloco `{!data.churnNotApplicable?.[prodKey] && (<div className="flex flex-wrap ...">` para **depois** da grade de meses (depois do `</div>` do grid em L1286), seguindo o mesmo padrão do ticket onde os controles ficam abaixo dos meses.
 
-Layout proposto:
+Ordem final:
 ```
-Churn (clientes/mês) — 2025   [N/A]
-Churn base (flat): [___] % a.a.  |  Crescimento de churn: [___] % a.a.  [Aplicar]
+Título "Churn (clientes/mês)" + [N/A]
+Grid 12 meses (ou N/A)
+Churn base (flat): [___]  |  Crescimento de churn: [___]  [Aplicar]
+Total ano: X clientes perdidos
 ```
 
-Isso garante que:
-- Os campos fiquem sempre visíveis independente da largura da tela
-- O input de "Churn base (flat)" fique acessível para digitação
-- O botão "Aplicar" fique visível e clicável
-- Mantém o `disabled={!editing}` em todos os campos
+**2. Corrigir value do input "Churn base (flat)"**
 
-### Mudança técnica
-- Mover o bloco `{!data.churnNotApplicable?.[prodKey] && (...)}` (linhas 1168-1259) para fora do `div` do título, criando um `div` separado logo abaixo
-- Usar `flex flex-wrap items-center gap-2 mt-1` no novo container
+O `value` atual usa uma IIFE como fallback que pode não atualizar corretamente. Trocar para uma variável calculada antes do JSX:
+
+```ts
+const currentChurnFlat = data.monthlyChurnRates?.[prodKey]?.[selectedYear] 
+  ?? Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
+```
+
+E usar `value={currentChurnFlat}` no input — mais limpo e garante re-render correto.
+
+**3. Condicionar exibição dos controles**
+
+Só mostrar os controles de flat+crescimento quando `!data.churnNotApplicable?.[prodKey]`, mantendo a lógica atual mas na nova posição (abaixo do grid).
 
