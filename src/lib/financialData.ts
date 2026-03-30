@@ -341,29 +341,25 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
     taxRT: 5000,
     taxDTC: 5000,
   },
-  // Item 8: 15% Education/Expansão team rate
+  // Item 8: legacy rate
   eduExpansaoTeamRate: 0.15,
-  // Item 7: Squad config
+  // Item 7: legacy Squad config
   squadConfig: {
-    // Squad CaaS: 1 Diretor (R$15k) + 2 (CFO + FP&A) (R$8k cada) = R$31k/squad, aguenta 15 clientes
     cfoSalary: 15000,
     cfoAnalistaSalary: 8000,
     cfoAnalistasPerSquad: 2,
     cfoClientsPerSquad: 15,
-    // CS: 1 CS (R$5k) a cada 100 clientes — inside Squad CaaS
     csPerClients: 100,
     csSalary: 5000,
-    // Squad Setup: 1 analista (R$8k) + 2 implementadores (R$8k cada) = R$24k/squad, aguenta 16 setups/mês
     setupAnalistaSalary: 8000,
     setupImplSalary: 8000,
     setupImplPerSquad: 2,
     setupSetupsPerSquad: 16,
-    // Líder: R$12k, cuida de 2 squads (custo dividido = R$6k por squad → total R$30k/squad)
     setupLiderSalary: 12000,
     setupSquadsPerLider: 2,
   },
-  // Editable Selic monthly rate (default 1.17%)
-  selicMonthly: 0.0117,
+  // COS Config (new)
+  cosConfig: { ...DEFAULT_COS_CONFIG },
   // Lucro Presumido — tax config per BU
   buTaxConfigs: [
     { buKey: 'caas',  tipoReceita: 'servico', aliquotaIss: 5 },
