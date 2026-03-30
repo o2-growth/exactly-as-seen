@@ -959,6 +959,7 @@ export default function Assumptions() {
                                             ) : (
                                               <MonthlyClientInput
                                                 value={monthTicket}
+                                                readOnly={!editing}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
                                                   const currentMonthlyTickets = assumptions.monthlyTickets ?? {};
