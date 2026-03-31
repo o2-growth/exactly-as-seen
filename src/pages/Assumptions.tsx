@@ -187,12 +187,18 @@ function isHistorical(year: Year, monthIdx: number): boolean {
   return false;
 }
 
-function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
-  // N/A — no churn for this product
+/** Returns the monthly churn rate (as a fraction, e.g. 0.004167 for 5%/12) for a specific month.
+ *  If monthlyChurnRates[key][year] is an array of 12 values, returns array[monthIndex] / 100 / 12.
+ *  If it's a single number (legacy flat), returns that number / 100 / 12.
+ *  Otherwise falls back to the category default. */
+function getChurnForMonth(key: SubProductKey, data: AssumptionsType, year: Year, monthIndex: number): number {
   if (data.churnNotApplicable?.[key]) return 0;
-  // Check for per-product override first
-  if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
-    return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
+  const stored = data.monthlyChurnRates?.[key]?.[year];
+  if (stored !== undefined) {
+    if (Array.isArray(stored)) {
+      return (stored[monthIndex] ?? 0) / 100 / 12;
+    }
+    return stored / 100 / 12;
   }
   if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup' || key === 'caasParceiros') {
     return data.churnCaas / 100 / 12;
@@ -210,6 +216,18 @@ function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year)
     return 0;
   }
   return 0;
+}
+
+/** Legacy wrapper — returns average monthly churn for a year (used in summary displays) */
+function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  const yr = year ?? (2025 as Year);
+  const stored = data.monthlyChurnRates?.[key]?.[yr];
+  if (stored !== undefined && Array.isArray(stored)) {
+    // Average of the 12 monthly rates
+    const avg = stored.reduce((s, v) => s + v, 0) / 12;
+    return avg / 100 / 12;
+  }
+  return getChurnForMonth(key, data, yr, 0);
 }
 
 // computeProjectedClients removed — display now uses getMonthlyClients directly

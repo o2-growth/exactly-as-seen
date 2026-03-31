@@ -62,8 +62,9 @@ export interface Assumptions {
   monthlyClientOverrides?: Partial<Record<TicketKey, Partial<Record<Year, (number | null)[]>>>>;
   // Flags which monthly client overrides were manually edited by the user vs auto-generated previews
   manualMonthlyClientOverrideFlags?: Partial<Record<TicketKey, Partial<Record<Year, boolean[]>>>>;
-  // Monthly churn rates per sub-product per year (annual % stored, converted to monthly in engine)
-  monthlyChurnRates?: Partial<Record<TicketKey, Partial<Record<Year, number>>>>;
+  // Monthly churn rates per sub-product per year
+  // Can be a single number (legacy: annual % flat) or an array of 12 monthly rates (progressive growth)
+  monthlyChurnRates?: Partial<Record<TicketKey, Partial<Record<Year, number | number[]>>>>;
   churnCaas: number;
   churnSaas: number;
   churnBaas: number;
