@@ -1,51 +1,44 @@
 
 
-# Crescimento de churn mensal linear (não composto anual)
+# Adicionar "Adicional de IRPJ" — Faturamento Global (Corrigido)
 
-## Mudança de lógica
+## Correção
+Trimestres encerram nos meses **3, 6, 9 e 12** (índices 1-based), ou seja, índices **2, 5, 8, 11** no array 0-based. O plano anterior já usava os índices corretos no código (0-based), mas a descrição textual estava confusa. Agora fica claro:
 
-Atualmente o crescimento de churn é **composto por ano** (ex: 5% → 5.5% → 6.05%). O usuário quer que o crescimento seja **linear e mensal**: pega o % de crescimento, divide por 12, e soma essa fração à taxa base a cada mês.
+- Q1: Jan–Mar (meses 1-3) → calcula no mês 3
+- Q2: Abr–Jun (meses 4-6) → calcula no mês 6
+- Q3: Jul–Set (meses 7-9) → calcula no mês 9
+- Q4: Out–Dez (meses 10-12) → calcula no mês 12
 
-**Exemplo**: churn base 5% a.a., crescimento 12%:
-- Incremento mensal = 12% / 12 = 1 ponto percentual por mês
-- Mês 1: 5.0% | Mês 2: 6.0% | Mês 3: 7.0% | ... | Mês 12: 16.0%
-- Ano seguinte continua de onde parou: Mês 13: 17.0% | etc.
+## Lógica
+
+Soma-se a receita bruta total (grossRev de todos os subprodutos) nos 3 meses do trimestre. Ao final (mês 3, 6, 9, 12):
+
+```
+lucroPresumido = receitaBrutaTotalTri × 0.32
+adicionalTri = max(0, (lucroPresumido - 60) × 0.10)    // R$ mil
+```
+
+Distribui `adicionalTri / 3` nos 3 meses do trimestre (retroativamente).
 
 ## Alterações
 
-### 1. `src/pages/Assumptions.tsx` — Botão "Aplicar" (linhas 1395-1417)
+### 1. `src/engine/calculationsEngine.ts` — Cálculo trimestral global
 
-Em vez de calcular taxas anuais compostas, calcular **churn por mês** e armazenar no `monthlyChurnRates` como array de 12 valores por ano:
+- Acumulador `quarterGrossRev` somando `grossRev` de todos os subprodutos a cada mês
+- No mês final do trimestre (quando `monthIndex % 3 === 2`, i.e. meses 3, 6, 9, 12), calcular o adicional e distribuir nos 3 meses do quarter
+- Adicionar `adicionalIrpj` ao `taxD` e incluir em `totalTax`/`annualTaxes`
+- Resetar acumulador após cada trimestre
 
-```
-const monthlyIncrement = growthPct / 12;  // incremento em p.p. por mês
-let currentRate = baseVal;  // taxa anual base (ex: 5)
-for each year:
-  for each month (0-11):
-    currentRate += monthlyIncrement;
-    monthlyRates[year][month] = currentRate;
-```
+### 2. `src/engine/calculationsEngine.ts` — PnL Tree
 
-### 2. `src/lib/financialData.ts` — Tipo `monthlyChurnRates`
+Novo nó `10.03 — Adicional de IRPJ` entre IRPJ e CSLL, com valores annual e monthly.
 
-Alterar de `Partial<Record<TicketKey, Partial<Record<Year, number>>>>` para suportar **arrays de 12 valores**: `Partial<Record<TicketKey, Partial<Record<Year, number | number[]>>>>`.
+### 3. `src/pages/Assumptions.tsx` — UI Tax Deductions
 
-### 3. `src/pages/Assumptions.tsx` — `getChurnMonthly` → `getChurnForMonth`
+Linha informativa "Adicional de IRPJ" abaixo de "IRPJ efetivo" mostrando "até 3.20%" com nota "(10% sobre excedente de R$60k/tri)". Incluir no TOTAL.
 
-Aceitar `monthIndex` como parâmetro. Se `monthlyChurnRates[key][year]` for um array, retornar `array[monthIndex] / 100 / 12`. Se for um número (legado), manter comportamento atual.
+### 4. Testes
 
-### 4. Atualizar todos os call sites de `getChurnMonthly`
-
-Passar o índice do mês em cada uso (loops de projeção, grid de churn, display de resumo). São ~10 call sites, todos em `Assumptions.tsx`.
-
-### 5. `reprojectWithChurn` — usar churn variável por mês
-
-Na linha 752, em vez de `churnRate` fixo, usar a taxa do mês corrente.
-
-### 6. Preview "Churn por ano" — mostrar range
-
-Em vez de "2025: 5%", mostrar "2025: 5.0→16.0%" para indicar a evolução mensal.
-
-## Resultado
-Com churn base 5% e crescimento 12%: cada mês aumenta 1 p.p., visível imediatamente na grid mensal.
+Validar `taxDetail.adicionalIrpj` correto e = 0 quando receita trimestral × 0.32 ≤ R$60k.
 
