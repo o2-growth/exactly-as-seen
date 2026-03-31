@@ -1709,7 +1709,7 @@ export default function Assumptions() {
                 ))}
                 <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL abatidos abaixo do EBITDA, somente se EBT &gt; 0. Base presumida: 32% para serviços.</span>
+                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL sempre incidem sobre a base presumida (32%), independente de lucro ou prejuízo (regime Lucro Presumido).</span>
                 </div>
               </div>
             );

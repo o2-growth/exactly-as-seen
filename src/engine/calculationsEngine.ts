@@ -855,7 +855,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
     // Taxes — Lucro Presumido: base presumida × (IRPJ 15% + CSLL 9%) sobre faturamento por subproduto
     let irpj = 0, csll = 0;
-    if (ebt > 0 && assumptions.taxEnabled !== false) {
+    if (assumptions.taxEnabled !== false) {
       for (const key of ALL_SUBPRODUCT_KEYS) {
         const fat = revBySubprod[key] || 0;
         if (fat <= 0) continue;
