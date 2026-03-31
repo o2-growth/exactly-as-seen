@@ -1522,15 +1522,19 @@ export default function Assumptions() {
                                         <span className="text-muted-foreground italic">Não se aplica</span>
                                       ) : (
                                         (() => {
-                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          const annualPct = Math.round(churnRate * 12 * 100 * 10) / 10;
                                           const totalChurn = MONTHS.reduce((sum, _, i) => {
-                                            const prev = i === 0
+                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                            const prevClients = i === 0
                                               ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
                                               : monthly[i - 1];
-                                            return sum + Math.round(prev * churnRate);
+                                            return sum + Math.round(prevClients * churnRate);
                                           }, 0);
-                                          return <span className="text-negative">Churn: <strong>{annualPct}% a.a.</strong> ({Math.round(churnRate * 10000) / 100}%/mes) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
+                                          const stored = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
+                                          const annualLabel = stored !== undefined && Array.isArray(stored)
+                                            ? `${stored[0]}→${stored[11]}%`
+                                            : (() => { const r = getChurnMonthly(prodKey, data, selectedYear); return `${Math.round(r * 12 * 100 * 10) / 10}% a.a.`; })();
+                                          const avgRate = getChurnMonthly(prodKey, data, selectedYear);
+                                          return <span className="text-negative">Churn: <strong>{annualLabel}</strong> ({Math.round(avgRate * 10000) / 100}%/mes avg) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
                                         })()
                                       )}
                                     </div>
