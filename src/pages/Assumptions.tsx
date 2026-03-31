@@ -1355,6 +1355,7 @@ export default function Assumptions() {
                                       const currentChurnFlat = data.monthlyChurnRates?.[prodKey]?.[selectedYear]
                                         ?? Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
                                       return (
+                                      <>
                                       <div className="flex flex-wrap items-center gap-2 mt-1">
                                         <span className="text-[10px] text-muted-foreground">Churn base (flat):</span>
                                         <input
@@ -1408,7 +1409,6 @@ export default function Assumptions() {
                                               }
                                             }
                                             reprojectWithChurn(prodKey, newRates);
-                                            // Feedback visual
                                             const btn = e.currentTarget;
                                             btn.textContent = 'Aplicado ✓';
                                             btn.classList.add('bg-emerald-500/20', 'text-emerald-500');
@@ -1423,19 +1423,13 @@ export default function Assumptions() {
                                           Aplicar
                                         </button>
                                       </div>
-                                      {/* Preview do churn projetado por ano */}
-                                      {(() => {
-                                        const preview = YEARS.map(yr => {
+                                      <div className="text-[10px] text-muted-foreground mt-1">
+                                        Churn por ano: {YEARS.map(yr => {
                                           const rate = data.monthlyChurnRates?.[prodKey]?.[yr]
                                             ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
                                           return `${yr}: ${rate}%`;
-                                        });
-                                        return (
-                                          <div className="text-[10px] text-muted-foreground mt-1">
-                                            Churn por ano: {preview.join(' · ')}
-                                          </div>
-                                        );
-                                      })()}
+                                        }).join(' · ')}
+                                      </div>
                                       </>
                                       );
                                     })()}
