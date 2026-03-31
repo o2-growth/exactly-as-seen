@@ -928,7 +928,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     cogsD.saas += cosBreakdown.saas; cogsD.education += cosBreakdown.education; cogsD.baas += cosBreakdown.expansao; cogsD.tax += cosBreakdown.tax;
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
-    taxD.irpj += irpj; taxD.csll += csll;
+    taxD.irpj += irpj; taxD.csll += csll; // adicionalIrpj accumulated after loop
     dedD.pis += dedResult.deducaoPIS; dedD.cofins += dedResult.deducaoCOFINS; dedD.iss += dedResult.deducaoISSQN;
     dedD.csllRetido += dedResult.deducaoCsllRetido; dedD.pisRetido += dedResult.deducaoPisRetido;
     dedD.icms += dedResult.deducaoICMS; dedD.irrfRetido += dedResult.deducaoIrrfRetido; dedD.cofinsRetido += dedResult.deducaoCofinsRetido;
