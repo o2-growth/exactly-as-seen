@@ -1584,7 +1584,7 @@ export default function Assumptions() {
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
               { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100 },
-              { label: 'Adicional de IRPJ (% máx)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100, tooltip: '10% sobre excedente de R$60k/tri de lucro presumido' },
+              { label: 'Adicional de IRPJ (% máx)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100 },
               { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100 },
               { label: 'TOTAL efetivo (%)', computed: (cfg) => {
                 const irpj = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100;
