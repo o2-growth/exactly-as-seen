@@ -1584,11 +1584,13 @@ export default function Assumptions() {
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
               { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100 },
+              { label: 'Adicional de IRPJ (% máx)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100 },
               { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100 },
               { label: 'TOTAL efetivo (%)', computed: (cfg) => {
                 const irpj = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100;
+                const adicional = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100;
                 const csll = (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100;
-                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
+                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + adicional + csll;
               }, isTotal: true },
             ];
 

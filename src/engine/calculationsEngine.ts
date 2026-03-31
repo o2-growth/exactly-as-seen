@@ -80,7 +80,7 @@ export interface AnnualOutput {
   financialResult: number;
   ebt: number;
   taxes: number;
-  taxDetail: { irpj: number; csll: number };
+  taxDetail: { irpj: number; csll: number; adicionalIrpj: number };
   netIncome: number;
   netMarginPct: number;
   debtPayments: number;
@@ -654,7 +654,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0, tax: 0 };
   let hcD = { salaries: 0, benefits: 0 };
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
-  let taxD = { irpj: 0, csll: 0 };
+  let taxD = { irpj: 0, csll: 0, adicionalIrpj: 0 };
+  let quarterGrossRev = 0; // accumulator for quarterly IRPJ adicional
+  const monthlyAdicional: number[] = new Array(12).fill(0);
   let debtD = { loans: 0, suppliers: 0 };
   let dedD = { pis: 0, cofins: 0, iss: 0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0 };
   let capexD = { software: 0, realestate: 0 };
@@ -863,6 +865,22 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
         csll += -(fat * base.csll * 0.09);
       }
     }
+
+    // Adicional de IRPJ — accumulate quarterly global revenue
+    quarterGrossRev += grossRev;
+    if (m % 3 === 2) {
+      // End of quarter (months 3, 6, 9, 12)
+      if (assumptions.taxEnabled !== false) {
+        const lucroPresumidoTri = quarterGrossRev * 0.32; // base presumida serviços
+        const adicionalTri = Math.max(0, (lucroPresumidoTri - 60) * 0.10); // R$ mil, R$60k = 60
+        const perMonth = adicionalTri / 3;
+        monthlyAdicional[m - 2] = -perMonth;
+        monthlyAdicional[m - 1] = -perMonth;
+        monthlyAdicional[m] = -perMonth;
+      }
+      quarterGrossRev = 0;
+    }
+
     const totalTax = irpj + csll;
 
     // Net income
@@ -910,7 +928,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     cogsD.saas += cosBreakdown.saas; cogsD.education += cosBreakdown.education; cogsD.baas += cosBreakdown.expansao; cogsD.tax += cosBreakdown.tax;
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
     mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
-    taxD.irpj += irpj; taxD.csll += csll;
+    taxD.irpj += irpj; taxD.csll += csll; // adicionalIrpj accumulated after loop
     dedD.pis += dedResult.deducaoPIS; dedD.cofins += dedResult.deducaoCOFINS; dedD.iss += dedResult.deducaoISSQN;
     dedD.csllRetido += dedResult.deducaoCsllRetido; dedD.pisRetido += dedResult.deducaoPisRetido;
     dedD.icms += dedResult.deducaoICMS; dedD.irrfRetido += dedResult.deducaoIrrfRetido; dedD.cofinsRetido += dedResult.deducaoCofinsRetido;
@@ -929,6 +947,22 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       totalClients: totalClientsM,
     });
   }
+
+  // Apply quarterly Adicional de IRPJ retroactively to monthly data
+  let annualAdicionalIrpj = 0;
+  for (let m = 0; m < 12; m++) {
+    const adic = monthlyAdicional[m];
+    if (adic !== 0) {
+      monthly[m].taxes += adic;
+      monthly[m].netIncome += adic;
+      monthly[m].finalResult += adic;
+      annualAdicionalIrpj += adic;
+    }
+  }
+  taxD.adicionalIrpj = annualAdicionalIrpj;
+  annualTaxes += annualAdicionalIrpj;
+  annualNI += annualAdicionalIrpj;
+  annualFinal += annualAdicionalIrpj;
 
   const r = (v: number) => Math.round(v);
 
@@ -967,7 +1001,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     ebitda: r(annualEBITDA),
     ebitdaMarginPct: annualNetRevenue !== 0 ? Number(((annualEBITDA / annualNetRevenue) * 100).toFixed(1)) : 0,
     financialResult: r(annualFinancial), ebt: r(annualEBT),
-    taxes: r(annualTaxes), taxDetail: { irpj: r(taxD.irpj), csll: r(taxD.csll) },
+    taxes: r(annualTaxes), taxDetail: { irpj: r(taxD.irpj), csll: r(taxD.csll), adicionalIrpj: r(taxD.adicionalIrpj) },
     netIncome: r(annualNI),
     netMarginPct: annualNetRevenue !== 0 ? Number(((annualNI / annualNetRevenue) * 100).toFixed(1)) : 0,
     debtPayments: r(annualDebt), debtDetail: { loans: r(debtD.loans), suppliers: r(debtD.suppliers) },
@@ -1541,7 +1575,7 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const fcrAn = a(y => y.finalResult), fcrMo = mo(d => d.finalResult);
   // Detail annuals
   const hcSalAn = a(y => y.headcountDetail.salaries), hcBenAn = a(y => y.headcountDetail.benefits);
-  const irpjAn = a(y => y.taxDetail.irpj), csllAn = a(y => y.taxDetail.csll);
+  const irpjAn = a(y => y.taxDetail.irpj), csllAn = a(y => y.taxDetail.csll), adicIrpjAn = a(y => y.taxDetail.adicionalIrpj);
   const dLoansAn = a(y => y.debtDetail.loans), dSuppAn = a(y => y.debtDetail.suppliers);
   const cSWAn = a(y => y.capexDetail.software), cREAn = a(y => y.capexDetail.realestate);
   const cogsCaasAn = a(y => y.cogsDetail.caas), cogsCSAn = a(y => y.cogsDetail.customerService);
@@ -1729,6 +1763,7 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
       code: 'TAX', label: 'Provisão IRPJ/CSLL', annual: taxAn, monthly: taxMo,
       children: [
         { code: '10.01', label: 'IRPJ', annual: irpjAn, monthly: allocMo(taxMo, irpjAn, taxAn) },
+        { code: '10.03', label: 'Adicional de IRPJ', annual: adicIrpjAn, monthly: allocMo(taxMo, adicIrpjAn, taxAn) },
         { code: '10.02', label: 'CSLL', annual: csllAn, monthly: allocMo(taxMo, csllAn, taxAn) },
       ],
     },
