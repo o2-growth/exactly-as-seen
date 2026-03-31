@@ -1436,6 +1436,7 @@ export default function Assumptions() {
                                           </div>
                                         );
                                       })()}
+                                      </>
                                       );
                                     })()}
                                     <div className="flex items-center gap-6 text-xs">
