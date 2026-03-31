@@ -1372,7 +1372,6 @@ export default function Assumptions() {
                                             }
                                             reprojectWithChurn(prodKey, newRates);
                                           }}
-                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                         <span className="text-muted-foreground/30">|</span>
@@ -1388,12 +1387,10 @@ export default function Assumptions() {
                                             const num = v === '' || v === '-' ? 0 : Number(v);
                                             setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
                                           }}
-                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                         <button
-                                          className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                          disabled={!editing}
+                                          className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
                                           onClick={e => {
                                             e.stopPropagation();
                                             const growthPct = rowChurnPct[prodKey] ?? 0;
@@ -1411,11 +1408,34 @@ export default function Assumptions() {
                                               }
                                             }
                                             reprojectWithChurn(prodKey, newRates);
+                                            // Feedback visual
+                                            const btn = e.currentTarget;
+                                            btn.textContent = 'Aplicado ✓';
+                                            btn.classList.add('bg-emerald-500/20', 'text-emerald-500');
+                                            btn.classList.remove('bg-negative/20', 'text-negative');
+                                            setTimeout(() => {
+                                              btn.textContent = 'Aplicar';
+                                              btn.classList.remove('bg-emerald-500/20', 'text-emerald-500');
+                                              btn.classList.add('bg-negative/20', 'text-negative');
+                                            }, 1500);
                                           }}
                                         >
                                           Aplicar
                                         </button>
                                       </div>
+                                      {/* Preview do churn projetado por ano */}
+                                      {(() => {
+                                        const preview = YEARS.map(yr => {
+                                          const rate = data.monthlyChurnRates?.[prodKey]?.[yr]
+                                            ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
+                                          return `${yr}: ${rate}%`;
+                                        });
+                                        return (
+                                          <div className="text-[10px] text-muted-foreground mt-1">
+                                            Churn por ano: {preview.join(' · ')}
+                                          </div>
+                                        );
+                                      })()}
                                       );
                                     })()}
                                     <div className="flex items-center gap-6 text-xs">
