@@ -162,7 +162,7 @@ export interface BUTaxConfig {
 export interface SubProductTaxConfig {
   pis: number;              // 2.04 PIS — default 0.65
   cofins: number;           // 2.05 COFINS — default 3.0
-  iss: number;              // 2.03 ISS — default 5.0 (CaaS) ou 2.9 (demais)
+  iss: number;              // 2.03 ISS — default 2.9 (SaaS) ou 5.0 (demais)
   csllRetido: number;       // 2.01 CSLL (retido na fonte) — default 0
   pisRetido: number;        // 2.02 PIS (retido na fonte) — default 0
   icms: number;             // 2.06 ICMS — default 0
@@ -180,8 +180,8 @@ export const TAX_KEYS: TicketKey[] = ['taxAT', 'taxGPT', 'taxRCT', 'taxRT', 'tax
 export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...EDUCATION_KEYS, ...EXPANSAO_KEYS, ...TAX_KEYS];
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
-  const isCaas = CAAS_KEYS.includes(key);
-  return { pis: 0.65, cofins: 3.0, iss: isCaas ? 5.0 : 2.9, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, tipoReceita: 'servico' };
+  const isSaas = SAAS_KEYS.includes(key);
+  return { pis: 0.65, cofins: 3.0, iss: isSaas ? 2.9 : 5.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, tipoReceita: 'servico' };
 }
 
 export function getSubProductTaxRate(key: TicketKey, assumptions: Assumptions): SubProductTaxConfig {
