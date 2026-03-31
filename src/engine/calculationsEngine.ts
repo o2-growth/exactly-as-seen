@@ -1763,6 +1763,7 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
       code: 'TAX', label: 'Provisão IRPJ/CSLL', annual: taxAn, monthly: taxMo,
       children: [
         { code: '10.01', label: 'IRPJ', annual: irpjAn, monthly: allocMo(taxMo, irpjAn, taxAn) },
+        { code: '10.03', label: 'Adicional de IRPJ', annual: adicIrpjAn, monthly: allocMo(taxMo, adicIrpjAn, taxAn) },
         { code: '10.02', label: 'CSLL', annual: csllAn, monthly: allocMo(taxMo, csllAn, taxAn) },
       ],
     },
