@@ -187,12 +187,18 @@ function isHistorical(year: Year, monthIdx: number): boolean {
   return false;
 }
 
-function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
-  // N/A — no churn for this product
+/** Returns the monthly churn rate (as a fraction, e.g. 0.004167 for 5%/12) for a specific month.
+ *  If monthlyChurnRates[key][year] is an array of 12 values, returns array[monthIndex] / 100 / 12.
+ *  If it's a single number (legacy flat), returns that number / 100 / 12.
+ *  Otherwise falls back to the category default. */
+function getChurnForMonth(key: SubProductKey, data: AssumptionsType, year: Year, monthIndex: number): number {
   if (data.churnNotApplicable?.[key]) return 0;
-  // Check for per-product override first
-  if (year && data.monthlyChurnRates?.[key]?.[year] !== undefined) {
-    return (data.monthlyChurnRates[key]![year]!) / 100 / 12;
+  const stored = data.monthlyChurnRates?.[key]?.[year];
+  if (stored !== undefined) {
+    if (Array.isArray(stored)) {
+      return (stored[monthIndex] ?? 0) / 100 / 12;
+    }
+    return stored / 100 / 12;
   }
   if (key === 'caasAssessoria' || key === 'caasEnterprise' || key === 'caasCorporate' || key === 'caasSetup' || key === 'caasParceiros') {
     return data.churnCaas / 100 / 12;
@@ -210,6 +216,18 @@ function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year)
     return 0;
   }
   return 0;
+}
+
+/** Legacy wrapper — returns average monthly churn for a year (used in summary displays) */
+function getChurnMonthly(key: SubProductKey, data: AssumptionsType, year?: Year): number {
+  const yr = year ?? (2025 as Year);
+  const stored = data.monthlyChurnRates?.[key]?.[yr];
+  if (stored !== undefined && Array.isArray(stored)) {
+    // Average of the 12 monthly rates
+    const avg = stored.reduce((s, v) => s + v, 0) / 12;
+    return avg / 100 / 12;
+  }
+  return getChurnForMonth(key, data, yr, 0);
 }
 
 // computeProjectedClients removed — display now uses getMonthlyClients directly
@@ -577,7 +595,6 @@ export default function Assumptions() {
 
           // Build sequential projection — preserve existing manual overrides
           const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-          const churnRate = getChurnMonthly(k, data, y);
           const existingOverrides = data.monthlyClientOverrides?.[k]?.[y];
           const manualFlags = data.manualMonthlyClientOverrideFlags?.[k]?.[y];
           let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
@@ -586,11 +603,11 @@ export default function Assumptions() {
             if (isHistorical(y, m)) {
               prev = Math.round(base[m]);
             } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
-              // Preserve manually entered value and use it as base for next month
               const manual = existingOverrides[m]!;
               projected[m] = manual;
               prev = manual;
             } else {
+              const churnRate = getChurnForMonth(k, data, y, m);
               prev = prev * (1 + arr[m] - churnRate);
               projected[m] = Math.max(0, Math.round(prev));
             }
@@ -658,7 +675,6 @@ export default function Assumptions() {
       allGrowthRates[y] = arr;
 
       const base = getMonthlyClients(key, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-      const churnRate = getChurnMonthly(key, data, y);
       const existingOverrides = data.monthlyClientOverrides?.[key]?.[y];
       const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[y];
 
@@ -676,6 +692,7 @@ export default function Assumptions() {
           projected[m] = manual;
           prev = manual;
         } else {
+          const churnRate = getChurnForMonth(key, data, y, m);
           prev = prev * (1 + arr[m] - churnRate);
           projected[m] = Math.max(0, Math.round(prev));
         }
@@ -732,7 +749,6 @@ export default function Assumptions() {
     for (const y of yearsToApply) {
       const growthArr = growthRates[y as Year]?.[key] ?? Array(12).fill(0.06);
       const base = getMonthlyClients(key, y as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-      const churnRate = newChurnRates[y] !== undefined ? newChurnRates[y] / 100 / 12 : getChurnMonthly(key, data, y as Year);
       const existingOverrides = data.monthlyClientOverrides?.[key]?.[y as Year];
       const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[y as Year];
 
@@ -749,6 +765,7 @@ export default function Assumptions() {
           projected[m] = manual;
           prev = manual;
         } else {
+          const churnRate = newChurnRates[y] !== undefined ? newChurnRates[y] / 100 / 12 : getChurnForMonth(key, data, y as Year, m);
           prev = prev * (1 + growthArr[m] - churnRate);
           projected[m] = Math.max(0, Math.round(prev));
         }
@@ -763,6 +780,64 @@ export default function Assumptions() {
       const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
       const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
       const newCR = { ...(prev.monthlyChurnRates ?? {}), [key]: { ...((prev.monthlyChurnRates ?? {})[key] ?? {}), ...newChurnRates } };
+
+      for (const y of yearsToApply) {
+        (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
+        (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
+        (newMF[key] as Record<number, boolean[]>)[y] = allManualFlags[y];
+      }
+
+      return {
+        ...prev,
+        subProductClients: newSPC,
+        monthlyClientOverrides: newMO,
+        manualMonthlyClientOverrideFlags: newMF,
+        monthlyChurnRates: newCR,
+      };
+    };
+    if (editing) setEditState(updater); else setAssumptions(updater);
+  };
+
+  // ─── Reproject clients when churn changes (monthly arrays) ───
+  const reprojectWithChurnArrays = (key: SubProductKey, newChurnArrays: Record<number, number[]>) => {
+    const yearsToApply = YEARS.filter(y => y >= selectedYear);
+    const allOverrides: Record<number, (number | null)[]> = {};
+    const allDecTargets: Record<number, number> = {};
+    const allManualFlags: Record<number, boolean[]> = {};
+
+    let prev = selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(key, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+
+    for (const y of yearsToApply) {
+      const growthArr = growthRates[y as Year]?.[key] ?? Array(12).fill(0.06);
+      const base = getMonthlyClients(key, y as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+      const churnArr = newChurnArrays[y];
+      const existingOverrides = data.monthlyClientOverrides?.[key]?.[y as Year];
+      const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[y as Year];
+
+      const projected: (number | null)[] = Array(12).fill(null);
+      for (let m = 0; m < 12; m++) {
+        if (isHistorical(y as Year, m)) {
+          prev = Math.round(base[m]);
+        } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+          const manual = existingOverrides[m]!;
+          projected[m] = manual;
+          prev = manual;
+        } else {
+          const churnRate = churnArr ? churnArr[m] / 100 / 12 : getChurnForMonth(key, data, y as Year, m);
+          prev = prev * (1 + growthArr[m] - churnRate);
+          projected[m] = Math.max(0, Math.round(prev));
+        }
+      }
+      allOverrides[y] = projected;
+      allDecTargets[y] = projected[11] ?? Math.round(base[11]);
+      allManualFlags[y] = Array(12).fill(false);
+    }
+
+    const updater = (prev: AssumptionsType) => {
+      const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key] } };
+      const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
+      const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
+      const newCR = { ...(prev.monthlyChurnRates ?? {}), [key]: { ...((prev.monthlyChurnRates ?? {})[key] ?? {}), ...newChurnArrays } };
 
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
@@ -1338,8 +1413,8 @@ export default function Assumptions() {
                                       <div className="grid grid-cols-12 gap-1.5">
                                         {MONTHS.map((m, i) => {
                                           const hist = isHistorical(selectedYear, i);
-                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100; // % mensal com 2 decimais
+                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100;
                                           return (
                                             <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
                                               <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
@@ -1352,8 +1427,10 @@ export default function Assumptions() {
                                       </div>
                                     )}
                                     {!data.churnNotApplicable?.[prodKey] && (() => {
-                                      const currentChurnFlat = data.monthlyChurnRates?.[prodKey]?.[selectedYear]
-                                        ?? Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
+                                      const storedChurn = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
+                                      const currentChurnFlat: number = storedChurn !== undefined
+                                        ? (Array.isArray(storedChurn) ? storedChurn[0] ?? 0 : storedChurn)
+                                        : Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
                                       return (
                                       <>
                                       <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -1395,16 +1472,20 @@ export default function Assumptions() {
                                           onClick={e => {
                                             e.stopPropagation();
                                             const growthPct = rowChurnPct[prodKey] ?? 0;
-                                            const growthRate = growthPct / 100;
-                                            const baseVal = currentChurnFlat;
+                                            const baseVal = currentChurnFlat as number;
+                                            const monthlyIncrement = growthPct / 12; // p.p. per month
                                             const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            const newRates: Record<number, number> = {};
-                                            let base = baseVal;
+                                            const newMonthlyChurnArrays: Record<number, number[]> = {};
+                                            let currentRate = baseVal;
                                             for (const y of yearsToApply) {
-                                              base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
-                                              newRates[y] = base;
+                                              const yearRates: number[] = [];
+                                              for (let m = 0; m < 12; m++) {
+                                                currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
+                                                yearRates.push(currentRate);
+                                              }
+                                              newMonthlyChurnArrays[y] = yearRates;
                                             }
-                                            reprojectWithChurn(prodKey, newRates);
+                                            reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
                                             const btn = e.currentTarget;
                                             btn.textContent = 'Aplicado ✓';
                                             btn.classList.add('bg-emerald-500/20', 'text-emerald-500');
@@ -1421,7 +1502,13 @@ export default function Assumptions() {
                                       </div>
                                       <div className="text-[10px] text-muted-foreground mt-1">
                                         Churn por ano: {YEARS.map(yr => {
-                                          const rate = data.monthlyChurnRates?.[prodKey]?.[yr]
+                                          const stored = data.monthlyChurnRates?.[prodKey]?.[yr];
+                                          if (stored !== undefined && Array.isArray(stored)) {
+                                            const first = stored[0] ?? 0;
+                                            const last = stored[11] ?? stored[stored.length - 1] ?? 0;
+                                            return `${yr}: ${first}→${last}%`;
+                                          }
+                                          const rate = (typeof stored === 'number' ? stored : null)
                                             ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
                                           return `${yr}: ${rate}%`;
                                         }).join(' · ')}
@@ -1434,15 +1521,19 @@ export default function Assumptions() {
                                         <span className="text-muted-foreground italic">Não se aplica</span>
                                       ) : (
                                         (() => {
-                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          const annualPct = Math.round(churnRate * 12 * 100 * 10) / 10;
                                           const totalChurn = MONTHS.reduce((sum, _, i) => {
-                                            const prev = i === 0
+                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                            const prevClients = i === 0
                                               ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
                                               : monthly[i - 1];
-                                            return sum + Math.round(prev * churnRate);
+                                            return sum + Math.round(prevClients * churnRate);
                                           }, 0);
-                                          return <span className="text-negative">Churn: <strong>{annualPct}% a.a.</strong> ({Math.round(churnRate * 10000) / 100}%/mes) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
+                                          const stored = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
+                                          const annualLabel = stored !== undefined && Array.isArray(stored)
+                                            ? `${stored[0]}→${stored[11]}%`
+                                            : (() => { const r = getChurnMonthly(prodKey, data, selectedYear); return `${Math.round(r * 12 * 100 * 10) / 10}% a.a.`; })();
+                                          const avgRate = getChurnMonthly(prodKey, data, selectedYear);
+                                          return <span className="text-negative">Churn: <strong>{annualLabel}</strong> ({Math.round(avgRate * 10000) / 100}%/mes avg) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
                                         })()
                                       )}
                                     </div>
