@@ -1401,12 +1401,8 @@ export default function Assumptions() {
                                             const newRates: Record<number, number> = {};
                                             let base = baseVal;
                                             for (const y of yearsToApply) {
-                                              if (y === selectedYear) {
-                                                newRates[y] = base;
-                                              } else {
-                                                base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
-                                                newRates[y] = base;
-                                              }
+                                              base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
+                                              newRates[y] = base;
                                             }
                                             reprojectWithChurn(prodKey, newRates);
                                             const btn = e.currentTarget;
