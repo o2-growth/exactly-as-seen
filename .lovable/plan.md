@@ -1,39 +1,28 @@
 
 
-# Corrigir "Crescimento de churn" — diagnóstico e correções
+# Corrigir: crescimento de churn deve começar no ano selecionado
 
-## Diagnóstico
+## Problema
+Na linha 1404, quando `y === selectedYear`, o código mantém o valor base sem aplicar crescimento. O usuário espera que, se está em 2025 com churn 5% e crescimento 10%, o churn de 2025 já mude para 5.5%.
 
-Analisei o código em detalhe. A lógica do botão "Aplicar" para crescimento de churn (lines 1397-1413) e a função `reprojectWithChurn` (lines 724-782) estão estruturalmente corretas. Os problemas identificados são:
+## Alteração
 
-### Problema 1: O crescimento composto aplica-se **ano a ano**, mas a UI mostra apenas o ano selecionado
-Quando o usuário digita 10% de crescimento e clica "Aplicar" estando em 2025, o churn de 2025 permanece 5% (o base). O efeito só é visível ao trocar para 2026 (5.5%), 2027 (6.05%), etc. Não há feedback visual imediato.
+### `src/pages/Assumptions.tsx` — linhas 1401-1410
 
-### Problema 2: O resumo "Churn: X% a.a." e os valores mensais não refletem anos futuros na mesma tela
-O usuário precisa manualmente trocar de ano para verificar se o crescimento foi aplicado.
+Trocar a lógica para aplicar o crescimento **a partir do ano selecionado**, inclusive:
 
-### Problema 3: O campo de crescimento e o botão "Aplicar" exigem modo de edição (`editing`)
-Se o usuário não entrou no modo de edição, os controles ficam desabilitados sem feedback claro.
-
-## Alterações
-
-### 1. `src/pages/Assumptions.tsx` — Adicionar preview do churn projetado por ano
-Após o botão "Aplicar", exibir uma linha resumo mostrando o churn resultante para cada ano (2025→2030), similar à visualização de "Clientes por ano (soma)":
-
-```
-Churn por ano: 2025: 5.0% | 2026: 5.5% | 2027: 6.1% | 2028: 6.7% | 2029: 7.3% | 2030: 8.1%
+```typescript
+const newRates: Record<number, number> = {};
+let base = baseVal;
+for (const y of yearsToApply) {
+  base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
+  newRates[y] = base;
+}
 ```
 
-Isso dá feedback imediato de que o crescimento foi aplicado.
-
-### 2. `src/pages/Assumptions.tsx` — Remover `disabled={!editing}` dos controles de churn
-Os campos "Churn base (flat)", "Crescimento de churn" e o botão "Aplicar" devem funcionar em modo não-edição (aplicando direto em `setAssumptions`), consistente com o fato de que `reprojectWithChurn` já suporta ambos os modos (line 781: `if (editing) setEditState(updater); else setAssumptions(updater);`).
-
-### 3. `src/pages/Assumptions.tsx` — Feedback visual no botão "Aplicar"
-Trocar brevemente o texto do botão para "Aplicado ✓" após o clique, retornando ao normal após 1.5s.
+Removemos o `if (y === selectedYear)` que preservava o valor original. Agora o primeiro ano já recebe `base * (1 + growthRate)`.
 
 ## Resultado
-- O crescimento de churn funciona sem precisar entrar em modo de edição
-- O usuário vê imediatamente os valores projetados por ano após clicar "Aplicar"
-- Feedback visual confirma que a ação foi executada
+Com churn base 5% e crescimento 10%, ao clicar "Aplicar" em 2025:
+- 2025: 5.5% | 2026: 6.05% | 2027: 6.66% | ...
 
