@@ -948,6 +948,22 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     });
   }
 
+  // Apply quarterly Adicional de IRPJ retroactively to monthly data
+  let annualAdicionalIrpj = 0;
+  for (let m = 0; m < 12; m++) {
+    const adic = monthlyAdicional[m];
+    if (adic !== 0) {
+      monthly[m].taxes += adic;
+      monthly[m].netIncome += adic;
+      monthly[m].finalResult += adic;
+      annualAdicionalIrpj += adic;
+    }
+  }
+  taxD.adicionalIrpj = annualAdicionalIrpj;
+  annualTaxes += annualAdicionalIrpj;
+  annualNI += annualAdicionalIrpj;
+  annualFinal += annualAdicionalIrpj;
+
   const r = (v: number) => Math.round(v);
 
   // ─── PMR / Receivables Change ───
