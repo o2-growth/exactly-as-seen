@@ -799,6 +799,64 @@ export default function Assumptions() {
     if (editing) setEditState(updater); else setAssumptions(updater);
   };
 
+  // ─── Reproject clients when churn changes (monthly arrays) ───
+  const reprojectWithChurnArrays = (key: SubProductKey, newChurnArrays: Record<number, number[]>) => {
+    const yearsToApply = YEARS.filter(y => y >= selectedYear);
+    const allOverrides: Record<number, (number | null)[]> = {};
+    const allDecTargets: Record<number, number> = {};
+    const allManualFlags: Record<number, boolean[]> = {};
+
+    let prev = selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(key, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+
+    for (const y of yearsToApply) {
+      const growthArr = growthRates[y as Year]?.[key] ?? Array(12).fill(0.06);
+      const base = getMonthlyClients(key, y as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+      const churnArr = newChurnArrays[y];
+      const existingOverrides = data.monthlyClientOverrides?.[key]?.[y as Year];
+      const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[y as Year];
+
+      const projected: (number | null)[] = Array(12).fill(null);
+      for (let m = 0; m < 12; m++) {
+        if (isHistorical(y as Year, m)) {
+          prev = Math.round(base[m]);
+        } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+          const manual = existingOverrides[m]!;
+          projected[m] = manual;
+          prev = manual;
+        } else {
+          const churnRate = churnArr ? churnArr[m] / 100 / 12 : getChurnForMonth(key, data, y as Year, m);
+          prev = prev * (1 + growthArr[m] - churnRate);
+          projected[m] = Math.max(0, Math.round(prev));
+        }
+      }
+      allOverrides[y] = projected;
+      allDecTargets[y] = projected[11] ?? Math.round(base[11]);
+      allManualFlags[y] = Array(12).fill(false);
+    }
+
+    const updater = (prev: AssumptionsType) => {
+      const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key] } };
+      const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
+      const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
+      const newCR = { ...(prev.monthlyChurnRates ?? {}), [key]: { ...((prev.monthlyChurnRates ?? {})[key] ?? {}), ...newChurnArrays } };
+
+      for (const y of yearsToApply) {
+        (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
+        (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
+        (newMF[key] as Record<number, boolean[]>)[y] = allManualFlags[y];
+      }
+
+      return {
+        ...prev,
+        subProductClients: newSPC,
+        monthlyClientOverrides: newMO,
+        manualMonthlyClientOverrideFlags: newMF,
+        monthlyChurnRates: newCR,
+      };
+    };
+    if (editing) setEditState(updater); else setAssumptions(updater);
+  };
+
   const handleApplyTicketGrowth = (prodKey: SubProductKey, year: Year) => {
     const pct = rowTicketGrowthPct[prodKey] ?? 0;
     const rate = pct / 100;
