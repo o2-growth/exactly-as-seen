@@ -749,7 +749,6 @@ export default function Assumptions() {
     for (const y of yearsToApply) {
       const growthArr = growthRates[y as Year]?.[key] ?? Array(12).fill(0.06);
       const base = getMonthlyClients(key, y as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-      const churnRate = newChurnRates[y] !== undefined ? newChurnRates[y] / 100 / 12 : getChurnMonthly(key, data, y as Year);
       const existingOverrides = data.monthlyClientOverrides?.[key]?.[y as Year];
       const manualFlags = data.manualMonthlyClientOverrideFlags?.[key]?.[y as Year];
 
@@ -766,6 +765,7 @@ export default function Assumptions() {
           projected[m] = manual;
           prev = manual;
         } else {
+          const churnRate = newChurnRates[y] !== undefined ? newChurnRates[y] / 100 / 12 : getChurnForMonth(key, data, y as Year, m);
           prev = prev * (1 + growthArr[m] - churnRate);
           projected[m] = Math.max(0, Math.round(prev));
         }
