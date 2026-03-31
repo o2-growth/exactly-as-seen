@@ -595,7 +595,6 @@ export default function Assumptions() {
 
           // Build sequential projection — preserve existing manual overrides
           const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-          const churnRate = getChurnMonthly(k, data, y);
           const existingOverrides = data.monthlyClientOverrides?.[k]?.[y];
           const manualFlags = data.manualMonthlyClientOverrideFlags?.[k]?.[y];
           let prev = y === 2025 ? 0 : Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
@@ -604,11 +603,11 @@ export default function Assumptions() {
             if (isHistorical(y, m)) {
               prev = Math.round(base[m]);
             } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
-              // Preserve manually entered value and use it as base for next month
               const manual = existingOverrides[m]!;
               projected[m] = manual;
               prev = manual;
             } else {
+              const churnRate = getChurnForMonth(k, data, y, m);
               prev = prev * (1 + arr[m] - churnRate);
               projected[m] = Math.max(0, Math.round(prev));
             }
