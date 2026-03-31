@@ -1415,16 +1415,20 @@ export default function Assumptions() {
                                           onClick={e => {
                                             e.stopPropagation();
                                             const growthPct = rowChurnPct[prodKey] ?? 0;
-                                            const growthRate = growthPct / 100;
-                                            const baseVal = currentChurnFlat;
+                                            const baseVal = currentChurnFlat as number;
+                                            const monthlyIncrement = growthPct / 12; // p.p. per month
                                             const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            const newRates: Record<number, number> = {};
-                                            let base = baseVal;
+                                            const newMonthlyChurnArrays: Record<number, number[]> = {};
+                                            let currentRate = baseVal;
                                             for (const y of yearsToApply) {
-                                              base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
-                                              newRates[y] = base;
+                                              const yearRates: number[] = [];
+                                              for (let m = 0; m < 12; m++) {
+                                                currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
+                                                yearRates.push(currentRate);
+                                              }
+                                              newMonthlyChurnArrays[y] = yearRates;
                                             }
-                                            reprojectWithChurn(prodKey, newRates);
+                                            reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
                                             const btn = e.currentTarget;
                                             btn.textContent = 'Aplicado ✓';
                                             btn.classList.add('bg-emerald-500/20', 'text-emerald-500');
