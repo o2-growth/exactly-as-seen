@@ -1370,8 +1370,10 @@ export default function Assumptions() {
                                       </div>
                                     )}
                                     {!data.churnNotApplicable?.[prodKey] && (() => {
-                                      const currentChurnFlat = data.monthlyChurnRates?.[prodKey]?.[selectedYear]
-                                        ?? Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
+                                      const storedChurn = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
+                                      const currentChurnFlat: number = storedChurn !== undefined
+                                        ? (Array.isArray(storedChurn) ? storedChurn[0] ?? 0 : storedChurn)
+                                        : Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
                                       return (
                                       <>
                                       <div className="flex flex-wrap items-center gap-2 mt-1">
