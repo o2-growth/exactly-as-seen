@@ -1445,7 +1445,13 @@ export default function Assumptions() {
                                       </div>
                                       <div className="text-[10px] text-muted-foreground mt-1">
                                         Churn por ano: {YEARS.map(yr => {
-                                          const rate = data.monthlyChurnRates?.[prodKey]?.[yr]
+                                          const stored = data.monthlyChurnRates?.[prodKey]?.[yr];
+                                          if (stored !== undefined && Array.isArray(stored)) {
+                                            const first = stored[0] ?? 0;
+                                            const last = stored[11] ?? stored[stored.length - 1] ?? 0;
+                                            return `${yr}: ${first}→${last}%`;
+                                          }
+                                          const rate = (typeof stored === 'number' ? stored : null)
                                             ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
                                           return `${yr}: ${rate}%`;
                                         }).join(' · ')}
