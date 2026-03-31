@@ -1575,7 +1575,7 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const fcrAn = a(y => y.finalResult), fcrMo = mo(d => d.finalResult);
   // Detail annuals
   const hcSalAn = a(y => y.headcountDetail.salaries), hcBenAn = a(y => y.headcountDetail.benefits);
-  const irpjAn = a(y => y.taxDetail.irpj), csllAn = a(y => y.taxDetail.csll);
+  const irpjAn = a(y => y.taxDetail.irpj), csllAn = a(y => y.taxDetail.csll), adicIrpjAn = a(y => y.taxDetail.adicionalIrpj);
   const dLoansAn = a(y => y.debtDetail.loans), dSuppAn = a(y => y.debtDetail.suppliers);
   const cSWAn = a(y => y.capexDetail.software), cREAn = a(y => y.capexDetail.realestate);
   const cogsCaasAn = a(y => y.cogsDetail.caas), cogsCSAn = a(y => y.cogsDetail.customerService);
