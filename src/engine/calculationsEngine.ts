@@ -80,7 +80,7 @@ export interface AnnualOutput {
   financialResult: number;
   ebt: number;
   taxes: number;
-  taxDetail: { irpj: number; csll: number };
+  taxDetail: { irpj: number; csll: number; adicionalIrpj: number };
   netIncome: number;
   netMarginPct: number;
   debtPayments: number;
