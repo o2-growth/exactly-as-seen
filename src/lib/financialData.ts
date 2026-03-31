@@ -162,7 +162,7 @@ export interface BUTaxConfig {
 export interface SubProductTaxConfig {
   pis: number;              // 2.04 PIS — default 0.65
   cofins: number;           // 2.05 COFINS — default 3.0
-  iss: number;              // 2.03 ISS — default 5.0 (CaaS) ou 2.9 (demais)
+  iss: number;              // 2.03 ISS — default 2.9 (SaaS) ou 5.0 (demais)
   csllRetido: number;       // 2.01 CSLL (retido na fonte) — default 0
   pisRetido: number;        // 2.02 PIS (retido na fonte) — default 0
   icms: number;             // 2.06 ICMS — default 0
