@@ -865,6 +865,22 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
         csll += -(fat * base.csll * 0.09);
       }
     }
+
+    // Adicional de IRPJ — accumulate quarterly global revenue
+    quarterGrossRev += grossRev;
+    if (m % 3 === 2) {
+      // End of quarter (months 3, 6, 9, 12)
+      if (assumptions.taxEnabled !== false) {
+        const lucroPresumidoTri = quarterGrossRev * 0.32; // base presumida serviços
+        const adicionalTri = Math.max(0, (lucroPresumidoTri - 60) * 0.10); // R$ mil, R$60k = 60
+        const perMonth = adicionalTri / 3;
+        monthlyAdicional[m - 2] = -perMonth;
+        monthlyAdicional[m - 1] = -perMonth;
+        monthlyAdicional[m] = -perMonth;
+      }
+      quarterGrossRev = 0;
+    }
+
     const totalTax = irpj + csll;
 
     // Net income
