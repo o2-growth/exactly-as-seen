@@ -72,7 +72,7 @@ const HEADCOUNT_ROLES = [
 ];
 
 export default function ClientsGrowth() {
-  const { projections, assumptions, selectedYear, model } = useFinancialModel();
+  const { projections, assumptions, selectedYear, model, setAssumptions } = useFinancialModel();
   const [viewMode, setViewMode] = useState<'planned' | 'actual'>('planned');
 
   const subProductKeys = Object.keys(SUB_PRODUCT_LABELS) as SubProductKey[];
@@ -86,8 +86,11 @@ export default function ClientsGrowth() {
     return row;
   });
 
-  // Actual data placeholder
+  // Actual data — load from assumptions, fallback to empty
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
+    if (assumptions.actualData && Object.keys(assumptions.actualData).length > 0) {
+      return assumptions.actualData;
+    }
     const d: Record<string, Record<number, number>> = {};
     subProductKeys.forEach(key => {
       d[key] = {};
@@ -97,10 +100,11 @@ export default function ClientsGrowth() {
   });
 
   const updateActual = (key: string, year: Year, val: number) => {
-    setActualData(prev => ({
-      ...prev,
-      [key]: { ...prev[key], [year]: val },
-    }));
+    setActualData(prev => {
+      const next = { ...prev, [key]: { ...prev[key], [year]: val } };
+      setAssumptions(p => ({ ...p, actualData: next }));
+      return next;
+    });
   };
 
   // CAC data from real model (7 sectors)

@@ -348,8 +348,9 @@ function getSgaValue(key: string, month: number): number {
   return v as number;
 }
 
-function calcMonthlySGA(month: number, year: number, grossRevenue: number, totalHeadcount: number): number {
-  const yearMult = Math.pow(1.10, year - 2025);
+function calcMonthlySGA(month: number, year: number, grossRevenue: number, totalHeadcount: number, assumptions?: Assumptions): number {
+  const sgaGrowth = (assumptions?.sgaGrowthRate ?? 10) / 100; // default 10%
+  const yearMult = Math.pow(1 + sgaGrowth, year - 2025);
 
   // Items that scale with 10% YoY (truly fixed costs)
   // For 2025, use monthly values; for later years, use Feb-Nov base × yearMult
@@ -412,7 +413,8 @@ function calcMonthlyHeadcount(
   caasClients: number, caasSaasClients: number, totalClients: number,
   assumptions?: Assumptions
 ): { salaries: number; benefits: number } {
-  const yearMult = Math.pow(1.10, year - 2025);
+  const hcGrowth = (assumptions?.headcountGrowth ?? 10) / 100; // default 10%
+  const yearMult = Math.pow(1 + hcGrowth, year - 2025);
 
   // Base payroll (named employees, code 5.01)
   let basePay = basePayroll2025;
@@ -464,19 +466,21 @@ function calcMonthlyHeadcount(
     totalHC = baseHC + squadHC;
   } else {
     // ── LEGACY MODE: ratio-based hiring ──
-    const additionalCFOs = Math.max(0, Math.ceil(caasClients / Math.max(1, headcountRatios.clientsPerCFO)) - 9);
-    const additionalFPA = Math.max(0, Math.ceil(caasClients / Math.max(1, headcountRatios.clientsPerFPA)) - 3);
-    const additionalPF = Math.max(0, Math.ceil(caasClients / Math.max(1, headcountRatios.clientsPerPF)));
-    const additionalProjectAnal = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, headcountRatios.clientsPerProjectAnal)));
-    const additionalDataAnal = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, headcountRatios.clientsPerDataAnal)));
-    const additionalCSM = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, headcountRatios.clientsPerCSM)) - 1);
+    const hr = assumptions?.headcountRatios ?? headcountRatios;
+    const sr = assumptions?.salaryRanges ?? salaryRanges;
+    const additionalCFOs = Math.max(0, Math.ceil(caasClients / Math.max(1, hr.clientsPerCFO)) - 9);
+    const additionalFPA = Math.max(0, Math.ceil(caasClients / Math.max(1, hr.clientsPerFPA)) - 3);
+    const additionalPF = Math.max(0, Math.ceil(caasClients / Math.max(1, (hr as any).clientsPerPF ?? headcountRatios.clientsPerPF)));
+    const additionalProjectAnal = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, (hr as any).clientsPerProjectAnal ?? headcountRatios.clientsPerProjectAnal)));
+    const additionalDataAnal = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, (hr as any).clientsPerDataAnal ?? headcountRatios.clientsPerDataAnal)));
+    const additionalCSM = Math.max(0, Math.ceil(caasSaasClients / Math.max(1, hr.clientsPerCSM)) - 1);
 
-    salaries += (additionalCFOs * salaryRanges['CFO'] +
-      additionalFPA * salaryRanges['FP&A Analyst'] +
-      additionalCSM * salaryRanges['Customer Service'] +
-      additionalPF * salaryRanges['Project Finance Director'] +
-      additionalProjectAnal * salaryRanges['Project Analyst'] +
-      additionalDataAnal * salaryRanges['Data Processes Analyst']) / 1000;
+    salaries += (additionalCFOs * (sr['CFO'] ?? salaryRanges['CFO']) +
+      additionalFPA * (sr['FP&A Analyst'] ?? salaryRanges['FP&A Analyst']) +
+      additionalCSM * (sr['Customer Service'] ?? salaryRanges['Customer Service']) +
+      additionalPF * (sr['Project Finance Director'] ?? salaryRanges['Project Finance Director']) +
+      additionalProjectAnal * (sr['Project Analyst'] ?? salaryRanges['Project Analyst']) +
+      additionalDataAnal * (sr['Data Processes Analyst'] ?? salaryRanges['Data Processes Analyst'])) / 1000;
 
     // Tech hires (scale with SaaS client growth)
     const saasScale = Math.max(0, Math.floor(caasSaasClients / 500));
@@ -489,12 +493,12 @@ function calcMonthlyHeadcount(
       pmo: Math.min(Math.ceil(saasScale / 4), 2),
     };
     salaries += (
-      techHires.seniorFullstack * salaryRanges['Senior Fullstack'] +
-      techHires.plenoFullstack * salaryRanges['Pleno Fullstack'] +
-      techHires.aiEngineer * salaryRanges['AI Engineer'] +
-      techHires.devops * salaryRanges['DevOps'] +
-      techHires.uxDesigner * salaryRanges['UX Designer'] +
-      techHires.pmo * salaryRanges['PMO']
+      techHires.seniorFullstack * (sr['Senior Fullstack'] ?? salaryRanges['Senior Fullstack']) +
+      techHires.plenoFullstack * (sr['Pleno Fullstack'] ?? salaryRanges['Pleno Fullstack']) +
+      techHires.aiEngineer * (sr['AI Engineer'] ?? salaryRanges['AI Engineer']) +
+      techHires.devops * (sr['DevOps'] ?? salaryRanges['DevOps']) +
+      techHires.uxDesigner * (sr['UX Designer'] ?? salaryRanges['UX Designer']) +
+      techHires.pmo * (sr['PMO'] ?? salaryRanges['PMO'])
     ) / 1000;
 
     const baseHC = namedEmployees2025.filter(e => !('endMonth' in e)).length;
@@ -799,16 +803,17 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
     // Estimate total headcount for SG&A scaling
     const baseHC = 22;
-    const addCFOs = Math.max(0, Math.ceil(caasClientsM / headcountRatios.clientsPerCFO) - 9);
-    const addFPA = Math.max(0, Math.ceil(caasClientsM / headcountRatios.clientsPerFPA) - 3);
-    const addCSM = Math.max(0, Math.ceil(caasSaasClientsM / headcountRatios.clientsPerCSM) - 1);
+    const hRatios = assumptions.headcountRatios ?? headcountRatios;
+    const addCFOs = Math.max(0, Math.ceil(caasClientsM / Math.max(1, hRatios.clientsPerCFO)) - 9);
+    const addFPA = Math.max(0, Math.ceil(caasClientsM / Math.max(1, hRatios.clientsPerFPA)) - 3);
+    const addCSM = Math.max(0, Math.ceil(caasSaasClientsM / Math.max(1, hRatios.clientsPerCSM)) - 1);
     const saasScale = Math.max(0, Math.floor(caasSaasClientsM / 500));
     const estTotalHC = baseHC + addCFOs + addFPA + addCSM +
       Math.min(saasScale, 5) + Math.min(saasScale * 2, 10) +
       Math.min(Math.floor(saasScale / 2), 3) + Math.min(Math.ceil(saasScale / 3), 3);
 
     // SG&A (uses gross revenue for PDD, headcount for scaling)
-    const sga = calcMonthlySGA(m, year, grossRev, estTotalHC);
+    const sga = calcMonthlySGA(m, year, grossRev, estTotalHC, assumptions);
 
     // Commercial
     const commercial = calcMonthlyCommercial(m, year);

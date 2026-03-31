@@ -72,19 +72,44 @@ function formatSharesInput(value: number): string {
 }
 
 export default function Valuation() {
-  const { projections, assumptions, scenario, filteredYears, focalYear } = useFinancialModel();
+  const { projections, assumptions, scenario, filteredYears, focalYear, setAssumptions } = useFinancialModel();
 
   // Use filteredYears for tables/charts; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
-  const [shareholders, setShareholders] = useState<Shareholder[]>(loadCapTable);
-  const [totalSharesPool, setTotalSharesPool] = useState(loadTotalShares);
-  const [ebitdaMultiple, setEbitdaMultiple] = useState(10);
-  const [arrMultiple, setArrMultiple] = useState(5);
-  const [raiseAmount, setRaiseAmount] = useState(0);
-  const [raiseValuation, setRaiseValuation] = useState(0);
+
+  // Load from assumptions first, fallback to legacy localStorage
+  const [shareholders, setShareholders] = useState<Shareholder[]>(() => {
+    if (assumptions.capTable?.shareholders?.length) return assumptions.capTable.shareholders as Shareholder[];
+    return loadCapTable();
+  });
+  const [totalSharesPool, setTotalSharesPool] = useState(() => {
+    if (assumptions.capTable?.totalShares) return assumptions.capTable.totalShares;
+    return loadTotalShares();
+  });
+  const [ebitdaMultiple, setEbitdaMultiple] = useState(() => assumptions.valuationConfig?.ebitdaMultiple ?? 10);
+  const [arrMultiple, setArrMultiple] = useState(() => assumptions.valuationConfig?.arrMultiple ?? 5);
+  const [raiseAmount, setRaiseAmount] = useState(() => assumptions.valuationConfig?.raiseAmount ?? 0);
+  const [raiseValuation, setRaiseValuation] = useState(() => assumptions.valuationConfig?.raiseValuation ?? 0);
   const [dirty, setDirty] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(() => localStorage.getItem(LAST_SAVED_KEY));
   const [justSaved, setJustSaved] = useState(false);
+
+  // Sync from assumptions when context finishes loading from storage
+  const valuationSynced = useRef(false);
+  useEffect(() => {
+    if (valuationSynced.current) return;
+    if (assumptions.valuationConfig) {
+      valuationSynced.current = true;
+      setEbitdaMultiple(assumptions.valuationConfig.ebitdaMultiple);
+      setArrMultiple(assumptions.valuationConfig.arrMultiple);
+      setRaiseAmount(assumptions.valuationConfig.raiseAmount);
+      setRaiseValuation(assumptions.valuationConfig.raiseValuation);
+    }
+    if (assumptions.capTable?.shareholders?.length) {
+      setShareholders(assumptions.capTable.shareholders as Shareholder[]);
+      setTotalSharesPool(assumptions.capTable.totalShares);
+    }
+  }, [assumptions.valuationConfig, assumptions.capTable]);
 
   // Local editing states for free-typing (keyed by shareholder id)
   const [editingPct, setEditingPct] = useState<Record<string, string>>({});
@@ -109,7 +134,22 @@ export default function Valuation() {
     setDirty(false);
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
+    // Also persist to assumptions for Supabase backup
+    setAssumptions(prev => ({
+      ...prev,
+      capTable: { shareholders, totalShares: totalSharesPool },
+    }));
   };
+
+  // Auto-save valuation config to assumptions when multiples change (skip initial mount)
+  const valDirty = useRef(false);
+  useEffect(() => {
+    if (!valDirty.current) { valDirty.current = true; return; }
+    setAssumptions(prev => ({
+      ...prev,
+      valuationConfig: { ebitdaMultiple, arrMultiple, raiseAmount, raiseValuation },
+    }));
+  }, [ebitdaMultiple, arrMultiple, raiseAmount, raiseValuation]);
 
   const getShares = (pct: number) => Math.round(totalSharesPool * pct / 100);
   const totalShares = totalSharesPool;

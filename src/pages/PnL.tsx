@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { YEARS, Year } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
@@ -20,29 +20,55 @@ function formatPnlValue(value: number, isMargin: boolean): string {
 }
 
 function useChartOfAccounts() {
+  const { assumptions, setAssumptions } = useFinancialModel();
+
+  // Load from assumptions first, fallback to legacy localStorage
   const [customLabels, setCustomLabels] = useState<Record<string, string>>(() => {
+    if (assumptions.pnlConfig?.customLabels && Object.keys(assumptions.pnlConfig.customLabels).length > 0) {
+      return assumptions.pnlConfig.customLabels;
+    }
     try { return JSON.parse(localStorage.getItem('o2_coa_labels') || '{}'); } catch { return {}; }
   });
   const [hiddenItems, setHiddenItems] = useState<Set<string>>(() => {
+    if (assumptions.pnlConfig?.hiddenItems?.length) {
+      return new Set(assumptions.pnlConfig.hiddenItems);
+    }
     try { return new Set(JSON.parse(localStorage.getItem('o2_coa_hidden') || '[]')); } catch { return new Set(); }
   });
+
+  // Sync from assumptions when context finishes loading
+  const coaSynced = useRef(false);
+  useEffect(() => {
+    if (coaSynced.current) return;
+    if (assumptions.pnlConfig?.customLabels && Object.keys(assumptions.pnlConfig.customLabels).length > 0) {
+      coaSynced.current = true;
+      setCustomLabels(assumptions.pnlConfig.customLabels);
+    }
+    if (assumptions.pnlConfig?.hiddenItems?.length) {
+      setHiddenItems(new Set(assumptions.pnlConfig.hiddenItems));
+    }
+  }, [assumptions.pnlConfig]);
 
   const setLabel = useCallback((code: string, label: string) => {
     setCustomLabels(prev => {
       const next = { ...prev, [code]: label };
       localStorage.setItem('o2_coa_labels', JSON.stringify(next));
+      // Persist to assumptions for Supabase backup
+      setAssumptions(p => ({ ...p, pnlConfig: { customLabels: next, hiddenItems: [...(p.pnlConfig?.hiddenItems ?? [])] } }));
       return next;
     });
-  }, []);
+  }, [setAssumptions]);
 
   const toggleHidden = useCallback((code: string) => {
     setHiddenItems(prev => {
       const next = new Set(prev);
       if (next.has(code)) next.delete(code); else next.add(code);
       localStorage.setItem('o2_coa_hidden', JSON.stringify([...next]));
+      // Persist to assumptions for Supabase backup
+      setAssumptions(p => ({ ...p, pnlConfig: { customLabels: p.pnlConfig?.customLabels ?? {}, hiddenItems: [...next] } }));
       return next;
     });
-  }, []);
+  }, [setAssumptions]);
 
   return { customLabels, hiddenItems, setLabel, toggleHidden };
 }

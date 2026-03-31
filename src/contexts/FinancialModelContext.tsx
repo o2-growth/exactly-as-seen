@@ -111,6 +111,34 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           };
         }
 
+        // Migrate legacy cap table from separate localStorage keys
+        if (!fixed.capTable) {
+          try {
+            const capRaw = localStorage.getItem('o2-cap-table');
+            const sharesRaw = localStorage.getItem('o2-total-shares');
+            if (capRaw) {
+              fixed.capTable = {
+                shareholders: JSON.parse(capRaw),
+                totalShares: sharesRaw ? Number(sharesRaw) || 1_000_000 : 1_000_000,
+              };
+            }
+          } catch {}
+        }
+
+        // Migrate legacy PnL config from separate localStorage keys
+        if (!fixed.pnlConfig) {
+          try {
+            const labelsRaw = localStorage.getItem('o2_coa_labels');
+            const hiddenRaw = localStorage.getItem('o2_coa_hidden');
+            if (labelsRaw || hiddenRaw) {
+              fixed.pnlConfig = {
+                customLabels: labelsRaw ? JSON.parse(labelsRaw) : {},
+                hiddenItems: hiddenRaw ? JSON.parse(hiddenRaw) : [],
+              };
+            }
+          } catch {}
+        }
+
         setAssumptions(fixed);
       }
     });

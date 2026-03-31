@@ -117,6 +117,39 @@ export interface Assumptions {
   buTaxConfigs?: BUTaxConfig[];
   // Lucro Presumido — per-subproduct tax rates
   subProductTaxRates?: Partial<Record<TicketKey, SubProductTaxConfig>>;
+
+  // ─── Growth percentages (persisted for UX continuity) ───
+  growthRates?: Record<number, Record<string, number[]>>;
+  applyAllPct?: number;
+  rowApplyPct?: Record<string, number>;
+  rowTicketGrowthPct?: Record<string, number>;
+  rowChurnPct?: Record<string, number>;
+
+  // ─── Actual data (planned vs actual client counts) ───
+  actualData?: Record<string, Record<number, number>>;
+
+  // ─── Headcount employees (editable named employees table) ───
+  hcEmployees?: { name: string; role: string; code: string; bu: string; monthly: Record<string, number> }[];
+
+  // ─── Valuation Config (persisted) ───
+  valuationConfig?: {
+    ebitdaMultiple: number;
+    arrMultiple: number;
+    raiseAmount: number;
+    raiseValuation: number;
+  };
+
+  // ─── Cap Table (persisted — migrated from separate localStorage) ───
+  capTable?: {
+    shareholders: { id: string; name: string; type: string; ownershipPct: number; entryDate: string }[];
+    totalShares: number;
+  };
+
+  // ─── PnL Customization (persisted — migrated from separate localStorage) ───
+  pnlConfig?: {
+    customLabels: Record<string, string>;
+    hiddenItems: string[];
+  };
 }
 
 export interface BUTaxConfig {

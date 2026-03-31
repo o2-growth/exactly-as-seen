@@ -253,6 +253,9 @@ export default function Assumptions() {
   const [hcViewMode, setHcViewMode] = useState<'people' | 'cost'>('people');
 
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
+    if (assumptions.actualData && Object.keys(assumptions.actualData).length > 0) {
+      return assumptions.actualData;
+    }
     const d: Record<string, Record<number, number>> = {};
     (Object.keys(SUB_PRODUCT_LABELS) as SubProductKey[]).forEach(key => {
       d[key] = {};
@@ -265,6 +268,9 @@ export default function Assumptions() {
   type GrowthRates = Record<string, number[]>;
 
   const [growthRates, setGrowthRates] = useState<Record<Year, GrowthRates>>(() => {
+    if (assumptions.growthRates && Object.keys(assumptions.growthRates).length > 0) {
+      return assumptions.growthRates as Record<Year, GrowthRates>;
+    }
     const init = {} as Record<Year, GrowthRates>;
     for (const y of YEARS) {
       init[y] = {};
@@ -278,10 +284,38 @@ export default function Assumptions() {
     return init;
   });
 
-  const [applyAllPct, setApplyAllPct] = useState(6);
-  const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>({});
-  const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>({});
-  const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>({});
+  const [applyAllPct, setApplyAllPct] = useState(() => assumptions.applyAllPct ?? 6);
+  const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>(() => assumptions.rowApplyPct ?? {});
+  const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>(() => assumptions.rowTicketGrowthPct ?? {});
+  const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>(() => assumptions.rowChurnPct ?? {});
+  // Sync local state from assumptions on mount (after async load)
+  const initialSyncDone = React.useRef(false);
+  React.useEffect(() => {
+    // Only sync once — on the first assumptions change after mount (the async load)
+    if (initialSyncDone.current) return;
+    // Wait for context to have loaded from storage (assumptions !== DEFAULT_ASSUMPTIONS)
+    const hasPersistedGrowth = assumptions.rowApplyPct && Object.keys(assumptions.rowApplyPct).length > 0;
+    const hasPersistedTicketGrowth = assumptions.rowTicketGrowthPct && Object.keys(assumptions.rowTicketGrowthPct).length > 0;
+    const hasPersistedChurnPct = assumptions.rowChurnPct && Object.keys(assumptions.rowChurnPct).length > 0;
+    const hasPersistedActual = assumptions.actualData && Object.keys(assumptions.actualData).length > 0;
+    const hasPersistedEmployees = assumptions.hcEmployees && assumptions.hcEmployees.length > 0;
+
+    if (hasPersistedGrowth) setRowApplyPct(assumptions.rowApplyPct!);
+    if (hasPersistedTicketGrowth) setRowTicketGrowthPct(assumptions.rowTicketGrowthPct!);
+    if (hasPersistedChurnPct) setRowChurnPct(assumptions.rowChurnPct!);
+    if (assumptions.applyAllPct !== undefined && assumptions.applyAllPct !== 6) setApplyAllPct(assumptions.applyAllPct);
+    if (assumptions.growthRates && Object.keys(assumptions.growthRates).length > 0) {
+      setGrowthRates(assumptions.growthRates as Record<Year, GrowthRates>);
+    }
+    if (hasPersistedActual) setActualData(assumptions.actualData!);
+    if (hasPersistedEmployees) setHcEmployees(assumptions.hcEmployees!);
+
+    // Mark done after first real sync attempt
+    if (hasPersistedGrowth || hasPersistedTicketGrowth || hasPersistedChurnPct || hasPersistedActual || hasPersistedEmployees) {
+      initialSyncDone.current = true;
+    }
+  }, [assumptions.rowApplyPct, assumptions.rowTicketGrowthPct, assumptions.rowChurnPct, assumptions.applyAllPct, assumptions.growthRates, assumptions.actualData, assumptions.hcEmployees]);
+
   const [activeTaxCategory, setActiveTaxCategory] = useState<string>('caas');
   const [opExpandedGroups, setOpExpandedGroups] = useState<Record<string, boolean>>({
     custos: false,
@@ -289,14 +323,20 @@ export default function Assumptions() {
   });
 
   // ─── Headcount editable state ───
-  const [hcEmployees, setHcEmployees] = useState(() =>
-    hcNamedEmployees.map(e => ({ ...e, monthly: { ...e.monthly } }))
-  );
+  const [hcEmployees, setHcEmployees] = useState(() => {
+    if (assumptions.hcEmployees?.length) return assumptions.hcEmployees;
+    return hcNamedEmployees.map(e => ({ ...e, monthly: { ...e.monthly } }));
+  });
+
+  const persistEmployees = (employees: typeof hcEmployees) => {
+    queueMicrotask(() => setAssumptions(prev => ({ ...prev, hcEmployees: employees })));
+  };
 
   const updateEmployeeSalary = (empIdx: number, period: string, value: number) => {
     setHcEmployees(prev => {
       const next = [...prev];
       next[empIdx] = { ...next[empIdx], monthly: { ...next[empIdx].monthly, [period]: value } };
+      persistEmployees(next);
       return next;
     });
   };
@@ -305,22 +345,31 @@ export default function Assumptions() {
     setHcEmployees(prev => {
       const next = [...prev];
       next[empIdx] = { ...next[empIdx], [field]: value };
+      persistEmployees(next);
       return next;
     });
   };
 
   const addEmployee = () => {
-    setHcEmployees(prev => [...prev, {
-      name: 'Novo Colaborador',
-      role: '',
-      code: '',
-      bu: 'CaaS',
-      monthly: {},
-    }]);
+    setHcEmployees(prev => {
+      const next = [...prev, {
+        name: 'Novo Colaborador',
+        role: '',
+        code: '',
+        bu: 'CaaS',
+        monthly: {},
+      }];
+      persistEmployees(next);
+      return next;
+    });
   };
 
   const removeEmployee = (empIdx: number) => {
-    setHcEmployees(prev => prev.filter((_, i) => i !== empIdx));
+    setHcEmployees(prev => {
+      const next = prev.filter((_, i) => i !== empIdx);
+      persistEmployees(next);
+      return next;
+    });
   };
 
   const startEditing = () => {
@@ -371,10 +420,11 @@ export default function Assumptions() {
   };
 
   const updateActual = (key: string, year: Year, val: number) => {
-    setActualData(prev => ({
-      ...prev,
-      [key]: { ...prev[key], [year]: val },
-    }));
+    setActualData(prev => {
+      const next = { ...prev, [key]: { ...prev[key], [year]: val } };
+      queueMicrotask(() => setAssumptions(p => ({ ...p, actualData: next })));
+      return next;
+    });
   };
 
   const data = editing ? editState : assumptions;
@@ -388,11 +438,54 @@ export default function Assumptions() {
     }
   };
 
+  // Wrappers that persist growth fields to assumptions on every change
+  // Uses queueMicrotask to avoid "setState during render" React warning
+  const persistGrowthField = React.useCallback((field: string, value: any) => {
+    queueMicrotask(() => setAssumptions(prev => ({ ...prev, [field]: value })));
+  }, [setAssumptions]);
+
+  const setRowApplyPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
+    setRowApplyPct(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      persistGrowthField('rowApplyPct', next);
+      return next;
+    });
+  };
+
+  const setRowTicketGrowthPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
+    setRowTicketGrowthPct(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      persistGrowthField('rowTicketGrowthPct', next);
+      return next;
+    });
+  };
+
+  const setRowChurnPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
+    setRowChurnPct(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      persistGrowthField('rowChurnPct', next);
+      return next;
+    });
+  };
+
+  const setApplyAllPctPersist = (val: number) => {
+    setApplyAllPct(val);
+    persistGrowthField('applyAllPct', val);
+  };
+
+  const setGrowthRatesPersist = (valOrFn: Record<Year, GrowthRates> | ((prev: Record<Year, GrowthRates>) => Record<Year, GrowthRates>)) => {
+    setGrowthRates(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      persistGrowthField('growthRates', next);
+      return next;
+    });
+  };
+
   // ─── Projection handlers ───
 
   const handleGrowthChange = (key: SubProductKey, year: Year, monthIdx: number, newPctVal: number) => {
     const newRate = newPctVal / 100;
-    setGrowthRates(prev => {
+    setGrowthRatesPersist(prev => {
       const updated = { ...prev };
       const yearRates = { ...updated[year] };
       const arr = [...(yearRates[key] ?? Array(12).fill(0.06))];
@@ -511,7 +604,7 @@ export default function Assumptions() {
       newGrowthRates[y] = yearRates;
     }
 
-    setGrowthRates(newGrowthRates);
+    setGrowthRatesPersist(newGrowthRates);
 
     const applyAllUpdater = (prev: AssumptionsType) => {
       const newSPC = { ...prev.subProductClients };
@@ -592,7 +685,7 @@ export default function Assumptions() {
       allManualFlags[y] = Array(12).fill(false);
     }
 
-    setGrowthRates(prev => {
+    setGrowthRatesPersist(prev => {
       const updated = { ...prev };
       for (const y of yearsToApply) {
         const yearRates = { ...updated[y as Year] };
@@ -1032,7 +1125,7 @@ export default function Assumptions() {
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowApplyPct[rowKey] ?? 6}
                                           onClick={e => e.stopPropagation()}
-                                          onChange={e => setRowApplyPct(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                          onChange={e => setRowApplyPctPersist(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
                                           disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
@@ -1085,7 +1178,7 @@ export default function Assumptions() {
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowTicketGrowthPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
-                                          onChange={e => setRowTicketGrowthPct(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
+                                          onChange={e => setRowTicketGrowthPctPersist(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
                                           disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">%</span>
@@ -1210,10 +1303,10 @@ export default function Assumptions() {
                                     </div>
                                    </div>
 
-                                  {/* Churn (clientes/mês) */}
+                                  {/* Churn (% mensal) */}
                                   <div className="space-y-2 pt-1">
                                     <div className="flex items-center gap-4">
-                                      <p className="text-xs font-semibold text-negative">Churn (clientes/mês) — {selectedYear}</p>
+                                      <p className="text-xs font-semibold text-negative">Churn (% mensal) — {selectedYear}</p>
                                       <button
                                         className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
                                         disabled={!editing}
@@ -1246,15 +1339,12 @@ export default function Assumptions() {
                                         {MONTHS.map((m, i) => {
                                           const hist = isHistorical(selectedYear, i);
                                           const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          const prev = i === 0
-                                            ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
-                                            : monthly[i - 1];
-                                          const churnVal = Math.round(prev * churnRate);
+                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100; // % mensal com 2 decimais
                                           return (
                                             <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
                                               <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
                                               <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
-                                                {churnVal || '—'}
+                                                {churnPctMonthly > 0 ? `${churnPctMonthly}%` : '—'}
                                               </span>
                                             </div>
                                           );
@@ -1293,7 +1383,11 @@ export default function Assumptions() {
                                           className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowChurnPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
-                                          onChange={e => setRowChurnPct(prev => ({ ...prev, [prodKey]: Number(e.target.value) || 0 }))}
+                                          onChange={e => {
+                                            const v = e.target.value;
+                                            const num = v === '' || v === '-' ? 0 : Number(v);
+                                            setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
+                                          }}
                                           disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
@@ -1312,7 +1406,7 @@ export default function Assumptions() {
                                               if (y === selectedYear) {
                                                 newRates[y] = base;
                                               } else {
-                                                base = Math.round(base * (1 + growthRate) * 100) / 100;
+                                                base = Math.max(0, Math.round(base * (1 + growthRate) * 100) / 100);
                                                 newRates[y] = base;
                                               }
                                             }
@@ -1330,13 +1424,14 @@ export default function Assumptions() {
                                       ) : (
                                         (() => {
                                           const churnRate = getChurnMonthly(prodKey, data, selectedYear);
+                                          const annualPct = Math.round(churnRate * 12 * 100 * 10) / 10;
                                           const totalChurn = MONTHS.reduce((sum, _, i) => {
                                             const prev = i === 0
                                               ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
                                               : monthly[i - 1];
                                             return sum + Math.round(prev * churnRate);
                                           }, 0);
-                                          return <span className="text-negative">Total ano: <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos</span>;
+                                          return <span className="text-negative">Churn: <strong>{annualPct}% a.a.</strong> ({Math.round(churnRate * 10000) / 100}%/mes) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
                                         })()
                                       )}
                                     </div>

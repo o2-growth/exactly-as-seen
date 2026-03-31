@@ -44,15 +44,17 @@ export function useAssumptionsPersistence() {
       if (!user) {
         const stored = localStorage.getItem('o2_assumptions');
         if (stored) {
+          const parsed = JSON.parse(stored);
           setSnapshots([{
             id: 'local',
             name: 'Local Save',
             scenario: 'BASE',
-            assumptions: JSON.parse(stored),
+            assumptions: parsed,
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }]);
+          return parsed;
         }
         return null;
       }
