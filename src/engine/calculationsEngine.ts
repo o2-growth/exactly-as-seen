@@ -1001,7 +1001,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     ebitda: r(annualEBITDA),
     ebitdaMarginPct: annualNetRevenue !== 0 ? Number(((annualEBITDA / annualNetRevenue) * 100).toFixed(1)) : 0,
     financialResult: r(annualFinancial), ebt: r(annualEBT),
-    taxes: r(annualTaxes), taxDetail: { irpj: r(taxD.irpj), csll: r(taxD.csll) },
+    taxes: r(annualTaxes), taxDetail: { irpj: r(taxD.irpj), csll: r(taxD.csll), adicionalIrpj: r(taxD.adicionalIrpj) },
     netIncome: r(annualNI),
     netMarginPct: annualNetRevenue !== 0 ? Number(((annualNI / annualNetRevenue) * 100).toFixed(1)) : 0,
     debtPayments: r(annualDebt), debtDetail: { loans: r(debtD.loans), suppliers: r(debtD.suppliers) },
