@@ -1414,8 +1414,8 @@ export default function Assumptions() {
                                       <div className="grid grid-cols-12 gap-1.5">
                                         {MONTHS.map((m, i) => {
                                           const hist = isHistorical(selectedYear, i);
-                                          const churnRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100; // % mensal com 2 decimais
+                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100;
                                           return (
                                             <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
                                               <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
