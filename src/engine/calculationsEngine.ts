@@ -654,7 +654,9 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0, tax: 0 };
   let hcD = { salaries: 0, benefits: 0 };
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
-  let taxD = { irpj: 0, csll: 0 };
+  let taxD = { irpj: 0, csll: 0, adicionalIrpj: 0 };
+  let quarterGrossRev = 0; // accumulator for quarterly IRPJ adicional
+  const monthlyAdicional: number[] = new Array(12).fill(0);
   let debtD = { loans: 0, suppliers: 0 };
   let dedD = { pis: 0, cofins: 0, iss: 0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0 };
   let capexD = { software: 0, realestate: 0 };
