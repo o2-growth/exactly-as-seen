@@ -216,9 +216,9 @@ describe('Engine: Tax toggle (Item 4)', () => {
     }
   });
 
-  it('IRPJ/CSLL are non-zero when taxEnabled=true and EBT > 0', () => {
+  it('IRPJ/CSLL are always non-zero when taxEnabled=true and there is revenue (Lucro Presumido)', () => {
     for (const y of YEARS) {
-      if (modelTaxOn.years[y].ebt > 0) {
+      if (modelTaxOn.years[y].grossRevenue > 0) {
         expect(modelTaxOn.years[y].taxes).toBeLessThan(0);
       }
     }
@@ -226,7 +226,7 @@ describe('Engine: Tax toggle (Item 4)', () => {
 
   it('net income is higher when taxes are off', () => {
     for (const y of YEARS) {
-      if (modelTaxOn.years[y].ebt > 0) {
+      if (modelTaxOn.years[y].grossRevenue > 0) {
         expect(modelTaxOff.years[y].netIncome).toBeGreaterThanOrEqual(modelTaxOn.years[y].netIncome);
       }
     }
