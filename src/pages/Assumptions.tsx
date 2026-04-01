@@ -347,7 +347,13 @@ export default function Assumptions() {
   });
 
   const persistEmployees = (employees: typeof hcEmployees) => {
-    queueMicrotask(() => setAssumptions(prev => ({ ...prev, hcEmployees: employees })));
+    queueMicrotask(() => {
+      if (editing) {
+        setEditState(prev => ({ ...prev, hcEmployees: employees }));
+      } else {
+        setAssumptions(prev => ({ ...prev, hcEmployees: employees }));
+      }
+    });
   };
 
   const updateEmployeeSalary = (empIdx: number, period: string, value: number) => {
@@ -424,7 +430,7 @@ export default function Assumptions() {
   };
 
   const updateTicket = (key: TicketKey, val: number) => {
-    setAssumptions(prev => ({
+    updateModel(prev => ({
       ...prev,
       tickets: { ...prev.tickets, [key]: val },
     }));
@@ -440,7 +446,13 @@ export default function Assumptions() {
   const updateActual = (key: string, year: Year, val: number) => {
     setActualData(prev => {
       const next = { ...prev, [key]: { ...prev[key], [year]: val } };
-      queueMicrotask(() => setAssumptions(p => ({ ...p, actualData: next })));
+      queueMicrotask(() => {
+        if (editing) {
+          setEditState(p => ({ ...p, actualData: next }));
+        } else {
+          setAssumptions(p => ({ ...p, actualData: next }));
+        }
+      });
       return next;
     });
   };
@@ -456,11 +468,17 @@ export default function Assumptions() {
     }
   };
 
-  // Wrappers that persist growth fields to assumptions on every change
+  // Wrappers that persist growth fields — writes to editState when editing, assumptions otherwise
   // Uses queueMicrotask to avoid "setState during render" React warning
   const persistGrowthField = React.useCallback((field: string, value: any) => {
-    queueMicrotask(() => setAssumptions(prev => ({ ...prev, [field]: value })));
-  }, [setAssumptions]);
+    queueMicrotask(() => {
+      if (editing) {
+        setEditState(prev => ({ ...prev, [field]: value }));
+      } else {
+        setAssumptions(prev => ({ ...prev, [field]: value }));
+      }
+    });
+  }, [setAssumptions, editing]);
 
   const setRowApplyPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     setRowApplyPct(prev => {
