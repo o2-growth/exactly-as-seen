@@ -43,11 +43,12 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
   // Persistence: auto-load from Supabase/localStorage on mount, auto-save on change
   const { saveAssumptions, loadSnapshots } = useAssumptionsPersistence();
+  const loadStarted = useRef(false);
   const hasLoaded = useRef(false);
 
   useEffect(() => {
-    if (hasLoaded.current) return;
-    hasLoaded.current = true;
+    if (loadStarted.current) return;
+    loadStarted.current = true;
     loadSnapshots().then(saved => {
       if (saved) {
         // One-time fix: restore accidentally changed caasAssessoria values
@@ -141,6 +142,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
         setAssumptions(fixed);
       }
+      // Mark as loaded AFTER state is set — prevents debounce from saving defaults
+      hasLoaded.current = true;
     });
   }, [loadSnapshots]);
 

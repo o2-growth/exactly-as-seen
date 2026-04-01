@@ -24,18 +24,19 @@ export function useAssumptionsPersistence() {
     try {
       const supabase = getBackendClientSafe();
       if (!supabase) {
-        // No backend — use localStorage fallback
         const stored = localStorage.getItem('o2_assumptions');
         if (stored) {
+          const parsed = JSON.parse(stored);
           setSnapshots([{
             id: 'local',
             name: 'Local Save',
             scenario: 'BASE',
-            assumptions: JSON.parse(stored),
+            assumptions: parsed,
             is_active: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }]);
+          return parsed;
         }
         return null;
       }
@@ -59,10 +60,13 @@ export function useAssumptionsPersistence() {
         return null;
       }
 
+      // Load with user_id filter and limit for performance
       const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(20);
 
       if (fetchError) throw fetchError;
 
@@ -77,8 +81,13 @@ export function useAssumptionsPersistence() {
       }));
       setSnapshots(mapped);
 
-      const active = mapped.find(s => s.is_active);
-      return active?.assumptions ?? null;
+      // Return the active snapshot, or the most recent one, or fall back to localStorage
+      const active = mapped.find(s => s.is_active) ?? mapped[0];
+      if (active?.assumptions) return active.assumptions;
+
+      // Fallback to localStorage if Supabase has no data
+      const stored = localStorage.getItem('o2_assumptions');
+      return stored ? JSON.parse(stored) : null;
     } catch (err: any) {
       console.error('Error loading assumptions:', err);
       setError(err.message);
@@ -97,6 +106,7 @@ export function useAssumptionsPersistence() {
     setSaving(true);
     setError(null);
     try {
+      // Always save to localStorage first (instant, reliable)
       localStorage.setItem('o2_assumptions', JSON.stringify(assumptions));
 
       const supabase = getBackendClientSafe();
@@ -105,22 +115,41 @@ export function useAssumptionsPersistence() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      await (supabase as any)
+      // Try to find existing active snapshot to UPDATE (not create new rows)
+      const { data: existing } = await (supabase as any)
         .from('assumptions_snapshots')
-        .update({ is_active: false })
-        .eq('user_id', user.id);
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
 
-      const { error: upsertError } = await (supabase as any)
-        .from('assumptions_snapshots')
-        .insert({
-          user_id: user.id,
-          scenario,
-          name: name || `Save ${new Date().toLocaleString('pt-BR')}`,
-          assumptions: assumptions as any,
-          is_active: true,
-        });
+      if (existing?.id) {
+        // UPDATE existing row (no table bloat)
+        const { error: updateError } = await (supabase as any)
+          .from('assumptions_snapshots')
+          .update({
+            scenario,
+            assumptions: assumptions as any,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id);
 
-      if (upsertError) throw upsertError;
+        if (updateError) throw updateError;
+      } else {
+        // No active snapshot exists — INSERT one
+        const { error: insertError } = await (supabase as any)
+          .from('assumptions_snapshots')
+          .insert({
+            user_id: user.id,
+            scenario,
+            name: name || `Save ${new Date().toLocaleString('pt-BR')}`,
+            assumptions: assumptions as any,
+            is_active: true,
+          });
+
+        if (insertError) throw insertError;
+      }
     } catch (err: any) {
       console.error('Error saving assumptions:', err);
       setError(err.message);
