@@ -594,6 +594,8 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
     case 'revenda_mercadoria':
     case 'material_didatico':
       return { irpj: 0.08, csll: 0.12 };
+    case 'produto_saas':
+      return { irpj: 0.08, csll: 0.12 };
     default: // 'servico'
       return { irpj: 0.32, csll: 0.32 };
   }
