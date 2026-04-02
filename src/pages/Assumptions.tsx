@@ -252,9 +252,6 @@ export default function Assumptions() {
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
   const [editing, setEditing] = useState(false);
-  const [editState, setEditState] = useState<AssumptionsType>(assumptions);
-  const [showSaveModal, setShowSaveModal] = useState(false);
-  const [saveNote, setSaveNote] = useState('');
   const [marketingView, setMarketingView] = useState<'planned' | 'actual'>('planned');
   const [selectedYear, setSelectedYear] = useState<Year>(2025);
 
@@ -347,13 +344,7 @@ export default function Assumptions() {
   });
 
   const persistEmployees = (employees: typeof hcEmployees) => {
-    queueMicrotask(() => {
-      if (editing) {
-        setEditState(prev => ({ ...prev, hcEmployees: employees }));
-      } else {
-        setAssumptions(prev => ({ ...prev, hcEmployees: employees }));
-      }
-    });
+    queueMicrotask(() => setAssumptions(prev => ({ ...prev, hcEmployees: employees })));
   };
 
   const updateEmployeeSalary = (empIdx: number, period: string, value: number) => {
@@ -396,29 +387,12 @@ export default function Assumptions() {
     });
   };
 
-  const startEditing = () => {
-    setEditState({ ...assumptions });
-    setEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setEditState(assumptions);
-    setEditing(false);
-  };
-
-  const handleSave = () => {
-    setShowSaveModal(true);
-  };
-
-  const confirmSave = () => {
-    if (!saveNote.trim()) return;
-    setAssumptions(editState);
-    saveVersion(saveNote.trim(), editState, scenario);
-    // Force immediate save to localStorage + Supabase (don't wait for debounce)
-    saveNow(editState);
-    setSaveNote('');
-    setShowSaveModal(false);
-    setEditing(false);
+  const toggleEditing = () => {
+    if (editing) {
+      // Exiting edit mode — force immediate save
+      saveNow(assumptions);
+    }
+    setEditing(!editing);
   };
 
   const updateSubProduct = (key: SubProductKey, year: Year, val: number) => {
@@ -448,39 +422,23 @@ export default function Assumptions() {
   const updateActual = (key: string, year: Year, val: number) => {
     setActualData(prev => {
       const next = { ...prev, [key]: { ...prev[key], [year]: val } };
-      queueMicrotask(() => {
-        if (editing) {
-          setEditState(p => ({ ...p, actualData: next }));
-        } else {
-          setAssumptions(p => ({ ...p, actualData: next }));
-        }
-      });
+      queueMicrotask(() => setAssumptions(p => ({ ...p, actualData: next })));
       return next;
     });
   };
 
-  const data = editing ? editState : assumptions;
+  const data = assumptions;
 
-  // Helper: update assumptions directly (when not in edit mode) or editState (when editing)
+  // Helper: update assumptions (always writes directly, auto-saved via debounce)
   const updateModel = (updater: (prev: AssumptionsType) => AssumptionsType) => {
-    if (editing) {
-      setEditState(updater);
-    } else {
-      setAssumptions(prev => updater(prev));
-    }
+    setAssumptions(prev => updater(prev));
   };
 
-  // Wrappers that persist growth fields — writes to editState when editing, assumptions otherwise
+  // Persist growth fields to assumptions (auto-saved via debounce)
   // Uses queueMicrotask to avoid "setState during render" React warning
   const persistGrowthField = React.useCallback((field: string, value: any) => {
-    queueMicrotask(() => {
-      if (editing) {
-        setEditState(prev => ({ ...prev, [field]: value }));
-      } else {
-        setAssumptions(prev => ({ ...prev, [field]: value }));
-      }
-    });
-  }, [setAssumptions, editing]);
+    queueMicrotask(() => setAssumptions(prev => ({ ...prev, [field]: value })));
+  }, [setAssumptions]);
 
   const setRowApplyPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
     setRowApplyPct(prev => {
@@ -535,8 +493,8 @@ export default function Assumptions() {
   };
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
-    // Read from the correct state source (editState when editing, assumptions otherwise)
-    const source = editing ? editState : assumptions;
+    // Read from assumptions (always the source of truth)
+    const source = assumptions;
     const currentOverrides = source.monthlyClientOverrides ?? {};
     const currentManualFlags = source.manualMonthlyClientOverrideFlags ?? {};
     const yearArr = currentOverrides[key as TicketKey]?.[year]
@@ -667,7 +625,7 @@ export default function Assumptions() {
       };
     };
     if (editing) {
-      setEditState(applyAllUpdater);
+      setAssumptions(applyAllUpdater);
     } else {
       setAssumptions(applyAllUpdater);
     }
@@ -751,7 +709,7 @@ export default function Assumptions() {
       };
     };
     if (editing) {
-      setEditState(applyRowUpdater);
+      setAssumptions(applyRowUpdater);
     } else {
       setAssumptions(applyRowUpdater);
     }
@@ -815,7 +773,7 @@ export default function Assumptions() {
         monthlyChurnRates: newCR,
       };
     };
-    if (editing) setEditState(updater); else setAssumptions(updater);
+    setAssumptions(updater);
   };
 
   // ─── Reproject clients when churn changes (monthly arrays) ───
@@ -873,7 +831,7 @@ export default function Assumptions() {
         monthlyChurnRates: newCR,
       };
     };
-    if (editing) setEditState(updater); else setAssumptions(updater);
+    setAssumptions(updater);
   };
 
   const handleApplyTicketGrowth = (prodKey: SubProductKey, year: Year) => {
@@ -925,7 +883,7 @@ export default function Assumptions() {
       },
     });
     if (editing) {
-      setEditState(updater);
+      setAssumptions(updater);
     } else {
       setAssumptions(updater);
     }
@@ -954,31 +912,27 @@ export default function Assumptions() {
           <p className="text-xs text-muted-foreground mt-1">Premissas da modelagem financeira. Os valores definidos aqui alimentam o P&L projetado, Cash Flow e demais demonstrações.</p>
         </div>
         <div className="flex items-center gap-2">
-          {editing ? (
-            <>
-              <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
-                <Save className="h-3.5 w-3.5" /> Save
-              </button>
-              <button onClick={cancelEditing} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
-                <X className="h-3.5 w-3.5" /> Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={startEditing} className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold border border-primary/40 rounded-lg text-primary hover:bg-primary/10 transition-colors">
-                <Unlock className="h-3.5 w-3.5" /> Edit Assumptions
-              </button>
-              <button onClick={resetAssumptions} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
-                <RotateCcw className="h-3.5 w-3.5" /> Reset
-              </button>
-            </>
-          )}
+          <button onClick={toggleEditing} className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition-colors ${
+            editing
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'border border-primary/40 text-primary hover:bg-primary/10'
+          }`}>
+            {editing ? <><Lock className="h-3.5 w-3.5" /> Parar de Editar</> : <><Unlock className="h-3.5 w-3.5" /> Editar Premissas</>}
+          </button>
+          <button onClick={resetAssumptions} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
+            <RotateCcw className="h-3.5 w-3.5" /> Reset
+          </button>
         </div>
       </div>
 
       {!editing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Lock className="h-3.5 w-3.5" /> Cells are locked. Click "Edit Assumptions" to modify.
+          <Lock className="h-3.5 w-3.5" /> Campos travados. Clique em "Editar Premissas" para modificar.
+        </div>
+      )}
+      {editing && (
+        <div className="flex items-center gap-2 text-xs text-positive">
+          <Unlock className="h-3.5 w-3.5" /> Modo edicao ativo. As alteracoes sao salvas automaticamente.
         </div>
       )}
 
@@ -1179,7 +1133,7 @@ export default function Assumptions() {
                                   monthlyTickets: newMonthlyTickets,
                                 };
                               };
-                              if (editing) setEditState(updater); else setAssumptions(updater);
+                              setAssumptions(updater);
                             };
                             return (
                             <tr className="border-b border-border/30">
@@ -1303,7 +1257,7 @@ export default function Assumptions() {
                                                 readOnly={!editing}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
-                                                  const src = editing ? editState : assumptions;
+                                                  const src = assumptions;
                                                   const currentMonthlyTickets = src.monthlyTickets ?? {};
                                                   const yearArr = currentMonthlyTickets[prodKey]?.[selectedYear]
                                                     ? [...currentMonthlyTickets[prodKey]![selectedYear]!]
@@ -1332,7 +1286,7 @@ export default function Assumptions() {
                                                       },
                                                     },
                                                   });
-                                                  if (editing) setEditState(updater);
+                                                  if (editing) setAssumptions(updater);
                                                   else setAssumptions(updater);
                                                 }}
                                               />
@@ -1414,7 +1368,7 @@ export default function Assumptions() {
                                               [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
                                             },
                                           });
-                                          if (editing) setEditState(updater); else setAssumptions(updater);
+                                          setAssumptions(updater);
                                         }}
                                       >
                                         N/A
@@ -1631,7 +1585,7 @@ export default function Assumptions() {
               const updated = { ...current, [field]: val };
               const rates = { ...(data.subProductTaxRates ?? {}), [key]: updated };
               if (editing) {
-                setEditState(prev => ({ ...prev, subProductTaxRates: rates }));
+                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
               } else {
                 setAssumptions(prev => ({ ...prev, subProductTaxRates: rates } as AssumptionsType));
               }
@@ -1741,13 +1695,13 @@ export default function Assumptions() {
         <TabsContent value="cos" className="space-y-6 mt-4">
 
           {(() => {
-            const data = editing ? editState : assumptions;
+            const data = assumptions;
             const cos = data.cosConfig ?? DEFAULT_COS_CONFIG;
 
             const updateCos = (field: keyof CosConfig, val: number) => {
               const newCos = { ...cos, [field]: val };
               if (editing) {
-                setEditState(prev => ({ ...prev, cosConfig: newCos }));
+                setAssumptions(prev => ({ ...prev, cosConfig: newCos }));
               } else {
                 setAssumptions(prev => ({ ...prev, cosConfig: newCos }));
               }
@@ -2141,8 +2095,7 @@ export default function Assumptions() {
                   value={data.marketingPR ?? 0}
                   onChange={e => {
                     const v = Number(e.target.value) || 0;
-                    if (editing) { setEditState(prev => ({ ...prev, marketingPR: v })); }
-                    else { setAssumptions(prev => ({ ...prev, marketingPR: v })); }
+                    setAssumptions(prev => ({ ...prev, marketingPR: v }));
                   }}
                 />
               </div>
@@ -2152,8 +2105,7 @@ export default function Assumptions() {
                   value={data.marketingEvents ?? 0}
                   onChange={e => {
                     const v = Number(e.target.value) || 0;
-                    if (editing) { setEditState(prev => ({ ...prev, marketingEvents: v })); }
-                    else { setAssumptions(prev => ({ ...prev, marketingEvents: v })); }
+                    setAssumptions(prev => ({ ...prev, marketingEvents: v }));
                   }}
                 />
               </div>
@@ -2181,8 +2133,7 @@ export default function Assumptions() {
                           onChange={e => {
                             const v = Number(e.target.value) || 0;
                             const newCac = { ...(data.cacPerProduct ?? {}), [key]: v };
-                            if (editing) { setEditState(prev => ({ ...prev, cacPerProduct: newCac })); }
-                            else { setAssumptions(prev => ({ ...prev, cacPerProduct: newCac })); }
+                            setAssumptions(prev => ({ ...prev, cacPerProduct: newCac }));
                           }}
                         />
                       </td>
@@ -2209,7 +2160,7 @@ export default function Assumptions() {
                 <div className="text-sm font-semibold">
                   {editing ? (
                     <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaPercent} onChange={e => setEditState(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
+                      value={data.sgaPercent} onChange={e => setAssumptions(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
                   ) : <span>{data.sgaPercent}%</span>}
                 </div>
               </div>
@@ -2218,7 +2169,7 @@ export default function Assumptions() {
                 <div className="text-sm font-semibold">
                   {editing ? (
                     <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaGrowthRate} onChange={e => setEditState(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
+                      value={data.sgaGrowthRate} onChange={e => setAssumptions(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
                   ) : <span>{data.sgaGrowthRate}%</span>}
                 </div>
               </div>
@@ -2227,7 +2178,7 @@ export default function Assumptions() {
                 <div className="text-sm font-semibold">
                   {editing ? (
                     <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.headcountGrowth} onChange={e => setEditState(p => ({ ...p, headcountGrowth: Number(e.target.value) || 0 }))} />
+                      value={data.headcountGrowth} onChange={e => setAssumptions(p => ({ ...p, headcountGrowth: Number(e.target.value) || 0 }))} />
                   ) : <span>{data.headcountGrowth}%</span>}
                 </div>
               </div>
@@ -2605,40 +2556,6 @@ export default function Assumptions() {
         </TabsContent>
       </Tabs>
 
-      {/* Save Modal */}
-      <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Save Assumptions</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div>
-              <label className="text-sm text-muted-foreground block mb-1.5">
-                Why are you changing this assumption? <span className="text-negative">*</span>
-              </label>
-              <textarea
-                className="w-full bg-secondary border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary resize-none"
-                rows={3}
-                placeholder="Describe the rationale for this change..."
-                value={saveNote}
-                onChange={e => setSaveNote(e.target.value)}
-              />
-            </div>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
-                Cancel
-              </button>
-              <button
-                disabled={!saveNote.trim()}
-                onClick={confirmSave}
-                className="px-4 py-2 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-              >
-                Confirm &amp; Save Version
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
