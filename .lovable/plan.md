@@ -1,35 +1,38 @@
 
 
-# Remover condição `ebt > 0` — IRPJ/CSLL sempre incidem no Lucro Presumido
+# SaaS — Tributação como Produto (Lucro Presumido 8%/12%)
 
-## Problema
-Atualmente (linha 858), IRPJ e CSLL só são calculados quando `ebt > 0`. No Lucro Presumido, esses tributos incidem **sempre** sobre a base presumida (32% da receita bruta), independente de lucro ou prejuízo.
+## Contexto
+SaaS está sendo tratado como serviço (base 32%) quando deveria usar bases presumidas de produto: **IRPJ 8%, CSLL 12%**. ISS também deve ser 0% para SaaS.
 
 ## Alterações
 
-### 1. `src/engine/calculationsEngine.ts` — Remover guarda `ebt > 0` (linha 858)
+### 1. `src/lib/financialData.ts` — Defaults SaaS
 
-Mudar de:
-```typescript
-if (ebt > 0 && assumptions.taxEnabled !== false) {
-```
-Para:
-```typescript
-if (assumptions.taxEnabled !== false) {
-```
+Em `getDefaultSubProductTaxConfig` (linha 182):
+- SaaS: `iss: 0` (não incide), `tipoReceita: 'produto_saas'`
+- Demais: mantém `iss: 5.0`, `tipoReceita: 'servico'`
 
-Isso faz IRPJ (15%) e CSLL (9%) incidirem sempre que `taxEnabled` estiver ativo, sobre a base presumida de cada subproduto, mesmo com EBT negativo.
+### 2. `src/engine/calculationsEngine.ts` — `getBasePresumida` (linha 592)
 
-### 2. `src/pages/Assumptions.tsx` — Atualizar nota explicativa (linha ~1712)
+Adicionar caso `'produto_saas'` retornando `{ irpj: 0.08, csll: 0.12 }`.
 
-Trocar o texto "somente se EBT > 0" por "sempre incidem — independente de lucro ou prejuízo", alinhado à regra do Lucro Presumido.
+### 3. `src/engine/calculationsEngine.ts` — Adicional IRPJ (linha 869)
 
-### 3. `src/test/engine/calculationsEngine.test.ts` — Ajustar testes
+O cálculo atual usa `grossRev * 0.32` (flat). Precisa acumular a base presumida por subproduto ao longo do trimestre, respeitando as bases distintas (8% SaaS vs 32% serviços). Mudar para:
+- Acumular `quarterBasePresumidaIRPJ` (soma ponderada por subproduto)
+- No fim do trimestre: `adicional = max(0, (quarterBasePresumidaIRPJ - 60) * 0.10)`
 
-Atualizar o teste "IRPJ/CSLL are non-zero when taxEnabled=true and EBT > 0" para refletir que IRPJ/CSLL são sempre não-zero quando há receita (independente de EBT).
+### 4. `src/pages/Assumptions.tsx` — Nota explicativa
+
+Atualizar texto na seção Tax Deductions para indicar que SaaS usa base presumida de 8%/12%.
+
+### 5. Testes
+
+Atualizar testes para validar que subprodutos SaaS geram impostos menores (base 8%/12%) vs serviços (32%).
 
 ## Impacto
-- IRPJ e CSLL passam a reduzir o lucro líquido mesmo em anos de prejuízo operacional
-- Adicional de IRPJ já está correto (não depende de EBT)
-- Valores no P&L e nos totais anuais refletirão a mudança automaticamente
+- Carga tributária de IRPJ/CSLL sobre SaaS cai significativamente (de ~7.68% efetivo para ~2.28%)
+- ISS zerado para SaaS reduz deduções de vendas
+- Adicional IRPJ passa a considerar bases mistas corretamente
 
