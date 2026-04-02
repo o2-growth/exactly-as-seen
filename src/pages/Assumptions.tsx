@@ -464,7 +464,7 @@ export default function Assumptions() {
     if (editing) {
       setEditState(updater);
     } else {
-      setAssumptions(updater(assumptions));
+      setAssumptions(prev => updater(prev));
     }
   };
 
@@ -1631,7 +1631,7 @@ export default function Assumptions() {
               if (editing) {
                 setEditState(prev => ({ ...prev, subProductTaxRates: rates }));
               } else {
-                setAssumptions({ ...assumptions, subProductTaxRates: rates } as AssumptionsType);
+                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates } as AssumptionsType));
               }
             };
 
@@ -2140,7 +2140,7 @@ export default function Assumptions() {
                   onChange={e => {
                     const v = Number(e.target.value) || 0;
                     if (editing) { setEditState(prev => ({ ...prev, marketingPR: v })); }
-                    else { setAssumptions({ ...assumptions, marketingPR: v }); }
+                    else { setAssumptions(prev => ({ ...prev, marketingPR: v })); }
                   }}
                 />
               </div>
@@ -2151,7 +2151,7 @@ export default function Assumptions() {
                   onChange={e => {
                     const v = Number(e.target.value) || 0;
                     if (editing) { setEditState(prev => ({ ...prev, marketingEvents: v })); }
-                    else { setAssumptions({ ...assumptions, marketingEvents: v }); }
+                    else { setAssumptions(prev => ({ ...prev, marketingEvents: v })); }
                   }}
                 />
               </div>
@@ -2180,7 +2180,7 @@ export default function Assumptions() {
                             const v = Number(e.target.value) || 0;
                             const newCac = { ...(data.cacPerProduct ?? {}), [key]: v };
                             if (editing) { setEditState(prev => ({ ...prev, cacPerProduct: newCac })); }
-                            else { setAssumptions({ ...assumptions, cacPerProduct: newCac }); }
+                            else { setAssumptions(prev => ({ ...prev, cacPerProduct: newCac })); }
                           }}
                         />
                       </td>
