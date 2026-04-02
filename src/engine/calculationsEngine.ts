@@ -595,6 +595,9 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
     case 'material_didatico':
     case 'produto_saas':
       return { irpj: 0.08, csll: 0.12 };
+    case 'mrr_saas':
+      // MRR SaaS: base presumida de 32% (serviço)
+      return { irpj: 0.32, csll: 0.32 };
     case 'expansao_misto':
       // 80% produto (8%/12%) + 20% serviço (32%/32%)
       return { irpj: 0.80 * 0.08 + 0.20 * 0.32, csll: 0.80 * 0.12 + 0.20 * 0.32 };
