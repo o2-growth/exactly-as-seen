@@ -594,6 +594,8 @@ function getBasePresumida(tipoReceita: string): { irpj: number; csll: number } {
     case 'revenda_mercadoria':
     case 'material_didatico':
       return { irpj: 0.08, csll: 0.12 };
+    case 'produto_saas':
+      return { irpj: 0.08, csll: 0.12 };
     default: // 'servico'
       return { irpj: 0.32, csll: 0.32 };
   }
@@ -655,7 +657,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
   let hcD = { salaries: 0, benefits: 0 };
   let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
   let taxD = { irpj: 0, csll: 0, adicionalIrpj: 0 };
-  let quarterGrossRev = 0; // accumulator for quarterly IRPJ adicional
+  let quarterBasePresumidaIRPJ = 0; // accumulator for quarterly IRPJ adicional (weighted by subproduct)
   const monthlyAdicional: number[] = new Array(12).fill(0);
   let debtD = { loans: 0, suppliers: 0 };
   let dedD = { pis: 0, cofins: 0, iss: 0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0 };
@@ -866,19 +868,24 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       }
     }
 
-    // Adicional de IRPJ — accumulate quarterly global revenue
-    quarterGrossRev += grossRev;
+    // Adicional de IRPJ — accumulate quarterly base presumida IRPJ (weighted by subproduct)
+    for (const key of ALL_SUBPRODUCT_KEYS) {
+      const fat = revBySubprod[key] || 0;
+      if (fat <= 0) continue;
+      const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
+      const base = getBasePresumida(cfg.tipoReceita);
+      quarterBasePresumidaIRPJ += fat * base.irpj;
+    }
     if (m % 3 === 2) {
       // End of quarter (months 3, 6, 9, 12)
       if (assumptions.taxEnabled !== false) {
-        const lucroPresumidoTri = quarterGrossRev * 0.32; // base presumida serviços
-        const adicionalTri = Math.max(0, (lucroPresumidoTri - 60) * 0.10); // R$ mil, R$60k = 60
+        const adicionalTri = Math.max(0, (quarterBasePresumidaIRPJ - 60) * 0.10); // R$ mil, R$60k = 60
         const perMonth = adicionalTri / 3;
         monthlyAdicional[m - 2] = -perMonth;
         monthlyAdicional[m - 1] = -perMonth;
         monthlyAdicional[m] = -perMonth;
       }
-      quarterGrossRev = 0;
+      quarterBasePresumidaIRPJ = 0;
     }
 
     const totalTax = irpj + csll;
