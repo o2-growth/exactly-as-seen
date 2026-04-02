@@ -1174,10 +1174,14 @@ export default function Assumptions() {
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
                                           value={rowApplyPct[rowKey] ?? 6}
                                           onClick={e => e.stopPropagation()}
-                                          onChange={e => setRowApplyPctPersist(p => ({ ...p, [rowKey]: Number(e.target.value) || 0 }))}
+                                          onChange={e => {
+                                            const val = Number(e.target.value) || 0;
+                                            setRowApplyPctPersist(p => ({ ...p, [rowKey]: val }));
+                                          }}
+                                          onBlur={() => { if (editing) handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
                                           disabled={!editing}
                                         />
-                                        <span className="text-[10px] text-muted-foreground">%</span>
+                                        <span className="text-[10px] text-muted-foreground">% a.m.</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
                                           className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1228,9 +1232,10 @@ export default function Assumptions() {
                                           value={rowTicketGrowthPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowTicketGrowthPctPersist(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
+                                          onBlur={() => { if (editing) handleApplyTicketGrowth(prodKey, selectedYear); }}
                                           disabled={!editing}
                                         />
-                                        <span className="text-[10px] text-muted-foreground">%</span>
+                                        <span className="text-[10px] text-muted-foreground">% a.m.</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
                                           className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1439,6 +1444,25 @@ export default function Assumptions() {
                                             const num = v === '' || v === '-' ? 0 : Number(v);
                                             setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
                                           }}
+                                          onBlur={() => {
+                                            if (!editing) return;
+                                            const growthPct = rowChurnPct[prodKey] ?? 0;
+                                            const baseVal = currentChurnFlat as number;
+                                            const monthlyIncrement = growthPct / 12;
+                                            const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                            const newMonthlyChurnArrays: Record<number, number[]> = {};
+                                            let currentRate = baseVal;
+                                            for (const y of yearsToApply) {
+                                              const yearRates: number[] = [];
+                                              for (let m = 0; m < 12; m++) {
+                                                currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
+                                                yearRates.push(currentRate);
+                                              }
+                                              newMonthlyChurnArrays[y] = yearRates;
+                                            }
+                                            reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
+                                          }}
+                                          disabled={!editing}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                         <button
