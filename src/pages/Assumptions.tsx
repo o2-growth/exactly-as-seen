@@ -1727,7 +1727,7 @@ export default function Assumptions() {
                 ))}
                 <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL sempre incidem sobre a base presumida (32%), independente de lucro ou prejuízo (regime Lucro Presumido).</span>
+                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL incidem sobre a base presumida: 32% para serviços (CaaS, Education, Expansão, Tax) e 8%/12% para SaaS (produto). Tributos sempre incidem, independente de lucro ou prejuízo (regime Lucro Presumido). SaaS não incide ISS.</span>
                 </div>
               </div>
             );

@@ -181,7 +181,12 @@ export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
   const isSaas = SAAS_KEYS.includes(key);
-  return { pis: 0.65, cofins: 3.0, iss: isSaas ? 2.9 : 5.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, tipoReceita: 'servico' };
+  return {
+    pis: 0.65, cofins: 3.0,
+    iss: isSaas ? 0 : 5.0,
+    csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
+    tipoReceita: isSaas ? 'produto_saas' : 'servico',
+  };
 }
 
 export function getSubProductTaxRate(key: TicketKey, assumptions: Assumptions): SubProductTaxConfig {

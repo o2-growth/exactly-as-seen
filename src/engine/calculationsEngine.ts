@@ -868,19 +868,24 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       }
     }
 
-    // Adicional de IRPJ — accumulate quarterly global revenue
-    quarterGrossRev += grossRev;
+    // Adicional de IRPJ — accumulate quarterly base presumida IRPJ (weighted by subproduct)
+    for (const key of ALL_SUBPRODUCT_KEYS) {
+      const fat = revBySubprod[key] || 0;
+      if (fat <= 0) continue;
+      const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
+      const base = getBasePresumida(cfg.tipoReceita);
+      quarterBasePresumidaIRPJ += fat * base.irpj;
+    }
     if (m % 3 === 2) {
       // End of quarter (months 3, 6, 9, 12)
       if (assumptions.taxEnabled !== false) {
-        const lucroPresumidoTri = quarterGrossRev * 0.32; // base presumida serviços
-        const adicionalTri = Math.max(0, (lucroPresumidoTri - 60) * 0.10); // R$ mil, R$60k = 60
+        const adicionalTri = Math.max(0, (quarterBasePresumidaIRPJ - 60) * 0.10); // R$ mil, R$60k = 60
         const perMonth = adicionalTri / 3;
         monthlyAdicional[m - 2] = -perMonth;
         monthlyAdicional[m - 1] = -perMonth;
         monthlyAdicional[m] = -perMonth;
       }
-      quarterGrossRev = 0;
+      quarterBasePresumidaIRPJ = 0;
     }
 
     const totalTax = irpj + csll;
