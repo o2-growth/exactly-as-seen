@@ -245,7 +245,7 @@ function findNodeInTree(code: string, nodes: PnlNode[]): PnlNode | undefined {
 }
 
 export default function Assumptions() {
-  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears } = useFinancialModel();
+  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow } = useFinancialModel();
   const { saveVersion } = useVersionHistory();
 
   // Use filteredYears for the year selector; fall back to all YEARS if empty
@@ -414,6 +414,8 @@ export default function Assumptions() {
     if (!saveNote.trim()) return;
     setAssumptions(editState);
     saveVersion(saveNote.trim(), editState, scenario);
+    // Force immediate save to localStorage + Supabase (don't wait for debounce)
+    saveNow(editState);
     setSaveNote('');
     setShowSaveModal(false);
     setEditing(false);

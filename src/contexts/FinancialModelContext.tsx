@@ -29,6 +29,7 @@ interface FinancialModelContextType {
   setDataSource: (d: DataSource) => void;
   setDateRange: (r: DateRange | undefined) => void;
   resetAssumptions: () => void;
+  saveNow: (a: Assumptions) => void;
 }
 
 const FinancialModelContext = createContext<FinancialModelContextType | null>(null);
@@ -149,6 +150,11 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
   // Debounced auto-save: save 2s after last change
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const latestAssumptions = useRef(assumptions);
+  const latestScenario = useRef(scenario);
+  latestAssumptions.current = assumptions;
+  latestScenario.current = scenario;
+
   useEffect(() => {
     if (!hasLoaded.current) return;
     clearTimeout(saveTimer.current);
@@ -157,6 +163,18 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     }, 2000);
     return () => clearTimeout(saveTimer.current);
   }, [assumptions, scenario, saveAssumptions]);
+
+  // Save immediately when user closes/leaves the page (prevents data loss)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (hasLoaded.current) {
+        // Synchronous localStorage save (Supabase can't be awaited here)
+        try { localStorage.setItem('o2_assumptions', JSON.stringify(latestAssumptions.current)); } catch {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Compute full model from engine
   const model = useMemo(
@@ -210,11 +228,17 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     setAssumptions(DEFAULT_ASSUMPTIONS);
   }, []);
 
+  // Force-save to localStorage + Supabase immediately (bypasses debounce)
+  const saveNow = useCallback((a: Assumptions) => {
+    clearTimeout(saveTimer.current);
+    saveAssumptions(a, scenario);
+  }, [saveAssumptions, scenario]);
+
   return (
     <FinancialModelContext.Provider value={{
       assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
       dateRange, filteredYears, focalYear, rangeDataSource,
-      setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions,
+      setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions, saveNow,
     }}>
       {children}
     </FinancialModelContext.Provider>
