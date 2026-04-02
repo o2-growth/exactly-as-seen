@@ -181,11 +181,20 @@ export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
   const isSaas = SAAS_KEYS.includes(key);
+  const isSetup = key === 'caasSetup';
+  const isExpansao = EXPANSAO_KEYS.includes(key);
+
+  // SaaS + Setup (CaaS) → produto_saas (ISS 0)
+  // Expansão → expansao_misto (80% produto 8%/12% + 20% serviço 32%, ISS reduzido)
+  const isProduto = isSaas || isSetup;
+  const tipoReceita = isProduto ? 'produto_saas' : isExpansao ? 'expansao_misto' : 'servico';
+  const iss = isProduto ? 0 : isExpansao ? 1.0 : 5.0; // Expansão: 20% × 5% = 1% efetivo de ISS
+
   return {
     pis: 0.65, cofins: 3.0,
-    iss: isSaas ? 0 : 5.0,
+    iss,
     csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
-    tipoReceita: isSaas ? 'produto_saas' : 'servico',
+    tipoReceita,
   };
 }
 
