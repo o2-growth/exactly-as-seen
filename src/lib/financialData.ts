@@ -180,15 +180,31 @@ export const TAX_KEYS: TicketKey[] = ['taxAT', 'taxGPT', 'taxRCT', 'taxRT', 'tax
 export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...EDUCATION_KEYS, ...EXPANSAO_KEYS, ...TAX_KEYS];
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
-  const isSaas = SAAS_KEYS.includes(key);
-  const isSetup = key === 'caasSetup';
   const isExpansao = EXPANSAO_KEYS.includes(key);
+  const isSetup = key === 'caasSetup' || key === 'saasSetup';
+  const isCaas = CAAS_KEYS.includes(key);
+  const isSaasSubscription = ['saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp', 'saasParceiros'].includes(key);
 
-  // SaaS + Setup (CaaS) → produto_saas (ISS 0)
-  // Expansão → expansao_misto (80% produto 8%/12% + 20% serviço 32%, ISS reduzido)
-  const isProduto = isSaas || isSetup;
-  const tipoReceita = isProduto ? 'produto_saas' : isExpansao ? 'expansao_misto' : 'servico';
-  const iss = isProduto ? 0 : isExpansao ? 1.0 : 5.0; // Expansão: 20% × 5% = 1% efetivo de ISS
+  // MRR SaaS (assinaturas recorrentes) → mrr_saas: base 32%/32%, ISS 2,9%
+  // CaaS + Setup → produto_saas: base 8%/12%, ISS 0%
+  // Expansão → expansao_misto: 80% produto + 20% serviço, ISS reduzido
+  // Education, Tax → servico: base 32%/32%, ISS 5%
+  let tipoReceita: string;
+  let iss: number;
+
+  if (isSaasSubscription) {
+    tipoReceita = 'mrr_saas';
+    iss = 2.9;
+  } else if (isCaas || isSetup) {
+    tipoReceita = 'produto_saas';
+    iss = 0;
+  } else if (isExpansao) {
+    tipoReceita = 'expansao_misto';
+    iss = 1.0;
+  } else {
+    tipoReceita = 'servico';
+    iss = 5.0;
+  }
 
   return {
     pis: 0.65, cofins: 3.0,
