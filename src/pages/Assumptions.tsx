@@ -1128,10 +1128,21 @@ export default function Assumptions() {
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
                                         return (
-                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-card border border-border/50'}`}>
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
                                             {hist ? (
-                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-not-allowed" title="Período histórico — somente leitura">
+                                              <span
+                                                className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
+                                                title="Clique para editar dado histórico"
+                                                onClick={() => {
+                                                  if (window.confirm(`Editar dado histórico de ${m}? Este é um valor realizado.`)) {
+                                                    const val = window.prompt(`${m} — Novo valor de clientes:`, String(Math.round(monthly[i])));
+                                                    if (val !== null) {
+                                                      handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(val) || 0);
+                                                    }
+                                                  }
+                                                }}
+                                              >
                                                 {monthly[i].toLocaleString('pt-BR')}
                                               </span>
                                             ) : (
@@ -1223,10 +1234,29 @@ export default function Assumptions() {
                                         const hist = isHistorical(selectedYear, i);
                                         const monthTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
                                         return (
-                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-card border border-border/50'}`}>
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
                                             {hist ? (
-                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-not-allowed">
+                                              <span
+                                                className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
+                                                title="Clique para editar dado histórico"
+                                                onClick={() => {
+                                                  if (window.confirm(`Editar ticket histórico de ${m}?`)) {
+                                                    const val = window.prompt(`${m} — Novo ticket (R$):`, String(Math.round(monthTicket)));
+                                                    if (val !== null) {
+                                                      const src = assumptions;
+                                                      const yearArr = src.monthlyTickets?.[prodKey]?.[selectedYear]
+                                                        ? [...src.monthlyTickets[prodKey]![selectedYear]!]
+                                                        : Array(12).fill(ticketVal);
+                                                      yearArr[i] = Number(val) || 0;
+                                                      setAssumptions(prev => ({
+                                                        ...prev,
+                                                        monthlyTickets: { ...(prev.monthlyTickets ?? {}), [prodKey]: { ...((prev.monthlyTickets ?? {})[prodKey] ?? {}), [selectedYear]: yearArr } },
+                                                      }));
+                                                    }
+                                                  }
+                                                }}
+                                              >
                                                 {formatCurrencyFull(monthTicket)}
                                               </span>
                                             ) : (
