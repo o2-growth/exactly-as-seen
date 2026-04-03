@@ -484,64 +484,57 @@ export default function Assumptions() {
   };
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
-    // Read from assumptions (always the source of truth)
-    const source = assumptions;
-    const currentOverrides = source.monthlyClientOverrides ?? {};
-    const currentManualFlags = source.manualMonthlyClientOverrideFlags ?? {};
-    const yearArr = currentOverrides[key as TicketKey]?.[year]
-      ? [...currentOverrides[key as TicketKey]![year]!]
-      : Array(12).fill(null);
-    const manualFlags = currentManualFlags[key as TicketKey]?.[year]
-      ? [...currentManualFlags[key as TicketKey]![year]!]
-      : Array(12).fill(false);
-    yearArr[monthIdx] = newCount;
-    manualFlags[monthIdx] = true;
+    // When user edits a month, recalculate subsequent months using current growth %
+    const rate = (rowApplyPct[key] ?? 6) / 100;
 
-    // Determine Dec target
-    const decValue = monthIdx === 11
-      ? newCount
-      : (yearArr[11] !== null && yearArr[11] !== undefined ? yearArr[11] : source.subProductClients[key][year]);
+    setAssumptions(prev => {
+      const currentOverrides = prev.monthlyClientOverrides ?? {};
+      const currentManualFlags = prev.manualMonthlyClientOverrideFlags ?? {};
+      const yearArr = currentOverrides[key as TicketKey]?.[year]
+        ? [...currentOverrides[key as TicketKey]![year]!]
+        : Array(12).fill(null);
+      const manualFlags = currentManualFlags[key as TicketKey]?.[year]
+        ? [...currentManualFlags[key as TicketKey]![year]!]
+        : Array(12).fill(false);
 
-    // Recalculate subsequent months via geometric interpolation from edited month to Dec target
-    if (monthIdx < 11) {
-      const remainingSteps = 11 - monthIdx;
-      for (let j = monthIdx + 1; j <= 10; j++) {
-        const step = j - monthIdx;
-        let val: number;
-        if (newCount > 0 && decValue > 0) {
-          val = newCount * Math.pow(decValue / newCount, step / remainingSteps);
-        } else if (newCount === 0 && decValue > 0) {
-          val = decValue * (step / remainingSteps);
+      yearArr[monthIdx] = newCount;
+      manualFlags[monthIdx] = true;
+
+      // Recalculate subsequent non-manual months using growth % from the edited value
+      let prevVal = newCount;
+      for (let j = monthIdx + 1; j < 12; j++) {
+        if (manualFlags[j] && yearArr[j] !== null && yearArr[j] !== undefined) {
+          prevVal = yearArr[j]!; // respect other manual edits
         } else {
-          val = 0;
+          const churnRate = getChurnForMonth(key, prev, year, j);
+          prevVal = prevVal * (1 + rate - churnRate);
+          yearArr[j] = Math.max(0, Math.round(prevVal));
         }
-        yearArr[j] = Math.round(val * 100) / 100;
       }
-      yearArr[11] = decValue;
-    }
+      const decValue = yearArr[11] ?? newCount;
 
-    console.log('[handleClientChange]', key, year, monthIdx, '→', newCount, 'decTarget:', decValue);
-    updateModel(prev => ({
-      ...prev,
-      subProductClients: {
-        ...prev.subProductClients,
-        [key]: { ...prev.subProductClients[key], [year]: decValue },
-      },
-      monthlyClientOverrides: {
-        ...(prev.monthlyClientOverrides ?? {}),
-        [key]: {
-          ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
-          [year]: yearArr,
+      return {
+        ...prev,
+        subProductClients: {
+          ...prev.subProductClients,
+          [key]: { ...prev.subProductClients[key], [year]: Math.round(decValue) },
         },
-      },
-      manualMonthlyClientOverrideFlags: {
-        ...(prev.manualMonthlyClientOverrideFlags ?? {}),
-        [key]: {
-          ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}),
-          [year]: manualFlags,
+        monthlyClientOverrides: {
+          ...(prev.monthlyClientOverrides ?? {}),
+          [key]: {
+            ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
+            [year]: yearArr,
+          },
         },
-      },
-    }));
+        manualMonthlyClientOverrideFlags: {
+          ...(prev.manualMonthlyClientOverrideFlags ?? {}),
+          [key]: {
+            ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}),
+            [year]: manualFlags,
+          },
+        },
+      };
+    });
   };
 
   const handleApplyAll = () => {
