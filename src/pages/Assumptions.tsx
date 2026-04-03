@@ -1060,7 +1060,7 @@ export default function Assumptions() {
                             </td>
                             {activeYears.map(y => (
                               <td key={y} className={`text-right p-3 tabular-nums text-sm ${y === selectedYear ? 'bg-primary/5 font-semibold' : ''}`}>
-                                {row.dataKey ? (data.subProductClients[row.dataKey as SubProductKey]?.[y] ?? 0).toLocaleString('pt-BR') : '—'}
+                                {row.dataKey ? Math.round(getMonthlyClients(row.dataKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0)).toLocaleString('pt-BR') : '—'}
                               </td>
                             ))}
                           </tr>
@@ -1109,7 +1109,7 @@ export default function Assumptions() {
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (soma)</p>
                                     <div className="grid grid-cols-6 gap-2">
                                       {activeYears.map(y => {
-                                        const yrMonthly = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.monthlyTickets ? Object.fromEntries(Object.entries(data.monthlyTickets).map(([k, v]) => [k, v?.[y]?.[0] ?? 0])) : undefined, data.monthlyClientOverrides);
+                                        const yrMonthly = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                                         const yrSum = yrMonthly.reduce((a, b) => a + b, 0);
                                         return (
                                           <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
