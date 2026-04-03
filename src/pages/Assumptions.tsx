@@ -26,6 +26,7 @@ import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG } from '@/lib/financialData';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
+import { resolveAnnualMetric } from '@/lib/periodResolution';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
 import { Lock, Unlock, Save, X, RotateCcw, Scale, Receipt, Landmark, Info, BadgePercent, UserCheck, Pencil, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import {
@@ -903,14 +904,24 @@ export default function Assumptions() {
 
       {/* Item 9: KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {[
-          { label: 'Receita Bruta', value: formatCurrency(model.years[selectedYear].grossRevenue * 1000) },
-          { label: 'EBITDA', value: formatCurrency(model.years[selectedYear].ebitda * 1000) },
-          { label: 'Margem Bruta', value: `${model.years[selectedYear].grossMarginPct}%` },
-          { label: 'Margem EBITDA', value: `${model.years[selectedYear].ebitdaMarginPct}%` },
-          { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR') },
-          { label: 'Resultado Líq.', value: formatCurrency(model.years[selectedYear].netIncome * 1000) },
-        ].map(kpi => (
+        {(() => {
+          const yr = model.years[selectedYear];
+          const gr = resolveAnnualMetric('RECEITA BRUTA', selectedYear, yr.grossRevenue);
+          const nr = resolveAnnualMetric('RECEITA LÍQUIDA', selectedYear, yr.netRevenue);
+          const gp = resolveAnnualMetric('LUCRO BRUTO', selectedYear, yr.grossProfit);
+          const ebitda = resolveAnnualMetric('EBITDA', selectedYear, yr.ebitda);
+          const ni = resolveAnnualMetric('RESULTADO LÍQUIDO', selectedYear, yr.netIncome);
+          const gmPct = nr > 0 ? ((gp / nr) * 100).toFixed(1) : '0';
+          const emPct = nr > 0 ? ((ebitda / nr) * 100).toFixed(1) : '0';
+          return [
+            { label: 'Receita Bruta', value: formatCurrency(gr * 1000) },
+            { label: 'EBITDA', value: formatCurrency(ebitda * 1000) },
+            { label: 'Margem Bruta', value: `${gmPct}%` },
+            { label: 'Margem EBITDA', value: `${emPct}%` },
+            { label: 'Clientes', value: yr.totalClients.toLocaleString('pt-BR') },
+            { label: 'Resultado Líq.', value: formatCurrency(ni * 1000) },
+          ];
+        })().map(kpi => (
           <div key={kpi.label} className="gradient-card p-3 space-y-1">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
             <p className="text-sm font-bold tabular-nums">{kpi.value}</p>
