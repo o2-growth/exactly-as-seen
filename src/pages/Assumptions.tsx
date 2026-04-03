@@ -627,21 +627,36 @@ export default function Assumptions() {
     const rate = pct / 100;
     const yearsToApply = YEARS.filter(y => y >= year);
 
-    // Use functional updater to read LATEST state (avoids stale closure)
+    // Pre-compute growth arrays outside updater to avoid stale closure
+    const newGrowthArrays: Record<number, number[]> = {};
+    for (const y of yearsToApply) {
+      const arr = Array(12).fill(rate);
+      for (let m = 0; m < 12; m++) {
+        if (isHistorical(y, m)) arr[m] = growthRates[y]?.[key]?.[m] ?? 0.06;
+      }
+      newGrowthArrays[y] = arr;
+    }
+
+    // Update growth rates first
+    setGrowthRatesPersist(prevGR => {
+      const updated = { ...prevGR };
+      for (const y of yearsToApply) {
+        const yearRates = { ...updated[y as Year] };
+        yearRates[key] = newGrowthArrays[y];
+        updated[y as Year] = yearRates;
+      }
+      return updated;
+    });
+
+    // Then compute and update assumptions using latest state
     setAssumptions(prev => {
       const allOverrides: Record<number, (number | null)[]> = {};
       const allDecTargets: Record<number, number> = {};
-      const allGrowthRates: Record<number, number[]> = {};
 
       let prevClients = year === 2025 ? 0 : Math.round(getMonthlyClients(key, (year - 1) as Year, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides)[11]);
 
       for (const y of yearsToApply) {
-        const currentArr = growthRates[y]?.[key] ?? Array(12).fill(0.06);
-        const arr = [...currentArr];
-        for (let m = 0; m < 12; m++) {
-          if (!isHistorical(y, m)) arr[m] = rate;
-        }
-        allGrowthRates[y] = arr;
+        const arr = newGrowthArrays[y];
 
         const base = getMonthlyClients(key, y, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
         const existingOverrides = prev.monthlyClientOverrides?.[key as TicketKey]?.[y as Year];
@@ -668,30 +683,19 @@ export default function Assumptions() {
 
       const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key] } };
       const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
-      // Preserve existing manual flags — only clear non-historical projected months
       const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
 
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
-        // Don't wipe manual flags — keep them so manual edits are respected on next apply
+        // Clear manual flags so Aplicar fully recalculates all projected months
+        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
       }
 
       return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF };
     });
 
-    setGrowthRatesPersist(prevGR => {
-      const updated = { ...prevGR };
-      for (const y of yearsToApply) {
-        const yearRates = { ...updated[y as Year] };
-        const arr = yearRates[key] ?? Array(12).fill(0.06);
-        const newArr = [...arr];
-        for (let m = 0; m < 12; m++) { if (!isHistorical(y, m)) newArr[m] = rate; }
-        yearRates[key] = newArr;
-        updated[y as Year] = yearRates;
-      }
-      return updated;
-    });
+    // Growth rates already updated above before setAssumptions
   };
 
   // ─── Reproject clients when churn changes ───
@@ -731,14 +735,16 @@ export default function Assumptions() {
 
       const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key] } };
       const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
+      const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
       const newCR = { ...(prev.monthlyChurnRates ?? {}), [key]: { ...((prev.monthlyChurnRates ?? {})[key] ?? {}), ...newChurnRates } };
 
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
+        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
       }
 
-      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, monthlyChurnRates: newCR };
+      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF, monthlyChurnRates: newCR };
     });
   };
 
@@ -779,14 +785,16 @@ export default function Assumptions() {
 
       const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key] } };
       const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}) } };
+      const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}) } };
       const newCR = { ...(prev.monthlyChurnRates ?? {}), [key]: { ...((prev.monthlyChurnRates ?? {})[key] ?? {}), ...newChurnArrays } };
 
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
+        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
       }
 
-      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, monthlyChurnRates: newCR };
+      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF, monthlyChurnRates: newCR };
     });
   };
 
