@@ -935,14 +935,21 @@ export default function Assumptions() {
         <div className="gradient-card p-5">
           <h3 className="text-sm font-semibold mb-3">Receita Projetada por BU (R$ mil)</h3>
           <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={activeYears.map(y => ({
-              year: y,
-              CaaS: model.years[y].caasRevenue,
-              SaaS: model.years[y].saasRevenue,
-              Education: model.years[y].educationRevenue,
-              Expansão: model.years[y].baasRevenue,
-              Tax: model.years[y].taxRevenue,
-            }))}>
+            <BarChart data={activeYears.map(y => {
+              const yr = model.years[y];
+              const totalEngine = yr.grossRevenue;
+              const totalBlend = resolveAnnualMetric('RECEITA BRUTA', y, totalEngine);
+              // Scale each BU proportionally so total matches blend
+              const scale = totalEngine > 0 ? totalBlend / totalEngine : 1;
+              return {
+                year: y,
+                CaaS: Math.round(yr.caasRevenue * scale),
+                SaaS: Math.round(yr.saasRevenue * scale),
+                Education: Math.round(yr.educationRevenue * scale),
+                Expansão: Math.round(yr.baasRevenue * scale),
+                Tax: Math.round(yr.taxRevenue * scale),
+              };
+            })}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
               <YAxis tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" tickFormatter={v => `${(v / 1000).toFixed(0)}M`} />
