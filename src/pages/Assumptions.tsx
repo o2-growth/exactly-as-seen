@@ -1539,9 +1539,41 @@ export default function Assumptions() {
                         </React.Fragment>
                       );
                     })}
+                    {/* Subtotal da categoria */}
+                    <tr className="border-b border-border bg-secondary/20">
+                      <td className="p-2 pl-5 text-xs font-bold text-foreground/70">Total {group.group}</td>
+                      <td className="text-right p-2 tabular-nums text-xs font-bold text-foreground/70 bg-primary/5">
+                        {Math.round(group.items.reduce((sum, row) => {
+                          if (!row.dataKey) return sum;
+                          return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
+                        }, 0)).toLocaleString('pt-BR')}
+                      </td>
+                    </tr>
                   </React.Fragment>
                 ))}
 
+                {/* Total geral de clientes */}
+                <tr className="border-t-2 border-primary/30 bg-primary/5">
+                  <td className="p-3 text-sm font-bold text-foreground">Total de Clientes (novos no ano)</td>
+                  <td className="text-right p-3 tabular-nums text-sm font-bold text-foreground">
+                    {Math.round(CLIENTS_ROWS.reduce((total, group) =>
+                      total + group.items.reduce((sum, row) => {
+                        if (!row.dataKey) return sum;
+                        return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
+                      }, 0), 0)).toLocaleString('pt-BR')}
+                  </td>
+                </tr>
+                <tr className="bg-primary/10">
+                  <td className="p-3 text-sm font-bold text-foreground">Clientes Ativos (Dez {selectedYear})</td>
+                  <td className="text-right p-3 tabular-nums text-sm font-bold text-primary">
+                    {Math.round(CLIENTS_ROWS.reduce((total, group) =>
+                      total + group.items.reduce((sum, row) => {
+                        if (!row.dataKey) return sum;
+                        const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                        return sum + monthly[11]; // December value = active clients at end of year
+                      }, 0), 0)).toLocaleString('pt-BR')}
+                  </td>
+                </tr>
 
               </tbody>
             </table>
