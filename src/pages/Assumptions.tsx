@@ -263,6 +263,12 @@ export default function Assumptions() {
   const [showGrowthPct, setShowGrowthPct] = useState(false);
   const [editingClients, setEditingClients] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
+  const [showTotalFilter, setShowTotalFilter] = useState(false);
+  // Products excluded from totals — default: Setup keys
+  const [excludedFromTotal, setExcludedFromTotal] = useState<Record<string, boolean>>(() => ({
+    caasSetup: true,
+    saasSetup: true,
+  }));
   const [hcViewMode, setHcViewMode] = useState<'people' | 'cost'>('people');
 
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
@@ -1544,7 +1550,7 @@ export default function Assumptions() {
                       <td className="p-2 pl-5 text-xs font-bold text-foreground/70">Total {group.group}</td>
                       <td className="text-right p-2 tabular-nums text-xs font-bold text-foreground/70 bg-primary/5">
                         {Math.round(group.items.reduce((sum, row) => {
-                          if (!row.dataKey || row.dataKey === 'caasSetup' || row.dataKey === 'saasSetup') return sum;
+                          if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
                           return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
                         }, 0)).toLocaleString('pt-BR')}
                       </td>
@@ -1552,55 +1558,79 @@ export default function Assumptions() {
                   </React.Fragment>
                 ))}
 
-                {/* Total geral de clientes (exclui Setup — nao sao clientes recorrentes) */}
+                {/* Total geral de clientes com filtro interativo */}
                 {(() => {
-                  const SETUP_KEYS = ['caasSetup', 'saasSetup'];
-                  const isRecurring = (key: string | null) => key && !SETUP_KEYS.includes(key);
+                  const allProducts = CLIENTS_ROWS.flatMap(g => g.items.map(r => ({ ...r, group: g.group })));
+                  const included = allProducts.filter(r => r.dataKey && !excludedFromTotal[r.dataKey]);
+                  const excluded = allProducts.filter(r => r.dataKey && excludedFromTotal[r.dataKey]);
 
-                  // Build breakdown per product
-                  const breakdown: { label: string; group: string; somaAno: number; dez: number }[] = [];
-                  for (const group of CLIENTS_ROWS) {
-                    for (const row of group.items) {
-                      if (!isRecurring(row.dataKey)) continue;
-                      const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                      breakdown.push({
-                        label: row.label,
-                        group: group.group,
-                        somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)),
-                        dez: Math.round(monthly[11]),
-                      });
-                    }
-                  }
+                  const breakdown = included.map(row => {
+                    const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                    return { label: row.label, group: row.group, key: row.dataKey!, somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)), dez: Math.round(monthly[11]) };
+                  });
                   const totalNovos = breakdown.reduce((s, b) => s + b.somaAno, 0);
                   const totalAtivos = breakdown.reduce((s, b) => s + b.dez, 0);
-                  const excluded = CLIENTS_ROWS.flatMap(g => g.items).filter(r => r.dataKey && SETUP_KEYS.includes(r.dataKey)).map(r => r.label);
 
                   return (
                     <>
-                      <tr className="border-t-2 border-primary/30 bg-primary/5">
+                      <tr className="border-t-2 border-primary/30 bg-primary/5 cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => setShowTotalFilter(v => !v)}>
                         <td className="p-3 text-sm font-bold text-foreground">
-                          Total de Clientes (soma no ano)
-                          <span className="block text-[9px] font-normal text-muted-foreground mt-0.5">
-                            Exclui: {excluded.join(', ')}
-                          </span>
-                          <span className="block text-[9px] font-normal text-muted-foreground">
-                            = {breakdown.map(b => `${b.label}: ${b.somaAno.toLocaleString('pt-BR')}`).join(' + ')}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {showTotalFilter ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                            Total de Clientes (soma no ano)
+                          </div>
+                          {excluded.length > 0 && (
+                            <span className="block text-[9px] font-normal text-muted-foreground mt-0.5 ml-5">
+                              Exclui: {excluded.map(r => r.label).join(', ')}
+                            </span>
+                          )}
                         </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-foreground">{totalNovos.toLocaleString('pt-BR')}</td>
                       </tr>
-                      <tr className="bg-primary/10">
+                      <tr className="bg-primary/10 cursor-pointer hover:bg-primary/15 transition-colors" onClick={() => setShowTotalFilter(v => !v)}>
                         <td className="p-3 text-sm font-bold text-foreground">
-                          Clientes Ativos (Dez {selectedYear})
-                          <span className="block text-[9px] font-normal text-muted-foreground mt-0.5">
-                            Exclui: {excluded.join(', ')}
-                          </span>
-                          <span className="block text-[9px] font-normal text-muted-foreground">
-                            = {breakdown.map(b => `${b.label}: ${b.dez.toLocaleString('pt-BR')}`).join(' + ')}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3.5" />
+                            Clientes Ativos (Dez {selectedYear})
+                          </div>
                         </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-primary">{totalAtivos.toLocaleString('pt-BR')}</td>
                       </tr>
+                      {showTotalFilter && (
+                        <tr>
+                          <td colSpan={2} className="p-0">
+                            <div className="bg-card border border-border rounded-lg m-2 p-4 space-y-3">
+                              <p className="text-xs font-semibold text-foreground">Selecione os produtos para incluir no calculo:</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {allProducts.filter(r => r.dataKey).map(row => {
+                                  const isIncluded = !excludedFromTotal[row.dataKey!];
+                                  const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                  const somaAno = Math.round(monthly.reduce((s, v) => s + v, 0));
+                                  const dez = Math.round(monthly[11]);
+                                  return (
+                                    <label key={row.dataKey} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isIncluded ? 'bg-primary/5 border-primary/30' : 'bg-secondary/30 border-border opacity-60'}`}>
+                                      <input
+                                        type="checkbox"
+                                        checked={isIncluded}
+                                        onChange={() => setExcludedFromTotal(prev => ({ ...prev, [row.dataKey!]: !prev[row.dataKey!] }))}
+                                        className="rounded"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <span className="text-xs font-medium text-foreground block truncate">{row.label}</span>
+                                        <span className="text-[9px] text-muted-foreground">{row.group} · Soma: {somaAno.toLocaleString('pt-BR')} · Dez: {dez.toLocaleString('pt-BR')}</span>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              <div className="border-t border-border pt-2 text-xs text-muted-foreground space-y-1">
+                                <p><strong>Soma no ano:</strong> {breakdown.map(b => `${b.label}: ${b.somaAno.toLocaleString('pt-BR')}`).join(' + ')} = <strong className="text-foreground">{totalNovos.toLocaleString('pt-BR')}</strong></p>
+                                <p><strong>Ativos Dez:</strong> {breakdown.map(b => `${b.label}: ${b.dez.toLocaleString('pt-BR')}`).join(' + ')} = <strong className="text-primary">{totalAtivos.toLocaleString('pt-BR')}</strong></p>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </>
                   );
                 })()}
