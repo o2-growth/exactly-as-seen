@@ -905,12 +905,17 @@ export default function Assumptions() {
       {/* Item 9: KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {(() => {
-          const yr = model.years[selectedYear];
-          const gr = resolveAnnualMetric('RECEITA BRUTA', selectedYear, yr.grossRevenue);
-          const nr = resolveAnnualMetric('RECEITA LÍQUIDA', selectedYear, yr.netRevenue);
-          const gp = resolveAnnualMetric('LUCRO BRUTO', selectedYear, yr.grossProfit);
-          const ebitda = resolveAnnualMetric('EBITDA', selectedYear, yr.ebitda);
-          const ni = resolveAnnualMetric('RESULTADO LÍQUIDO', selectedYear, yr.netIncome);
+          // Read from pnlTree (same source as P&L page — includes historical overrides)
+          const findNode = (code: string) => model.pnlTree.find(n => n.code === code);
+          const gr = findNode('1')?.annual[selectedYear] ?? model.years[selectedYear].grossRevenue;
+          const nrNode = findNode('NR');
+          const nr = nrNode?.annual[selectedYear] ?? model.years[selectedYear].netRevenue;
+          const gpNode = findNode('GP');
+          const gp = gpNode?.annual[selectedYear] ?? model.years[selectedYear].grossProfit;
+          const ebitdaNode = findNode('EBITDA');
+          const ebitda = ebitdaNode?.annual[selectedYear] ?? model.years[selectedYear].ebitda;
+          const niNode = findNode('NI');
+          const ni = niNode?.annual[selectedYear] ?? model.years[selectedYear].netIncome;
           const gmPct = nr > 0 ? ((gp / nr) * 100).toFixed(1) : '0';
           const emPct = nr > 0 ? ((ebitda / nr) * 100).toFixed(1) : '0';
           return [
@@ -918,7 +923,7 @@ export default function Assumptions() {
             { label: 'EBITDA', value: formatCurrency(ebitda * 1000) },
             { label: 'Margem Bruta', value: `${gmPct}%` },
             { label: 'Margem EBITDA', value: `${emPct}%` },
-            { label: 'Clientes', value: yr.totalClients.toLocaleString('pt-BR') },
+            { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR') },
             { label: 'Resultado Líq.', value: formatCurrency(ni * 1000) },
           ];
         })().map(kpi => (
@@ -936,18 +941,19 @@ export default function Assumptions() {
           <h3 className="text-sm font-semibold mb-3">Receita Projetada por BU (R$ mil)</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={activeYears.map(y => {
-              const yr = model.years[y];
-              const totalEngine = yr.grossRevenue;
-              const totalBlend = resolveAnnualMetric('RECEITA BRUTA', y, totalEngine);
-              // Scale each BU proportionally so total matches blend
-              const scale = totalEngine > 0 ? totalBlend / totalEngine : 1;
+              // Use pnlTree BU nodes (same source as P&L — includes historical overrides)
+              const findChild = (parentCode: string, childCode: string) => {
+                const parent = model.pnlTree.find(n => n.code === parentCode);
+                return parent?.children?.find(c => c.code === childCode)?.annual[y] ?? 0;
+              };
+              const findParent = (code: string) => model.pnlTree.find(n => n.code === code)?.annual[y] ?? 0;
               return {
                 year: y,
-                CaaS: Math.round(yr.caasRevenue * scale),
-                SaaS: Math.round(yr.saasRevenue * scale),
-                Education: Math.round(yr.educationRevenue * scale),
-                Expansão: Math.round(yr.baasRevenue * scale),
-                Tax: Math.round(yr.taxRevenue * scale),
+                CaaS: findChild('1', '1.1') || model.years[y].caasRevenue,
+                SaaS: findChild('1', '1.2') || model.years[y].saasRevenue,
+                Education: findChild('1', '1.3') || model.years[y].educationRevenue,
+                Expansão: findChild('1', '1.5') || model.years[y].baasRevenue,
+                Tax: findChild('1', '1.6') || model.years[y].taxRevenue,
               };
             })}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
