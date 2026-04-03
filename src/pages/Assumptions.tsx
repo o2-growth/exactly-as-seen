@@ -1124,17 +1124,10 @@ export default function Assumptions() {
                                             const val = Number(e.target.value) || 0;
                                             setRowApplyPctPersist(p => ({ ...p, [rowKey]: val }));
                                           }}
-                                          onBlur={() => { if (editing) handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
+                                          onBlur={() => handleApplyRow(row.dataKey as SubProductKey, selectedYear)}
                                           disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.m.</span>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                          disabled={false}
-                                        >
-                                          Aplicar
-                                        </button>
                                       </div>
                                       )}
                                     </div>
@@ -1226,17 +1219,10 @@ export default function Assumptions() {
                                           value={rowTicketGrowthPct[prodKey] ?? 0}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowTicketGrowthPctPersist(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
-                                          onBlur={() => { if (editing) handleApplyTicketGrowth(prodKey, selectedYear); }}
+                                          onBlur={() => handleApplyTicketGrowth(prodKey, selectedYear)}
                                           disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.m.</span>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
-                                          className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                          disabled={false}
-                                        >
-                                          Aplicar
-                                        </button>
                                       </div>
                                     </div>
                                     <div className="grid grid-cols-12 gap-1.5">
@@ -1439,7 +1425,6 @@ export default function Assumptions() {
                                             setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
                                           }}
                                           onBlur={() => {
-                                            if (!editing) return;
                                             const growthPct = rowChurnPct[prodKey] ?? 0;
                                             const baseVal = currentChurnFlat as number;
                                             const monthlyIncrement = growthPct / 12;
@@ -1459,38 +1444,6 @@ export default function Assumptions() {
                                           disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
-                                        <button
-                                          className="px-2 py-0.5 text-[10px] font-semibold rounded bg-negative/20 text-negative hover:bg-negative/30 transition-colors"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            const growthPct = rowChurnPct[prodKey] ?? 0;
-                                            const baseVal = currentChurnFlat as number;
-                                            const monthlyIncrement = growthPct / 12; // p.p. per month
-                                            const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            const newMonthlyChurnArrays: Record<number, number[]> = {};
-                                            let currentRate = baseVal;
-                                            for (const y of yearsToApply) {
-                                              const yearRates: number[] = [];
-                                              for (let m = 0; m < 12; m++) {
-                                                currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
-                                                yearRates.push(currentRate);
-                                              }
-                                              newMonthlyChurnArrays[y] = yearRates;
-                                            }
-                                            reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
-                                            const btn = e.currentTarget;
-                                            btn.textContent = 'Aplicado ✓';
-                                            btn.classList.add('bg-emerald-500/20', 'text-emerald-500');
-                                            btn.classList.remove('bg-negative/20', 'text-negative');
-                                            setTimeout(() => {
-                                              btn.textContent = 'Aplicar';
-                                              btn.classList.remove('bg-emerald-500/20', 'text-emerald-500');
-                                              btn.classList.add('bg-negative/20', 'text-negative');
-                                            }, 1500);
-                                          }}
-                                        >
-                                          Aplicar
-                                        </button>
                                       </div>
                                       <div className="text-[10px] text-muted-foreground mt-1">
                                         Churn por ano: {YEARS.map(yr => {
