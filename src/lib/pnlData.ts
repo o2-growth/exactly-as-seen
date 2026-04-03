@@ -134,6 +134,10 @@ export const PNL_TREE: PnlNode[] = [
   {
     code: '7', label: 'Despesas de Marketing',
     annual: { 2025: -5158, 2026: -11603, 2027: -51760, 2028: -184959, 2029: -440306, 2030: -785098 },
+    children: [
+      { code: '7.09', label: 'Assessoria de Imprensa', annual: { 2025: 0, 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 0 } },
+      { code: '7.10', label: 'Eventos & Patrocínios', annual: { 2025: 0, 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 0 } },
+    ],
   },
   {
     code: 'CM', label: '(=) Margem de Contribuição', isSummary: true,

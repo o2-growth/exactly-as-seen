@@ -35,6 +35,8 @@ export interface MonthlyPnL {
   grossProfit: number;
   commissions: number;
   marketing: number;
+  marketingPR: number;
+  marketingEvents: number;
   contributionMargin: number;
   sga: number;
   headcount: number;
@@ -67,7 +69,7 @@ export interface AnnualOutput {
   grossMarginPct: number;
   commissions: number;
   marketing: number;
-  marketingDetail: { caas: number; saas: number; education: number; baas: number };
+  marketingDetail: { caas: number; saas: number; education: number; baas: number; pr: number; events: number };
   contributionMargin: number;
   contributionMarginPct: number;
   sga: number;
@@ -660,7 +662,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 
   let cogsD = { caas: 0, customerService: 0, saas: 0, education: 0, baas: 0, tax: 0 };
   let hcD = { salaries: 0, benefits: 0 };
-  let mktD = { caas: 0, saas: 0, education: 0, baas: 0 };
+  let mktD = { caas: 0, saas: 0, education: 0, baas: 0, pr: 0, events: 0 };
   let taxD = { irpj: 0, csll: 0, adicionalIrpj: 0 };
   let quarterBasePresumidaIRPJ = 0; // accumulator for quarterly IRPJ adicional (weighted by subproduct)
   const monthlyAdicional: number[] = new Array(12).fill(0);
@@ -939,7 +941,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     cogsD.caas += cosBreakdown.caas; cogsD.customerService += cosBreakdown.customerSuccess;
     cogsD.saas += cosBreakdown.saas; cogsD.education += cosBreakdown.education; cogsD.baas += cosBreakdown.expansao; cogsD.tax += cosBreakdown.tax;
     hcD.salaries += hc.salaries; hcD.benefits += hc.benefits;
-    mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas;
+    mktD.caas += mktCaas; mktD.saas += mktSaas; mktD.education += mktEdu; mktD.baas += mktBaas; mktD.pr += mktPR; mktD.events += mktEvents;
     taxD.irpj += irpj; taxD.csll += csll; // adicionalIrpj accumulated after loop
     dedD.pis += dedResult.deducaoPIS; dedD.cofins += dedResult.deducaoCOFINS; dedD.iss += dedResult.deducaoISSQN;
     dedD.csllRetido += dedResult.deducaoCsllRetido; dedD.pisRetido += dedResult.deducaoPisRetido;
@@ -952,7 +954,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       grossRevenue: grossRev, caasRevenue: caasRev, saasRevenue: saasRev,
       educationRevenue: eduRev, baasRevenue: baasRev, taxRevenue: taxRev,
       deductions: ded, netRevenue: netRev, cogs: totalCogs, grossProfit: gp,
-      commissions: totalComm, marketing: totalMkt, contributionMargin: cm,
+      commissions: totalComm, marketing: totalMkt, marketingPR: mktPR, marketingEvents: mktEvents, contributionMargin: cm,
       sga, headcount: totalHC, commercial, otherExpenses: other,
       ebitda, financialResult, ebt, taxes: totalTax, netIncome: ni,
       debtPayments: totalDebtPmt, capex: totalCapex, finalResult,
@@ -1004,7 +1006,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     grossMarginPct: annualNetRevenue !== 0 ? Number(((annualGrossProfit / annualNetRevenue) * 100).toFixed(1)) : 0,
     commissions: r(annualCommissions),
     marketing: r(annualMarketing),
-    marketingDetail: { caas: r(mktD.caas), saas: r(mktD.saas), education: r(mktD.education), baas: r(mktD.baas) },
+    marketingDetail: { caas: r(mktD.caas), saas: r(mktD.saas), education: r(mktD.education), baas: r(mktD.baas), pr: r(mktD.pr), events: r(mktD.events) },
     contributionMargin: r(annualCM),
     contributionMarginPct: annualNetRevenue !== 0 ? Number(((annualCM / annualNetRevenue) * 100).toFixed(1)) : 0,
     sga: r(annualSGA), headcount: r(annualHC),
@@ -1156,8 +1158,8 @@ const BASE_MARKETING = [
   { c: '7.06', l: 'Alimentação - Marketing', v: V(-5,-8,-15,-40,-100,-200) },
   { c: '7.07', l: 'Deslocamento - Marketing', v: V(-8,-12,-25,-70,-180,-350) },
   { c: '7.08', l: 'Viagens e Estadias - Marketing', v: V(-10,-15,-30,-90,-220,-450) },
-  { c: '7.09', l: 'PR (Relações Públicas)', v: V(0,0,0,0,0,0) },
-  { c: '7.10', l: 'Eventos Marketing', v: V(0,0,0,0,0,0) },
+  { c: '7.09', l: 'Assessoria de Imprensa', v: V(0,0,0,0,0,0) },
+  { c: '7.10', l: 'Eventos & Patrocínios', v: V(0,0,0,0,0,0) },
 ];
 
 const BASE_FINANCIAL = [
@@ -1714,7 +1716,22 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     { code: 'DF_HDR', label: 'DESPESAS FIXAS', isHeader: true, annual: z, monthly: zMo() },
     {
       code: '7', label: 'Despesas de Marketing', annual: mktAn, monthly: mktMo,
-      children: buildDetailChildren(BASE_MARKETING, y => y.marketing, d => d.marketing, years),
+      children: (() => {
+        const kids = buildDetailChildren(BASE_MARKETING, y => y.marketing, d => d.marketing, years);
+        // Override 7.09 (Assessoria de Imprensa) and 7.10 (Eventos & Patrocínios) with actual engine values
+        for (const kid of kids) {
+          if (kid.code === '7.09') {
+            for (const y of YEARS) kid.annual[y] = years[y].marketingDetail.pr;
+            kid.monthly = {} as Record<Year, number[]>;
+            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => Math.round(d.marketingPR));
+          } else if (kid.code === '7.10') {
+            for (const y of YEARS) kid.annual[y] = years[y].marketingDetail.events;
+            kid.monthly = {} as Record<Year, number[]>;
+            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => Math.round(d.marketingEvents));
+          }
+        }
+        return kids;
+      })(),
     },
     {
       code: '6', label: 'Despesas Comerciais', annual: commlAn, monthly: commlMo,

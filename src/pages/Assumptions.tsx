@@ -2103,7 +2103,7 @@ export default function Assumptions() {
             <h3 className="text-sm font-semibold">PR e Eventos Marketing (custo mensal)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">PR (R$/mês)</label>
+                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">Assessoria de Imprensa (R$/mês)</label>
                 <input type="number" className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
                   value={data.marketingPR ?? 0}
                   onChange={e => {
@@ -2113,7 +2113,7 @@ export default function Assumptions() {
                 />
               </div>
               <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">Eventos (R$/mês)</label>
+                <label className="text-xs text-muted-foreground whitespace-nowrap min-w-[120px]">Eventos & Patrocínios (R$/mês)</label>
                 <input type="number" className="w-32 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
                   value={data.marketingEvents ?? 0}
                   onChange={e => {
