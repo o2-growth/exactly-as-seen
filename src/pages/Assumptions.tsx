@@ -166,9 +166,6 @@ const TICKETS_ROWS: TicketGroup[] = [
 ];
 
 function CellInput({ value, editing, onChange }: { value: number; editing: boolean; onChange: (v: number) => void }) {
-  if (!editing) {
-    return <span className="tabular-nums">{value.toLocaleString('pt-BR')}</span>;
-  }
   return (
     <input
       type="number"
@@ -251,7 +248,8 @@ export default function Assumptions() {
   // Use filteredYears for the year selector; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
-  const [editing, setEditing] = useState(false);
+  // editing always true — fields always editable, auto-save handles persistence
+  const editing = true;
   const [marketingView, setMarketingView] = useState<'planned' | 'actual'>('planned');
   const [selectedYear, setSelectedYear] = useState<Year>(2025);
 
@@ -387,13 +385,6 @@ export default function Assumptions() {
     });
   };
 
-  const toggleEditing = () => {
-    if (editing) {
-      // Exiting edit mode — force immediate save
-      saveNow(assumptions);
-    }
-    setEditing(!editing);
-  };
 
   const updateSubProduct = (key: SubProductKey, year: Year, val: number) => {
     updateModel(prev => ({
@@ -877,29 +868,14 @@ export default function Assumptions() {
           <p className="text-xs text-muted-foreground mt-1">Premissas da modelagem financeira. Os valores definidos aqui alimentam o P&L projetado, Cash Flow e demais demonstrações.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={toggleEditing} className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition-colors ${
-            editing
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-              : 'border border-primary/40 text-primary hover:bg-primary/10'
-          }`}>
-            {editing ? <><Lock className="h-3.5 w-3.5" /> Parar de Editar</> : <><Unlock className="h-3.5 w-3.5" /> Editar Premissas</>}
-          </button>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-positive bg-positive/10 border border-positive/30 rounded-lg">
+            <Save className="h-3.5 w-3.5" /> Auto-save ativo
+          </div>
           <button onClick={resetAssumptions} className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors">
             <RotateCcw className="h-3.5 w-3.5" /> Reset
           </button>
         </div>
       </div>
-
-      {!editing && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Lock className="h-3.5 w-3.5" /> Campos travados. Clique em "Editar Premissas" para modificar.
-        </div>
-      )}
-      {editing && (
-        <div className="flex items-center gap-2 text-xs text-positive">
-          <Unlock className="h-3.5 w-3.5" /> Modo edicao ativo. As alteracoes sao salvas automaticamente.
-        </div>
-      )}
 
       {/* Year Selector */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -1144,13 +1120,13 @@ export default function Assumptions() {
                                             setRowApplyPctPersist(p => ({ ...p, [rowKey]: val }));
                                           }}
                                           onBlur={() => { if (editing) handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
-                                          disabled={!editing}
+                                          disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.m.</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyRow(row.dataKey as SubProductKey, selectedYear); }}
                                           className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                          disabled={!editing}
+                                          disabled={false}
                                         >
                                           Aplicar
                                         </button>
@@ -1172,7 +1148,7 @@ export default function Assumptions() {
                                                 value={monthly[i]}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => handleClientChange(row.dataKey as SubProductKey, selectedYear, i, v)}
-                                                readOnly={!editing || prodKey === 'saasSetup'}
+                                                readOnly={prodKey === 'saasSetup'}
                                               />
                                             )}
                                             <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
@@ -1227,7 +1203,7 @@ export default function Assumptions() {
                                             };
                                           });
                                         }}
-                                        disabled={!editing}
+                                        disabled={false}
                                       />
                                     </div>
                                   )}
@@ -1246,13 +1222,13 @@ export default function Assumptions() {
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => setRowTicketGrowthPctPersist(p => ({ ...p, [prodKey]: Number(e.target.value) || 0 }))}
                                           onBlur={() => { if (editing) handleApplyTicketGrowth(prodKey, selectedYear); }}
-                                          disabled={!editing}
+                                          disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.m.</span>
                                         <button
                                           onClick={(e) => { e.stopPropagation(); handleApplyTicketGrowth(prodKey, selectedYear); }}
                                           className="px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary border border-primary/30 rounded hover:bg-primary/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                          disabled={!editing}
+                                          disabled={false}
                                         >
                                           Aplicar
                                         </button>
@@ -1272,7 +1248,7 @@ export default function Assumptions() {
                                             ) : (
                                               <MonthlyClientInput
                                                 value={monthTicket}
-                                                readOnly={!editing}
+                                                readOnly={false}
                                                 className="w-full bg-transparent text-center text-xs tabular-nums font-medium outline-none border-b border-transparent hover:border-primary/30 focus:border-primary transition-colors text-foreground"
                                                 onCommit={v => {
                                                   const src = assumptions;
@@ -1322,7 +1298,7 @@ export default function Assumptions() {
                                           value={ticketVal}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => directUpdateTicket(Number(e.target.value) || 0)}
-                                          disabled={!editing}
+                                          disabled={false}
                                         />
                                       </div>
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
@@ -1376,7 +1352,7 @@ export default function Assumptions() {
                                       <p className="text-xs font-semibold text-negative">Churn (% mensal) — {selectedYear}</p>
                                       <button
                                         className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
-                                        disabled={!editing}
+                                        disabled={false}
                                         onClick={e => {
                                           e.stopPropagation();
                                           const updater = (prev: typeof assumptions) => ({
@@ -1475,7 +1451,7 @@ export default function Assumptions() {
                                             }
                                             reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
                                           }}
-                                          disabled={!editing}
+                                          disabled={false}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
                                         <button
@@ -1825,33 +1801,33 @@ export default function Assumptions() {
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">Project Finance Director</p>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
-                        <input type="number" className={inputCls} value={cos.pfdClientsPerOne} disabled={!editing} onChange={e => updateCos('pfdClientsPerOne', Number(e.target.value) || 1)} />
+                        <input type="number" className={inputCls} value={cos.pfdClientsPerOne} disabled={false} onChange={e => updateCos('pfdClientsPerOne', Number(e.target.value) || 1)} />
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <CurrencyInput value={cos.pfdSalary} disabled={!editing} onChange={v => updateCos('pfdSalary', v)} />
+                        <CurrencyInput value={cos.pfdSalary} disabled={false} onChange={v => updateCos('pfdSalary', v)} />
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">CFO</p>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
-                        <input type="number" step="0.5" className={inputCls} value={cos.cfoClientsPerOne} disabled={!editing} onChange={e => updateCos('cfoClientsPerOne', Number(e.target.value) || 1)} />
+                        <input type="number" step="0.5" className={inputCls} value={cos.cfoClientsPerOne} disabled={false} onChange={e => updateCos('cfoClientsPerOne', Number(e.target.value) || 1)} />
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <CurrencyInput value={cos.cfoSalary} disabled={!editing} onChange={v => updateCos('cfoSalary', v)} />
+                        <CurrencyInput value={cos.cfoSalary} disabled={false} onChange={v => updateCos('cfoSalary', v)} />
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">FP&A Analyst</p>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
-                        <input type="number" step="0.5" className={inputCls} value={cos.fpaClientsPerOne} disabled={!editing} onChange={e => updateCos('fpaClientsPerOne', Number(e.target.value) || 1)} />
+                        <input type="number" step="0.5" className={inputCls} value={cos.fpaClientsPerOne} disabled={false} onChange={e => updateCos('fpaClientsPerOne', Number(e.target.value) || 1)} />
                       </div>
                       <div className="space-y-0.5">
                         <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                        <CurrencyInput value={cos.fpaSalary} disabled={!editing} onChange={v => updateCos('fpaSalary', v)} />
+                        <CurrencyInput value={cos.fpaSalary} disabled={false} onChange={v => updateCos('fpaSalary', v)} />
                       </div>
                     </div>
                   </div>
@@ -1871,19 +1847,19 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Dev Senior — 1 a cada N clientes</label>
-                          <input type="number" className={inputCls} value={cos.devSrClientsPerOne} disabled={!editing} onChange={e => updateCos('devSrClientsPerOne', Number(e.target.value) || 1)} />
+                          <input type="number" className={inputCls} value={cos.devSrClientsPerOne} disabled={false} onChange={e => updateCos('devSrClientsPerOne', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Dev Senior (R$/mês)</label>
-                          <CurrencyInput value={cos.devSrSalary} disabled={!editing} onChange={v => updateCos('devSrSalary', v)} />
+                          <CurrencyInput value={cos.devSrSalary} disabled={false} onChange={v => updateCos('devSrSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Customer Success — 1 a cada N clientes</label>
-                          <input type="number" className={inputCls} value={cos.csClientsPerOne} disabled={!editing} onChange={e => updateCos('csClientsPerOne', Number(e.target.value) || 1)} />
+                          <input type="number" className={inputCls} value={cos.csClientsPerOne} disabled={false} onChange={e => updateCos('csClientsPerOne', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">CS (R$/mês)</label>
-                          <CurrencyInput value={cos.csSaaSalary} disabled={!editing} onChange={v => updateCos('csSaaSalary', v)} />
+                          <CurrencyInput value={cos.csSaaSalary} disabled={false} onChange={v => updateCos('csSaaSalary', v)} />
                         </div>
                       </div>
                     </div>
@@ -1894,31 +1870,31 @@ export default function Assumptions() {
                       <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Novos clientes / squad</label>
-                          <input type="number" className={inputCls} value={cos.setupClientsPerSquad} disabled={!editing} onChange={e => updateCos('setupClientsPerSquad', Number(e.target.value) || 1)} />
+                          <input type="number" className={inputCls} value={cos.setupClientsPerSquad} disabled={false} onChange={e => updateCos('setupClientsPerSquad', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Data Analysts / squad</label>
-                          <input type="number" className={inputCls} value={cos.dataAnalystPerSquad} disabled={!editing} onChange={e => updateCos('dataAnalystPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className={inputCls} value={cos.dataAnalystPerSquad} disabled={false} onChange={e => updateCos('dataAnalystPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Data Analyst (R$/mês)</label>
-                          <CurrencyInput value={cos.dataAnalystSalary} disabled={!editing} onChange={v => updateCos('dataAnalystSalary', v)} />
+                          <CurrencyInput value={cos.dataAnalystSalary} disabled={false} onChange={v => updateCos('dataAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analysts / squad</label>
-                          <input type="number" className={inputCls} value={cos.processAnalystPerSquad} disabled={!editing} onChange={e => updateCos('processAnalystPerSquad', Number(e.target.value) || 0)} />
+                          <input type="number" className={inputCls} value={cos.processAnalystPerSquad} disabled={false} onChange={e => updateCos('processAnalystPerSquad', Number(e.target.value) || 0)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Process Analyst (R$/mês)</label>
-                          <CurrencyInput value={cos.processAnalystSalary} disabled={!editing} onChange={v => updateCos('processAnalystSalary', v)} />
+                          <CurrencyInput value={cos.processAnalystSalary} disabled={false} onChange={v => updateCos('processAnalystSalary', v)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Head of Data — 1 a cada N novos/mês</label>
-                          <input type="number" className={inputCls} value={cos.headDataClientsPerOne} disabled={!editing} onChange={e => updateCos('headDataClientsPerOne', Number(e.target.value) || 1)} />
+                          <input type="number" className={inputCls} value={cos.headDataClientsPerOne} disabled={false} onChange={e => updateCos('headDataClientsPerOne', Number(e.target.value) || 1)} />
                         </div>
                         <div className="space-y-0.5">
                           <label className="text-[9px] text-muted-foreground">Head of Data (R$/mês)</label>
-                          <CurrencyInput value={cos.headDataSalary} disabled={!editing} onChange={v => updateCos('headDataSalary', v)} />
+                          <CurrencyInput value={cos.headDataSalary} disabled={false} onChange={v => updateCos('headDataSalary', v)} />
                         </div>
                       </div>
                     </div>
@@ -1935,21 +1911,21 @@ export default function Assumptions() {
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.3 Education</p>
                       <div className="flex items-center gap-2">
-                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.eduCostRate * 100)} disabled={!editing} onChange={e => updateCos('eduCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.eduCostRate * 100)} disabled={false} onChange={e => updateCos('eduCostRate', (Number(e.target.value) || 0) / 100)} />
                         <span className="text-xs text-muted-foreground">% da receita bruta</span>
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.5 Expansão</p>
                       <div className="flex items-center gap-2">
-                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.expansaoCostRate * 100)} disabled={!editing} onChange={e => updateCos('expansaoCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.expansaoCostRate * 100)} disabled={false} onChange={e => updateCos('expansaoCostRate', (Number(e.target.value) || 0) / 100)} />
                         <span className="text-xs text-muted-foreground">% da receita bruta</span>
                       </div>
                     </div>
                     <div className="bg-secondary/30 rounded-lg p-3 space-y-1.5">
                       <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">3.6 Tax</p>
                       <div className="flex items-center gap-2">
-                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.taxCostRate * 100)} disabled={!editing} onChange={e => updateCos('taxCostRate', (Number(e.target.value) || 0) / 100)} />
+                        <input type="number" step="1" min="0" max="100" className="w-16 bg-card border border-border rounded px-2 py-1 text-right text-xs tabular-nums outline-none focus:ring-1 focus:ring-primary" value={Math.round(cos.taxCostRate * 100)} disabled={false} onChange={e => updateCos('taxCostRate', (Number(e.target.value) || 0) / 100)} />
                         <span className="text-xs text-muted-foreground">% da receita bruta</span>
                       </div>
                     </div>
@@ -1966,11 +1942,11 @@ export default function Assumptions() {
                     <p className="text-[10px] font-bold text-foreground/80 uppercase tracking-wide">Customer Experience Analyst</p>
                     <div className="space-y-0.5">
                       <label className="text-[9px] text-muted-foreground">1 a cada N clientes CaaS</label>
-                      <input type="number" className={inputCls} value={cos.cxAnalystClientsPerOne} disabled={!editing} onChange={e => updateCos('cxAnalystClientsPerOne', Number(e.target.value) || 1)} />
+                      <input type="number" className={inputCls} value={cos.cxAnalystClientsPerOne} disabled={false} onChange={e => updateCos('cxAnalystClientsPerOne', Number(e.target.value) || 1)} />
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[9px] text-muted-foreground">Salário (R$/mês)</label>
-                      <CurrencyInput value={cos.cxAnalystSalary} disabled={!editing} onChange={v => updateCos('cxAnalystSalary', v)} />
+                      <CurrencyInput value={cos.cxAnalystSalary} disabled={false} onChange={v => updateCos('cxAnalystSalary', v)} />
                     </div>
                   </div>
                 </div>
