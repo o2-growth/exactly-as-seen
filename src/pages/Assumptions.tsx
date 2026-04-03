@@ -688,11 +688,10 @@ export default function Assumptions() {
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
-        // Clear manual flags so Aplicar fully recalculates all projected months
-        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
+        // Keep manual flags — manual edits serve as anchor points for growth projection
       }
 
-      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF };
+      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO };
     });
 
     // Growth rates already updated above before setAssumptions
@@ -741,10 +740,9 @@ export default function Assumptions() {
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
-        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
       }
 
-      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF, monthlyChurnRates: newCR };
+      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, monthlyChurnRates: newCR };
     });
   };
 
@@ -791,10 +789,9 @@ export default function Assumptions() {
       for (const y of yearsToApply) {
         (newSPC[key] as Record<number, number>)[y] = allDecTargets[y];
         (newMO[key] as Record<number, (number | null)[]>)[y] = allOverrides[y];
-        (newMF[key] as Record<number, boolean[]>)[y] = Array(12).fill(false);
       }
 
-      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF, monthlyChurnRates: newCR };
+      return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, monthlyChurnRates: newCR };
     });
   };
 
