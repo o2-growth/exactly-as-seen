@@ -1556,24 +1556,49 @@ export default function Assumptions() {
                 {(() => {
                   const SETUP_KEYS = ['caasSetup', 'saasSetup'];
                   const isRecurring = (key: string | null) => key && !SETUP_KEYS.includes(key);
-                  const totalNovos = Math.round(CLIENTS_ROWS.reduce((total, group) =>
-                    total + group.items.reduce((sum, row) => {
-                      if (!isRecurring(row.dataKey)) return sum;
-                      return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
-                    }, 0), 0));
-                  const totalAtivos = Math.round(CLIENTS_ROWS.reduce((total, group) =>
-                    total + group.items.reduce((sum, row) => {
-                      if (!isRecurring(row.dataKey)) return sum;
-                      return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11];
-                    }, 0), 0));
+
+                  // Build breakdown per product
+                  const breakdown: { label: string; group: string; somaAno: number; dez: number }[] = [];
+                  for (const group of CLIENTS_ROWS) {
+                    for (const row of group.items) {
+                      if (!isRecurring(row.dataKey)) continue;
+                      const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                      breakdown.push({
+                        label: row.label,
+                        group: group.group,
+                        somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)),
+                        dez: Math.round(monthly[11]),
+                      });
+                    }
+                  }
+                  const totalNovos = breakdown.reduce((s, b) => s + b.somaAno, 0);
+                  const totalAtivos = breakdown.reduce((s, b) => s + b.dez, 0);
+                  const excluded = CLIENTS_ROWS.flatMap(g => g.items).filter(r => r.dataKey && SETUP_KEYS.includes(r.dataKey)).map(r => r.label);
+
                   return (
                     <>
                       <tr className="border-t-2 border-primary/30 bg-primary/5">
-                        <td className="p-3 text-sm font-bold text-foreground">Total de Clientes (soma no ano)</td>
+                        <td className="p-3 text-sm font-bold text-foreground">
+                          Total de Clientes (soma no ano)
+                          <span className="block text-[9px] font-normal text-muted-foreground mt-0.5">
+                            Exclui: {excluded.join(', ')}
+                          </span>
+                          <span className="block text-[9px] font-normal text-muted-foreground">
+                            = {breakdown.map(b => `${b.label}: ${b.somaAno.toLocaleString('pt-BR')}`).join(' + ')}
+                          </span>
+                        </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-foreground">{totalNovos.toLocaleString('pt-BR')}</td>
                       </tr>
                       <tr className="bg-primary/10">
-                        <td className="p-3 text-sm font-bold text-foreground">Clientes Ativos (Dez {selectedYear})</td>
+                        <td className="p-3 text-sm font-bold text-foreground">
+                          Clientes Ativos (Dez {selectedYear})
+                          <span className="block text-[9px] font-normal text-muted-foreground mt-0.5">
+                            Exclui: {excluded.join(', ')}
+                          </span>
+                          <span className="block text-[9px] font-normal text-muted-foreground">
+                            = {breakdown.map(b => `${b.label}: ${b.dez.toLocaleString('pt-BR')}`).join(' + ')}
+                          </span>
+                        </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-primary">{totalAtivos.toLocaleString('pt-BR')}</td>
                       </tr>
                     </>
