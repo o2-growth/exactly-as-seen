@@ -994,17 +994,14 @@ export default function Assumptions() {
               <thead>
                 <tr className="border-b border-border">
                   <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Sub-Produto</th>
-                  {activeYears.map(y => (
-                    <th key={y} className={`text-right p-3 text-muted-foreground font-medium min-w-[80px] ${y === selectedYear ? 'bg-primary/5' : ''}`}>{y}</th>
-                  ))}
-                  
+                  <th className="text-right p-3 text-muted-foreground font-medium min-w-[100px] bg-primary/5">Total {selectedYear}</th>
                 </tr>
               </thead>
               <tbody>
                 {CLIENTS_ROWS.map(group => (
                   <React.Fragment key={group.group}>
                     <tr className="bg-secondary/40 border-b border-border/50">
-                      <td colSpan={activeYears.length + 1} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
+                      <td colSpan={2} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
                         {group.group}
                       </td>
                     </tr>
@@ -1032,11 +1029,9 @@ export default function Assumptions() {
                                 {row.label}
                               </div>
                             </td>
-                            {activeYears.map(y => (
-                              <td key={y} className={`text-right p-3 tabular-nums text-sm ${y === selectedYear ? 'bg-primary/5 font-semibold' : ''}`}>
-                                {row.dataKey ? Math.round(getMonthlyClients(row.dataKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0)).toLocaleString('pt-BR') : '—'}
-                              </td>
-                            ))}
+                            <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold">
+                              {row.dataKey ? Math.round(getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0)).toLocaleString('pt-BR') : '—'}
+                            </td>
                           </tr>
 
                           {/* Expanded detail — monthly breakdown with inline edit */}
