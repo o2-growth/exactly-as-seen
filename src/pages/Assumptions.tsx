@@ -1396,11 +1396,12 @@ export default function Assumptions() {
                                           onChange={e => {
                                             const val = Number(e.target.value) || 0;
                                             const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            const newRates: Record<number, number> = {};
+                                            // Save as arrays (consistent with reprojectWithChurnArrays)
+                                            const newArrays: Record<number, number[]> = {};
                                             for (const y of yearsToApply) {
-                                              newRates[y] = val;
+                                              newArrays[y] = Array(12).fill(val);
                                             }
-                                            reprojectWithChurn(prodKey, newRates);
+                                            reprojectWithChurnArrays(prodKey, newArrays);
                                           }}
                                         />
                                         <span className="text-[10px] text-muted-foreground">% a.a.</span>
