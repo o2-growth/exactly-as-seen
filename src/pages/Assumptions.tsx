@@ -1395,15 +1395,41 @@ export default function Assumptions() {
                                       <div className="grid grid-cols-12 gap-1.5">
                                         {MONTHS.map((m, i) => {
                                           const hist = isHistorical(selectedYear, i);
-                                          // Historical months: show category default churn, not projected array
-                                          const churnRate = hist
-                                            ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
-                                            : getChurnForMonth(prodKey, data, selectedYear, i);
+                                          // Historical months: show stored value if manually edited, otherwise category default
+                                          const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
+                                          const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
+                                          const churnRate = hasManualChurn
+                                            ? storedArr[i] / 100 / 12
+                                            : (hist
+                                              ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
+                                              : getChurnForMonth(prodKey, data, selectedYear, i));
                                           const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100;
                                           return (
-                                            <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-negative/5 border border-negative/20'}`}>
+                                            <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
                                               <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
-                                              <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
+                                              <span
+                                                className={`block w-full text-center text-xs tabular-nums font-medium text-negative ${hist ? 'cursor-pointer hover:underline' : ''}`}
+                                                onClick={hist ? () => {
+                                                  if (window.confirm(`Editar churn histórico de ${m}?`)) {
+                                                    const val = window.prompt(`${m} — Novo churn (% anual):`, String(Math.round(churnPctMonthly * 12 * 100) / 100));
+                                                    if (val !== null) {
+                                                      const annualRate = Number(val) || 0;
+                                                      setAssumptions(prev => {
+                                                        const existing = prev.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
+                                                        const arr = existing && Array.isArray(existing) ? [...existing] : Array(12).fill(annualRate);
+                                                        arr[i] = annualRate;
+                                                        return {
+                                                          ...prev,
+                                                          monthlyChurnRates: {
+                                                            ...(prev.monthlyChurnRates ?? {}),
+                                                            [prodKey]: { ...((prev.monthlyChurnRates ?? {})[prodKey as TicketKey] ?? {}), [selectedYear]: arr },
+                                                          },
+                                                        };
+                                                      });
+                                                    }
+                                                  }
+                                                } : undefined}
+                                              >
                                                 {churnPctMonthly > 0 ? `${churnPctMonthly}%` : '—'}
                                               </span>
                                             </div>
