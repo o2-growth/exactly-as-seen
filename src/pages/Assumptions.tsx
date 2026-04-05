@@ -798,56 +798,54 @@ export default function Assumptions() {
   const handleApplyTicketGrowth = (prodKey: SubProductKey, year: Year) => {
     const pct = rowTicketGrowthPct[prodKey] ?? 0;
     const rate = pct / 100;
-    const ticketVal = data.tickets[prodKey as TicketKey] ?? 0;
-    const currentMonthlyTickets = data.monthlyTickets ?? {};
 
-    const yearsToApply = YEARS.filter(y => y >= year);
-    const allYearOverrides: Record<number, number[]> = {};
-    let prev = ticketVal as number; // float base
+    setAssumptions(prevState => {
+      const ticketVal = prevState.tickets[prodKey as TicketKey] ?? 0;
+      const currentMonthlyTickets = prevState.monthlyTickets ?? {};
 
-    for (const y of yearsToApply) {
-      const yearArr = currentMonthlyTickets[prodKey]?.[y]
-        ? [...currentMonthlyTickets[prodKey]![y]!]
-        : Array(12).fill(ticketVal);
+      const yearsToApply = YEARS.filter(y => y >= year);
+      const allYearOverrides: Record<number, number[]> = {};
+      let base = ticketVal as number; // float base
 
-      // For the first year, find the base from last value before projection
-      if (y === year) {
-        for (let m = 0; m < 12; m++) {
-          if (!isHistorical(y, m)) {
-            // Use the value just before the first projected month
-            prev = m > 0 ? (yearArr[m - 1] ?? ticketVal) : ticketVal;
-            break;
+      for (const y of yearsToApply) {
+        const yearArr = currentMonthlyTickets[prodKey]?.[y]
+          ? [...currentMonthlyTickets[prodKey]![y]!]
+          : Array(12).fill(ticketVal);
+
+        // For the first year, find the base from last value before projection
+        if (y === year) {
+          for (let m = 0; m < 12; m++) {
+            if (!isHistorical(y, m)) {
+              // Use the value just before the first projected month
+              base = m > 0 ? (yearArr[m - 1] ?? ticketVal) : ticketVal;
+              break;
+            }
           }
         }
-      }
 
-      for (let m = 0; m < 12; m++) {
-        if (isHistorical(y, m)) {
-          prev = yearArr[m] ?? ticketVal;
-          continue;
+        for (let m = 0; m < 12; m++) {
+          if (isHistorical(y, m)) {
+            base = yearArr[m] ?? ticketVal;
+            continue;
+          }
+          base = base * (1 + rate);
+          yearArr[m] = Math.round(base);
         }
-        prev = prev * (1 + rate);
-        yearArr[m] = Math.round(prev);
+
+        allYearOverrides[y] = yearArr;
       }
 
-      allYearOverrides[y] = yearArr;
-    }
-
-    const updater = (prev: AssumptionsType) => ({
-      ...prev,
-      monthlyTickets: {
-        ...(prev.monthlyTickets ?? {}),
-        [prodKey]: {
-          ...((prev.monthlyTickets ?? {})[prodKey] ?? {}),
-          ...allYearOverrides,
+      return {
+        ...prevState,
+        monthlyTickets: {
+          ...(prevState.monthlyTickets ?? {}),
+          [prodKey]: {
+            ...((prevState.monthlyTickets ?? {})[prodKey] ?? {}),
+            ...allYearOverrides,
+          },
         },
-      },
+      };
     });
-    if (editing) {
-      setAssumptions(updater);
-    } else {
-      setAssumptions(updater);
-    }
   };
 
   // Used by Marketing tab actual-data table
@@ -1025,13 +1023,14 @@ export default function Assumptions() {
                 <tr className="border-b border-border">
                   <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Sub-Produto</th>
                   <th className="text-right p-3 text-muted-foreground font-medium min-w-[100px] bg-primary/5">Total {selectedYear}</th>
+                  <th className="text-right p-3 text-muted-foreground font-medium min-w-[120px] bg-primary/5">Receita {selectedYear}</th>
                 </tr>
               </thead>
               <tbody>
                 {CLIENTS_ROWS.map(group => (
                   <React.Fragment key={group.group}>
                     <tr className="bg-secondary/40 border-b border-border/50">
-                      <td colSpan={2} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
+                      <td colSpan={3} className="p-2 text-xs font-bold text-foreground/80 uppercase tracking-wide">
                         {group.group}
                       </td>
                     </tr>
@@ -1061,6 +1060,14 @@ export default function Assumptions() {
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold">
                               {row.dataKey ? Math.round(getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0)).toLocaleString('pt-BR') : '—'}
+                            </td>
+                            <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold text-emerald-600">
+                              {row.dataKey ? (() => {
+                                const mc = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
+                                const rev = mc.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
+                                return formatCurrency(rev);
+                              })() : '—'}
                             </td>
                           </tr>
 
@@ -1578,6 +1585,14 @@ export default function Assumptions() {
                           return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
                         }, 0)).toLocaleString('pt-BR')}
                       </td>
+                      <td className="text-right p-2 tabular-nums text-xs font-bold text-emerald-600 bg-primary/5">
+                        {formatCurrency(group.items.reduce((sum, row) => {
+                          if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
+                          const mc = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                          const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
+                          return sum + mc.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
+                        }, 0))}
+                      </td>
                     </tr>
                   </React.Fragment>
                 ))}
@@ -1590,10 +1605,13 @@ export default function Assumptions() {
 
                   const breakdown = included.map(row => {
                     const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                    return { label: row.label, group: row.group, key: row.dataKey!, somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)), dez: Math.round(monthly[11]) };
+                    const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
+                    const receita = monthly.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
+                    return { label: row.label, group: row.group, key: row.dataKey!, somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)), dez: Math.round(monthly[11]), receita };
                   });
                   const totalNovos = breakdown.reduce((s, b) => s + b.somaAno, 0);
                   const totalAtivos = breakdown.reduce((s, b) => s + b.dez, 0);
+                  const totalReceita = breakdown.reduce((s, b) => s + b.receita, 0);
 
                   return (
                     <>
@@ -1610,6 +1628,7 @@ export default function Assumptions() {
                           )}
                         </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-foreground">{totalNovos.toLocaleString('pt-BR')}</td>
+                        <td className="text-right p-3 tabular-nums text-sm font-bold text-emerald-600">{formatCurrency(totalReceita)}</td>
                       </tr>
                       <tr className="bg-primary/10 cursor-pointer hover:bg-primary/15 transition-colors" onClick={() => setShowTotalFilter(v => !v)}>
                         <td className="p-3 text-sm font-bold text-foreground">
@@ -1619,10 +1638,11 @@ export default function Assumptions() {
                           </div>
                         </td>
                         <td className="text-right p-3 tabular-nums text-sm font-bold text-primary">{totalAtivos.toLocaleString('pt-BR')}</td>
+                        <td className="text-right p-3 tabular-nums text-sm font-bold text-primary"></td>
                       </tr>
                       {showTotalFilter && (
                         <tr>
-                          <td colSpan={2} className="p-0">
+                          <td colSpan={3} className="p-0">
                             <div className="bg-card border border-border rounded-lg m-2 p-4 space-y-3">
                               <p className="text-xs font-semibold text-foreground">Selecione os produtos para incluir no calculo:</p>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
