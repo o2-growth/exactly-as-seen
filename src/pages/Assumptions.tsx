@@ -808,28 +808,30 @@ export default function Assumptions() {
       let base = ticketVal as number; // float base
 
       for (const y of yearsToApply) {
-        const yearArr = currentMonthlyTickets[prodKey]?.[y]
-          ? [...currentMonthlyTickets[prodKey]![y]!]
-          : Array(12).fill(ticketVal);
+        // Start fresh from ticketVal for each year (don't carry stale overrides)
+        const yearArr = Array(12).fill(ticketVal);
 
-        // For the first year, find the base from last value before projection
+        // For the first projected year, use ticketVal as base
         if (y === year) {
+          // Historical months keep their real values
           for (let m = 0; m < 12; m++) {
-            if (!isHistorical(y, m)) {
-              // Use the value just before the first projected month
-              base = m > 0 ? (yearArr[m - 1] ?? ticketVal) : ticketVal;
-              break;
+            if (isHistorical(y, m)) {
+              const existing = currentMonthlyTickets[prodKey]?.[y];
+              yearArr[m] = existing?.[m] ?? ticketVal;
+              base = yearArr[m];
             }
           }
+          // Base for first projected month = last historical or ticketVal
+          if (!isHistorical(y, 0)) base = ticketVal;
         }
 
         for (let m = 0; m < 12; m++) {
           if (isHistorical(y, m)) {
-            base = yearArr[m] ?? ticketVal;
+            base = yearArr[m];
             continue;
           }
           base = base * (1 + rate);
-          yearArr[m] = Math.round(base);
+          yearArr[m] = Math.round(base * 100) / 100;
         }
 
         allYearOverrides[y] = yearArr;
