@@ -814,14 +814,22 @@ export default function Assumptions() {
         // Base for projection always starts from ticketVal
         base = ticketVal;
 
+        let firstProjected = true;
         for (let m = 0; m < 12; m++) {
           if (isHistorical(y, m)) {
-            yearArr[m] = ticketVal; // historical = ticket base flat
+            yearArr[m] = ticketVal;
             base = ticketVal;
             continue;
           }
-          base = base * (1 + rate);
-          yearArr[m] = Math.round(base * 100) / 100;
+          if (firstProjected) {
+            // First projected month = ticket base (no growth yet)
+            yearArr[m] = ticketVal;
+            base = ticketVal;
+            firstProjected = false;
+          } else {
+            base = base * (1 + rate);
+            yearArr[m] = Math.round(base * 100) / 100;
+          }
         }
 
         allYearOverrides[y] = yearArr;
