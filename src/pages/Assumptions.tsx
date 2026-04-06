@@ -808,26 +808,16 @@ export default function Assumptions() {
       let base = ticketVal as number; // float base
 
       for (const y of yearsToApply) {
-        // Start fresh from ticketVal for each year (don't carry stale overrides)
         const yearArr = Array(12).fill(ticketVal);
 
-        // For the first projected year, use ticketVal as base
-        if (y === year) {
-          // Historical months keep their real values
-          for (let m = 0; m < 12; m++) {
-            if (isHistorical(y, m)) {
-              const existing = currentMonthlyTickets[prodKey]?.[y];
-              yearArr[m] = existing?.[m] ?? ticketVal;
-              base = yearArr[m];
-            }
-          }
-          // Base for first projected month = last historical or ticketVal
-          if (!isHistorical(y, 0)) base = ticketVal;
-        }
+        // Historical months: use ticketVal (not stale overrides)
+        // Base for projection always starts from ticketVal
+        base = ticketVal;
 
         for (let m = 0; m < 12; m++) {
           if (isHistorical(y, m)) {
-            base = yearArr[m];
+            yearArr[m] = ticketVal; // historical = ticket base flat
+            base = ticketVal;
             continue;
           }
           base = base * (1 + rate);
@@ -1086,18 +1076,13 @@ export default function Assumptions() {
                               }));
                             };
                             const directUpdateTicket = (val: number) => {
-                              // Update flat ticket AND project all months from selectedYear to 2030
+                              // Update flat ticket AND ALL months (including historical)
                               const updater = (prev: typeof assumptions) => {
                                 const newMonthlyTickets = { ...(prev.monthlyTickets ?? {}) };
                                 const prevProdTickets = { ...(newMonthlyTickets[prodKey] ?? {}) };
                                 for (const y of YEARS.filter(yr => yr >= selectedYear)) {
-                                  const yearArr = prevProdTickets[y] ? [...prevProdTickets[y]!] : Array(12).fill(val);
-                                  for (let m = 0; m < 12; m++) {
-                                    if (!isHistorical(y, m)) {
-                                      yearArr[m] = val;
-                                    }
-                                  }
-                                  prevProdTickets[y] = yearArr;
+                                  // Fill ALL 12 months with the new ticket value
+                                  prevProdTickets[y] = Array(12).fill(val);
                                 }
                                 newMonthlyTickets[prodKey] = prevProdTickets;
                                 return {
