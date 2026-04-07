@@ -42,6 +42,7 @@ import { CurrencyInput } from '@/components/assumptions/CurrencyInput';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
@@ -245,6 +246,11 @@ function findNodeInTree(code: string, nodes: PnlNode[]): PnlNode | undefined {
 export default function Assumptions() {
   const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow } = useFinancialModel();
   const { saveVersion } = useVersionHistory();
+  const { data: historicalData, loading: historicalLoading } = useHistoricalClients();
+
+  /** Build period string from year and month index: (2025, 0) => '2025-01' */
+  const toPeriod = (year: Year, monthIdx: number): string =>
+    `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
 
   // Use filteredYears for the year selector; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
@@ -1154,23 +1160,26 @@ export default function Assumptions() {
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
+                                        const hcPeriod = toPeriod(selectedYear, i);
+                                        const hcEntry = hist ? historicalData[prodKey]?.[hcPeriod] : undefined;
+                                        const displayClients = hcEntry ? hcEntry.client_count : monthly[i];
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
                                             {hist ? (
                                               <span
-                                                className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
-                                                title="Clique para editar dado histórico"
+                                                className={`block w-full text-center text-xs tabular-nums font-medium cursor-pointer hover:text-foreground hover:underline transition-colors ${hcEntry ? 'text-sky-600' : 'text-muted-foreground'}`}
+                                                title={hcEntry ? 'Dado real (API)' : 'Clique para editar dado histórico'}
                                                 onClick={() => {
                                                   if (window.confirm(`Editar dado histórico de ${m}? Este é um valor realizado.`)) {
-                                                    const val = window.prompt(`${m} — Novo valor de clientes:`, String(Math.round(monthly[i])));
+                                                    const val = window.prompt(`${m} — Novo valor de clientes:`, String(Math.round(displayClients)));
                                                     if (val !== null) {
                                                       handleClientChange(row.dataKey as SubProductKey, selectedYear, i, Number(val) || 0);
                                                     }
                                                   }
                                                 }}
                                               >
-                                                {monthly[i].toLocaleString('pt-BR')}
+                                                {Math.round(displayClients).toLocaleString('pt-BR')}
                                               </span>
                                             ) : (
                               <MonthlyClientInput
@@ -1260,16 +1269,19 @@ export default function Assumptions() {
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
                                         const monthTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                        const htPeriod = toPeriod(selectedYear, i);
+                                        const htEntry = hist ? historicalData[prodKey]?.[htPeriod] : undefined;
+                                        const displayTicket = htEntry ? htEntry.avg_ticket : monthTicket;
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{htEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
                                             {hist ? (
                                               <span
-                                                className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground cursor-pointer hover:text-foreground hover:underline transition-colors"
-                                                title="Clique para editar dado histórico"
+                                                className={`block w-full text-center text-xs tabular-nums font-medium cursor-pointer hover:text-foreground hover:underline transition-colors ${htEntry ? 'text-sky-600' : 'text-muted-foreground'}`}
+                                                title={htEntry ? 'Dado real (API)' : 'Clique para editar dado histórico'}
                                                 onClick={() => {
                                                   if (window.confirm(`Editar ticket histórico de ${m}?`)) {
-                                                    const val = window.prompt(`${m} — Novo ticket (R$):`, String(Math.round(monthTicket)));
+                                                    const val = window.prompt(`${m} — Novo ticket (R$):`, String(Math.round(displayTicket)));
                                                     if (val !== null) {
                                                       const src = assumptions;
                                                       const yearArr = src.monthlyTickets?.[prodKey]?.[selectedYear]
@@ -1284,7 +1296,7 @@ export default function Assumptions() {
                                                   }
                                                 }}
                                               >
-                                                {formatCurrencyFull(monthTicket)}
+                                                {formatCurrencyFull(displayTicket)}
                                               </span>
                                             ) : (
                                               <MonthlyClientInput
@@ -1422,20 +1434,24 @@ export default function Assumptions() {
                                       <div className="grid grid-cols-12 gap-1.5">
                                         {MONTHS.map((m, i) => {
                                           const hist = isHistorical(selectedYear, i);
+                                          const hcChurnPeriod = toPeriod(selectedYear, i);
+                                          const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
                                           // Historical months: show stored value if manually edited, otherwise category default
                                           const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
                                           const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
-                                          const churnRate = hasManualChurn
-                                            ? storedArr[i] / 100 / 12
-                                            : (hist
-                                              ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
-                                              : getChurnForMonth(prodKey, data, selectedYear, i));
+                                          const churnRate = hcChurnEntry
+                                            ? hcChurnEntry.churn_rate / 100 / 12
+                                            : (hasManualChurn
+                                              ? storedArr[i] / 100 / 12
+                                              : (hist
+                                                ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
+                                                : getChurnForMonth(prodKey, data, selectedYear, i)));
                                           const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100;
                                           return (
                                             <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
-                                              <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                              <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcChurnEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
                                               <span
-                                                className={`block w-full text-center text-xs tabular-nums font-medium text-negative ${hist ? 'cursor-pointer hover:underline' : ''}`}
+                                                className={`block w-full text-center text-xs tabular-nums font-medium ${hcChurnEntry ? 'text-sky-600' : 'text-negative'} ${hist ? 'cursor-pointer hover:underline' : ''}`}
                                                 onClick={hist ? () => {
                                                   if (window.confirm(`Editar churn histórico de ${m}?`)) {
                                                     const val = window.prompt(`${m} — Novo churn (% anual):`, String(Math.round(churnPctMonthly * 12 * 100) / 100));
