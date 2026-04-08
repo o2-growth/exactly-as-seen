@@ -1295,6 +1295,33 @@ export default function Assumptions() {
                                     </div>
                                   </div>
 
+                                  {/* Clientes Ativos — READ-ONLY calculated: Ativos(m) = Ativos(m-1) + Novos(m) - Churn(m) */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                                      Clientes Ativos — {selectedYear}
+                                      {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
+                                    </p>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        const hcPeriod = toPeriod(selectedYear, i);
+                                        const hcEntry = hist ? historicalData[prodKey]?.[hcPeriod] : undefined;
+                                        const displayClients = hcEntry ? hcEntry.client_count : monthly[i];
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
+                                            <span className={`block w-full text-center text-xs tabular-nums font-medium ${hcEntry ? 'text-sky-600' : 'text-foreground'}`}>
+                                              {Math.round(displayClients).toLocaleString('pt-BR')}
+                                            </span>
+                                            <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                                              {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
+                                            </p>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+
                                   {/* Novos Clientes — EDITABLE: user inputs new clients per month */}
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
@@ -1429,33 +1456,6 @@ export default function Assumptions() {
                                           }, 0).toLocaleString('pt-BR')
                                         }</strong>
                                       </span>
-                                    </div>
-                                  </div>
-
-                                  {/* Clientes Ativos — READ-ONLY calculated: Ativos(m) = Ativos(m-1) + Novos(m) - Churn(m) */}
-                                  <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2">
-                                      Clientes Ativos — {selectedYear}
-                                      {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
-                                    </p>
-                                    <div className="grid grid-cols-12 gap-1.5">
-                                      {MONTHS.map((m, i) => {
-                                        const hist = isHistorical(selectedYear, i);
-                                        const hcPeriod = toPeriod(selectedYear, i);
-                                        const hcEntry = hist ? historicalData[prodKey]?.[hcPeriod] : undefined;
-                                        const displayClients = hcEntry ? hcEntry.client_count : monthly[i];
-                                        return (
-                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
-                                            <span className={`block w-full text-center text-xs tabular-nums font-medium ${hcEntry ? 'text-sky-600' : 'text-foreground'}`}>
-                                              {Math.round(displayClients).toLocaleString('pt-BR')}
-                                            </span>
-                                            <p className={`text-[9px] tabular-nums ${hist ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                                              {i > 0 && monthly[i - 1] > 0 ? `${(((monthly[i] / monthly[i - 1]) - 1) * 100).toFixed(0)}%` : '—'}
-                                            </p>
-                                          </div>
-                                        );
-                                      })}
                                     </div>
                                   </div>
 
