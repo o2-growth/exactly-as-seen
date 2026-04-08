@@ -252,6 +252,44 @@ export default function Assumptions() {
   const toPeriod = (year: Year, monthIdx: number): string =>
     `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
 
+  /** Get annual client sum using API data for historical months, engine for projected */
+  const getAnnualClientSum = (key: SubProductKey, year: Year): number => {
+    const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    let total = 0;
+    for (let m = 0; m < 12; m++) {
+      const period = toPeriod(year, m);
+      const apiEntry = historicalData[key]?.[period];
+      if (apiEntry && apiEntry.client_count > 0) {
+        total += apiEntry.client_count;
+      } else if (isHistorical(year, m) && apiEntry) {
+        total += 0; // API says 0, trust it
+      } else {
+        total += Math.round(engineMonthly[m]);
+      }
+    }
+    return Math.round(total);
+  };
+
+  /** Get annual revenue using API data for historical months, engine for projected */
+  const getAnnualRevenue = (key: SubProductKey, year: Year): number => {
+    const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    const tk = data.tickets[key as TicketKey] ?? 0;
+    let total = 0;
+    for (let m = 0; m < 12; m++) {
+      const period = toPeriod(year, m);
+      const apiEntry = historicalData[key]?.[period];
+      if (apiEntry && apiEntry.total_revenue > 0) {
+        total += apiEntry.total_revenue;
+      } else if (isHistorical(year, m) && apiEntry) {
+        total += 0;
+      } else {
+        const monthTicket = data.monthlyTickets?.[key]?.[year]?.[m] ?? tk;
+        total += engineMonthly[m] * monthTicket;
+      }
+    }
+    return total;
+  };
+
   // Use filteredYears for the year selector; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
@@ -1065,13 +1103,11 @@ export default function Assumptions() {
                               </div>
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold">
-                              {row.dataKey ? Math.round(getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0)).toLocaleString('pt-BR') : '—'}
+                              {row.dataKey ? getAnnualClientSum(row.dataKey as SubProductKey, selectedYear).toLocaleString('pt-BR') : '—'}
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold text-emerald-600">
                               {row.dataKey ? (() => {
-                                const mc = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
-                                const rev = mc.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
+                                const rev = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
                                 return formatCurrency(rev);
                               })() : '—'}
                             </td>
@@ -1116,13 +1152,12 @@ export default function Assumptions() {
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (soma)</p>
                                     <div className="grid grid-cols-6 gap-2">
                                       {activeYears.map(y => {
-                                        const yrMonthly = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                        const yrSum = yrMonthly.reduce((a, b) => a + b, 0);
+                                        const yrSum = getAnnualClientSum(prodKey as SubProductKey, y);
                                         return (
                                           <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
                                             <span className="block w-full text-center text-sm tabular-nums font-bold text-foreground">
-                                              {Math.round(yrSum).toLocaleString('pt-BR')}
+                                              {yrSum.toLocaleString('pt-BR')}
                                             </span>
                                           </div>
                                         );
@@ -1593,7 +1628,7 @@ export default function Assumptions() {
                       <td className="text-right p-2 tabular-nums text-xs font-bold text-foreground/70 bg-primary/5">
                         {Math.round(group.items.reduce((sum, row) => {
                           if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
-                          return sum + getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).reduce((s, v) => s + v, 0);
+                          return sum + getAnnualClientSum(row.dataKey as SubProductKey, selectedYear);
                         }, 0)).toLocaleString('pt-BR')}
                       </td>
                       <td className="text-right p-2 tabular-nums text-xs font-bold text-emerald-600 bg-primary/5">
@@ -1615,10 +1650,14 @@ export default function Assumptions() {
                   const excluded = allProducts.filter(r => r.dataKey && excludedFromTotal[r.dataKey]);
 
                   const breakdown = included.map(row => {
-                    const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                    const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
-                    const receita = monthly.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
-                    return { label: row.label, group: row.group, key: row.dataKey!, somaAno: Math.round(monthly.reduce((s, v) => s + v, 0)), dez: Math.round(monthly[11]), receita };
+                    const somaAno = getAnnualClientSum(row.dataKey as SubProductKey, selectedYear);
+                    const receita = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
+                    // Dez: use API if available, otherwise engine
+                    const decPeriod = toPeriod(selectedYear, 11);
+                    const decApi = historicalData[row.dataKey!]?.[decPeriod];
+                    const decEngine = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11];
+                    const dez = (decApi && isHistorical(selectedYear, 11)) ? decApi.client_count : Math.round(decEngine);
+                    return { label: row.label, group: row.group, key: row.dataKey!, somaAno, dez, receita };
                   });
                   const totalNovos = breakdown.reduce((s, b) => s + b.somaAno, 0);
                   const totalAtivos = breakdown.reduce((s, b) => s + b.dez, 0);
@@ -1659,9 +1698,11 @@ export default function Assumptions() {
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                                 {allProducts.filter(r => r.dataKey).map(row => {
                                   const isIncluded = !excludedFromTotal[row.dataKey!];
-                                  const monthly = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                  const somaAno = Math.round(monthly.reduce((s, v) => s + v, 0));
-                                  const dez = Math.round(monthly[11]);
+                                  const somaAno = getAnnualClientSum(row.dataKey as SubProductKey, selectedYear);
+                                  const decPeriod2 = toPeriod(selectedYear, 11);
+                                  const decApi2 = historicalData[row.dataKey!]?.[decPeriod2];
+                                  const decEng2 = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11];
+                                  const dez = (decApi2 && isHistorical(selectedYear, 11)) ? decApi2.client_count : Math.round(decEng2);
                                   return (
                                     <label key={row.dataKey} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isIncluded ? 'bg-primary/5 border-primary/30' : 'bg-secondary/30 border-border opacity-60'}`}>
                                       <input
