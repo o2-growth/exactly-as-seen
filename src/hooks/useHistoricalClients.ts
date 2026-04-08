@@ -11,6 +11,7 @@ export interface HistoricalClientData {
   avg_ticket: number;
   churned_clients: number;
   churn_rate: number;
+  client_names?: { name: string; value: number }[];
 }
 
 type HistoricalDataMap = Record<string, Record<string, HistoricalClientData>>;
@@ -62,6 +63,7 @@ export function useHistoricalClients(): {
             avg_ticket: row.avg_ticket ?? 0,
             churned_clients: row.churned_clients ?? 0,
             churn_rate: row.churn_rate ?? 0,
+            client_names: row.client_names ?? undefined,
           };
         }
 
