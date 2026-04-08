@@ -740,6 +740,7 @@ export default function Assumptions() {
 
       for (const y of yearsToApply) {
         const arr = newGrowthArrays[y];
+        const isFutureYear = y > year; // years beyond selectedYear: recalculate fully
 
         const base = getMonthlyClients(key, y, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
         const existingOverrides = prev.monthlyClientOverrides?.[key as TicketKey]?.[y as Year];
@@ -749,8 +750,8 @@ export default function Assumptions() {
         for (let m = 0; m < 12; m++) {
           if (isHistorical(y, m)) {
             prevClients = Math.round(base[m]);
-          } else if (manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
-            // Preserve manual edits
+          } else if (!isFutureYear && manualFlags?.[m] && existingOverrides?.[m] !== null && existingOverrides?.[m] !== undefined) {
+            // Preserve manual edits only for the selected year, not future years
             const manual = existingOverrides[m]!;
             projected[m] = manual;
             prevClients = manual;
