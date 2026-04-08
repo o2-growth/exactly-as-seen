@@ -604,26 +604,32 @@ export default function Assumptions() {
       }
       const decValue = yearArr[11] ?? newCount;
 
+      // Propagate to future years: recalculate from new Dec value
+      const futureYears = YEARS.filter(y => y > year);
+      const newSPC = { ...prev.subProductClients, [key]: { ...prev.subProductClients[key], [year]: Math.round(decValue) } };
+      const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}), [year]: yearArr } };
+      const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}), [year]: manualFlags } };
+
+      let prevFuture = decValue;
+      for (const fy of futureYears) {
+        const futureRate = getGrowthPct(key, fy) / 100;
+        const futureArr: (number | null)[] = Array(12).fill(null);
+        for (let m = 0; m < 12; m++) {
+          const churnRate = getChurnForMonth(key, prev, fy, m);
+          prevFuture = prevFuture * (1 + futureRate - churnRate);
+          futureArr[m] = Math.max(0, Math.round(prevFuture));
+        }
+        const futureDec = futureArr[11] ?? Math.round(prevFuture);
+        (newSPC[key] as Record<number, number>)[fy] = futureDec;
+        (newMO[key] as Record<number, (number | null)[]>)[fy] = futureArr;
+        (newMF[key] as Record<number, boolean[]>)[fy] = Array(12).fill(false);
+      }
+
       return {
         ...prev,
-        subProductClients: {
-          ...prev.subProductClients,
-          [key]: { ...prev.subProductClients[key], [year]: Math.round(decValue) },
-        },
-        monthlyClientOverrides: {
-          ...(prev.monthlyClientOverrides ?? {}),
-          [key]: {
-            ...((prev.monthlyClientOverrides ?? {})[key as TicketKey] ?? {}),
-            [year]: yearArr,
-          },
-        },
-        manualMonthlyClientOverrideFlags: {
-          ...(prev.manualMonthlyClientOverrideFlags ?? {}),
-          [key]: {
-            ...((prev.manualMonthlyClientOverrideFlags ?? {})[key as TicketKey] ?? {}),
-            [year]: manualFlags,
-          },
-        },
+        subProductClients: newSPC,
+        monthlyClientOverrides: newMO,
+        manualMonthlyClientOverrideFlags: newMF,
       };
     });
   };
@@ -1299,21 +1305,26 @@ export default function Assumptions() {
                                                 yearFlags[m] = true;
                                               }
                                             }
-                                            return {
-                                              ...prev,
-                                              subProductClients: {
-                                                ...prev.subProductClients,
-                                                [prodKey]: { ...prev.subProductClients[prodKey as keyof typeof prev.subProductClients], [selectedYear]: flatVal },
-                                              },
-                                              monthlyClientOverrides: {
-                                                ...(prev.monthlyClientOverrides ?? {}),
-                                                [key]: { ...((prev.monthlyClientOverrides ?? {})[key] ?? {}), [selectedYear]: yearOverrides },
-                                              },
-                                              manualMonthlyClientOverrideFlags: {
-                                                ...(prev.manualMonthlyClientOverrideFlags ?? {}),
-                                                [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key] ?? {}), [selectedYear]: yearFlags },
-                                              },
-                                            };
+                                            // Propagate to future years
+                                            const newSPC = { ...prev.subProductClients, [prodKey]: { ...prev.subProductClients[prodKey as keyof typeof prev.subProductClients], [selectedYear]: flatVal } };
+                                            const newMO = { ...(prev.monthlyClientOverrides ?? {}), [key]: { ...((prev.monthlyClientOverrides ?? {})[key] ?? {}), [selectedYear]: yearOverrides } };
+                                            const newMF = { ...(prev.manualMonthlyClientOverrideFlags ?? {}), [key]: { ...((prev.manualMonthlyClientOverrideFlags ?? {})[key] ?? {}), [selectedYear]: yearFlags } };
+
+                                            let prevFut = flatVal;
+                                            for (const fy of YEARS.filter(y => y > selectedYear)) {
+                                              const futRate = getGrowthPct(prodKey, fy) / 100;
+                                              const futArr: (number | null)[] = Array(12).fill(null);
+                                              for (let fm = 0; fm < 12; fm++) {
+                                                const cr = getChurnForMonth(prodKey as SubProductKey, prev, fy, fm);
+                                                prevFut = prevFut * (1 + futRate - cr);
+                                                futArr[fm] = Math.max(0, Math.round(prevFut));
+                                              }
+                                              (newSPC[prodKey as keyof typeof newSPC] as Record<number, number>)[fy] = Math.round(prevFut);
+                                              (newMO[key] as Record<number, (number | null)[]>)[fy] = futArr;
+                                              (newMF[key] as Record<number, boolean[]>)[fy] = Array(12).fill(false);
+                                            }
+
+                                            return { ...prev, subProductClients: newSPC, monthlyClientOverrides: newMO, manualMonthlyClientOverrideFlags: newMF };
                                           });
                                         }}
                                         disabled={false}
