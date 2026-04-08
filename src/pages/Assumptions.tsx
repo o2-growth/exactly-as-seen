@@ -1881,6 +1881,128 @@ export default function Assumptions() {
                                     </div>
                                   </div>
                                   )}
+
+                                  {/* ─── Logo Churn & Revenue Churn rows (MRR only) ─── */}
+                                  {(() => {
+                                    const anyHcEntryChurnBlock = Object.values(historicalData[prodKey] ?? {})[0];
+                                    const isNonMrrChurnBlock = anyHcEntryChurnBlock ? !anyHcEntryChurnBlock.is_mrr : false;
+                                    if (isNonMrrChurnBlock || data.churnNotApplicable?.[prodKey]) return null;
+
+                                    // Compute Logo Churn and Revenue Churn for each month
+                                    const logoChurnMonthly: number[] = [];
+                                    const revenueChurnMonthly: number[] = [];
+
+                                    for (let i = 0; i < 12; i++) {
+                                      const period = toPeriod(selectedYear, i);
+                                      const hist = isHistorical(selectedYear, i);
+
+                                      // Previous month period
+                                      let prevPeriodLC: string;
+                                      if (i > 0) {
+                                        prevPeriodLC = toPeriod(selectedYear, i - 1);
+                                      } else {
+                                        const prevYr = (selectedYear - 1) as Year;
+                                        prevPeriodLC = toPeriod(prevYr, 11);
+                                      }
+
+                                      const curEntry = historicalData[prodKey]?.[period];
+                                      const prevEntry = historicalData[prodKey]?.[prevPeriodLC];
+
+                                      if (hist && curEntry?.client_names && prevEntry?.client_names) {
+                                        // Historical: calculate from client_names comparison
+                                        const curNameSet = new Set(curEntry.client_names.map(c => c.name));
+                                        const churned = prevEntry.client_names.filter(c => !curNameSet.has(c.name));
+                                        logoChurnMonthly.push(churned.length);
+                                        revenueChurnMonthly.push(churned.reduce((sum, c) => sum + (c.value || 0), 0));
+                                      } else if (hist && curEntry) {
+                                        // Historical with churned_clients from DB
+                                        logoChurnMonthly.push(curEntry.churned_clients ?? 0);
+                                        const avgTk = curEntry.avg_ticket || (data.tickets[prodKey as TicketKey] ?? 0);
+                                        revenueChurnMonthly.push((curEntry.churned_clients ?? 0) * avgTk);
+                                      } else {
+                                        // Projected: estimate from churn_rate x prev_month_clients
+                                        const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                        const prevClients = i === 0
+                                          ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                          : monthly[i - 1];
+                                        const logoChurn = Math.round(prevClients * churnRate);
+                                        logoChurnMonthly.push(logoChurn);
+                                        const tk = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? (data.tickets[prodKey as TicketKey] ?? 0);
+                                        revenueChurnMonthly.push(logoChurn * tk);
+                                      }
+                                    }
+
+                                    const totalLogoChurn = logoChurnMonthly.reduce((s, v) => s + v, 0);
+                                    const totalRevenueChurn = revenueChurnMonthly.reduce((s, v) => s + v, 0);
+
+                                    // Annual Logo Churn Rate: totalLogoChurn / avg active clients
+                                    const avgActiveClients = monthly.reduce((s, v) => s + v, 0) / 12;
+                                    const logoChurnRateAnnual = avgActiveClients > 0 ? (totalLogoChurn / avgActiveClients) * 100 : 0;
+
+                                    // Annual Revenue Churn Rate: totalRevenueChurn / total revenue
+                                    const totalRevYear = getAnnualRevenue(prodKey, selectedYear);
+                                    const revenueChurnRateAnnual = totalRevYear > 0 ? (totalRevenueChurn / totalRevYear) * 100 : 0;
+
+                                    return (
+                                      <div className="space-y-2 pt-1">
+                                        {/* Logo Churn row */}
+                                        <div>
+                                          <p className="text-xs font-semibold text-negative mb-1">Logo Churn — {selectedYear}</p>
+                                          <div className="grid grid-cols-12 gap-1.5">
+                                            {MONTHS.map((m, i) => {
+                                              const hist = isHistorical(selectedYear, i);
+                                              return (
+                                                <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
+                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
+                                                  <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
+                                                    {logoChurnMonthly[i] > 0 ? logoChurnMonthly[i].toLocaleString('pt-BR') : '\u2014'}
+                                                  </span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+
+                                        {/* Revenue Churn row */}
+                                        <div>
+                                          <p className="text-xs font-semibold text-negative mb-1">Revenue Churn — {selectedYear}</p>
+                                          <div className="grid grid-cols-12 gap-1.5">
+                                            {MONTHS.map((m, i) => {
+                                              const hist = isHistorical(selectedYear, i);
+                                              return (
+                                                <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
+                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
+                                                  <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
+                                                    {revenueChurnMonthly[i] > 0 ? formatCurrency(revenueChurnMonthly[i]) : '\u2014'}
+                                                  </span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+
+                                        {/* Summary metrics */}
+                                        <div className="flex flex-wrap items-center gap-4 text-xs pt-1">
+                                          <span className="text-negative">
+                                            Logo Churn total: <strong>{totalLogoChurn.toLocaleString('pt-BR')} clientes</strong>
+                                          </span>
+                                          <span className="text-muted-foreground/30">|</span>
+                                          <span className="text-negative">
+                                            Revenue Churn total: <strong>{formatCurrency(totalRevenueChurn)}</strong>
+                                          </span>
+                                          <span className="text-muted-foreground/30">|</span>
+                                          <span className="text-negative">
+                                            Logo Churn Rate: <strong>{logoChurnRateAnnual.toFixed(1)}% a.a.</strong>
+                                          </span>
+                                          <span className="text-muted-foreground/30">|</span>
+                                          <span className="text-negative">
+                                            Revenue Churn Rate: <strong>{revenueChurnRateAnnual.toFixed(1)}% a.a.</strong>
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+
                                 </div>
                               </td>
                             </tr>
