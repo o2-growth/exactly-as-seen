@@ -1485,7 +1485,27 @@ export default function Assumptions() {
                                     </div>
                                    </div>
 
-                                  {/* Churn (% mensal) */}
+                                  {/* Churn (% mensal) — N/A for non-MRR products */}
+                                  {(() => {
+                                    const anyHcEntry = Object.values(historicalData[prodKey] ?? {})[0];
+                                    const isProductNonMrr = anyHcEntry ? !anyHcEntry.is_mrr : false;
+                                    const isChurnNA = isProductNonMrr || data.churnNotApplicable?.[prodKey];
+
+                                    if (isProductNonMrr) return (
+                                      <div className="space-y-2 pt-1">
+                                        <div className="flex items-center gap-4">
+                                          <p className="text-xs font-semibold text-muted-foreground">Churn — N/A (produto nao-recorrente)</p>
+                                        </div>
+                                      </div>
+                                    );
+
+                                    return null;
+                                  })()}
+                                  {(() => {
+                                    const anyHcEntry2 = Object.values(historicalData[prodKey] ?? {})[0];
+                                    if (anyHcEntry2 && !anyHcEntry2.is_mrr) return null; // already rendered N/A above
+                                    return true;
+                                  })() && (
                                   <div className="space-y-2 pt-1">
                                     <div className="flex items-center gap-4">
                                       <p className="text-xs font-semibold text-negative">Churn (% mensal) — {selectedYear}</p>
@@ -1665,6 +1685,7 @@ export default function Assumptions() {
                                       )}
                                     </div>
                                   </div>
+                                  )}
                                 </div>
                               </td>
                             </tr>
