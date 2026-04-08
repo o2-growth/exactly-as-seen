@@ -1538,6 +1538,8 @@ export default function Assumptions() {
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
                                       <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
                                       {(() => {
+                                        const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? true;
+                                        if (!hcIsMrr) return null;
                                         const decTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         return <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * decTicket)}</strong></span>;
                                       })()}
@@ -1573,7 +1575,9 @@ export default function Assumptions() {
                                         return (
                                           <>
                                             <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(totalAno)}</strong></span>
-                                            <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(mrrDez)}</strong></span>
+                                            {Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr !== false && (
+                                              <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(mrrDez)}</strong></span>
+                                            )}
                                           </>
                                         );
                                       })()}
