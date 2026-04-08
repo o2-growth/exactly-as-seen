@@ -1585,11 +1585,10 @@ export default function Assumptions() {
                                     </div>
                                    </div>
 
-                                  {/* Churn (% mensal) — N/A for non-MRR products */}
+                                  {/* ─── Unified Churn Section ─── */}
                                   {(() => {
                                     const anyHcEntry = Object.values(historicalData[prodKey] ?? {})[0];
                                     const isProductNonMrr = anyHcEntry ? !anyHcEntry.is_mrr : false;
-                                    const isChurnNA = isProductNonMrr || data.churnNotApplicable?.[prodKey];
 
                                     if (isProductNonMrr) return (
                                       <div className="space-y-2 pt-1">
@@ -1599,302 +1598,34 @@ export default function Assumptions() {
                                       </div>
                                     );
 
-                                    return null;
-                                  })()}
-                                  {(() => {
-                                    const anyHcEntry2 = Object.values(historicalData[prodKey] ?? {})[0];
-                                    if (anyHcEntry2 && !anyHcEntry2.is_mrr) return null; // already rendered N/A above
-                                    return true;
-                                  })() && (
-                                  <div className="space-y-2 pt-1">
-                                    <div className="flex items-center gap-4">
-                                      <p className="text-xs font-semibold text-negative">Churn (% mensal) — {selectedYear}</p>
-                                      <button
-                                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
-                                        disabled={false}
-                                        onClick={e => {
-                                          e.stopPropagation();
-                                          const updater = (prev: typeof assumptions) => ({
-                                            ...prev,
-                                            churnNotApplicable: {
-                                              ...(prev.churnNotApplicable ?? {}),
-                                              [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
-                                            },
-                                          });
-                                          setAssumptions(updater);
-                                        }}
-                                      >
-                                        N/A
-                                      </button>
-                                    </div>
-                                    {data.churnNotApplicable?.[prodKey] ? (
-                                      <div className="grid grid-cols-12 gap-1.5">
-                                        {MONTHS.map((m) => (
-                                          <div key={m} className="text-center space-y-1 p-1.5 rounded bg-muted/30">
-                                            <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground">N/A</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <>
-                                      <div className="grid grid-cols-12 gap-1.5">
-                                        {MONTHS.map((m, i) => {
-                                          const hist = isHistorical(selectedYear, i);
-                                          const hcChurnPeriod = toPeriod(selectedYear, i);
-                                          const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
-                                          // Historical months: show stored value if manually edited, otherwise category default
-                                          const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
-                                          const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
-                                          const churnRate = hcChurnEntry
-                                            ? hcChurnEntry.churn_rate / 100 / 12
-                                            : (hasManualChurn
-                                              ? storedArr[i] / 100 / 12
-                                              : (hist
-                                                ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
-                                                : getChurnForMonth(prodKey, data, selectedYear, i)));
-                                          const churnPctMonthly = Math.round(churnRate * 100 * 100) / 100;
-                                          const churnMonthKey = `${prodKey}::${hcChurnPeriod}`;
-                                          const hasClientNames = hcChurnEntry?.client_names && hcChurnEntry.client_names.length > 0;
-                                          const isExpanded = expandedChurnMonth === churnMonthKey;
-                                          return (
-                                            <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'} ${isExpanded ? 'ring-2 ring-sky-400' : ''}`}>
-                                              <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' \u{1F512}' : ''}{hcChurnEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
-                                              <span
-                                                className={`block w-full text-center text-xs tabular-nums font-medium ${hcChurnEntry ? 'text-sky-600' : 'text-negative'} ${hist ? 'cursor-pointer hover:underline' : ''}`}
-                                                onClick={hist ? (e) => {
-                                                  // If has client_names data, toggle expand instead of edit
-                                                  if (hasClientNames) {
-                                                    e.stopPropagation();
-                                                    setExpandedChurnMonth(prev => prev === churnMonthKey ? null : churnMonthKey);
-                                                    return;
-                                                  }
-                                                  if (window.confirm(`Editar churn hist\u00f3rico de ${m}?`)) {
-                                                    const val = window.prompt(`${m} \u2014 Novo churn (% anual):`, String(Math.round(churnPctMonthly * 12 * 100) / 100));
-                                                    if (val !== null) {
-                                                      const annualRate = Number(val) || 0;
-                                                      setAssumptions(prev => {
-                                                        const existing = prev.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
-                                                        const arr = existing && Array.isArray(existing) ? [...existing] : Array(12).fill(annualRate);
-                                                        arr[i] = annualRate;
-                                                        return {
-                                                          ...prev,
-                                                          monthlyChurnRates: {
-                                                            ...(prev.monthlyChurnRates ?? {}),
-                                                            [prodKey]: { ...((prev.monthlyChurnRates ?? {})[prodKey as TicketKey] ?? {}), [selectedYear]: arr },
-                                                          },
-                                                        };
-                                                      });
-                                                    }
-                                                  }
-                                                } : undefined}
-                                              >
-                                                {churnPctMonthly > 0 ? `${churnPctMonthly}%` : '\u2014'}
-                                              </span>
-                                              {hasClientNames && (
-                                                <span className="block text-[8px] text-sky-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); setExpandedChurnMonth(prev => prev === churnMonthKey ? null : churnMonthKey); }}>
-                                                  {isExpanded ? '\u25B2 detalhes' : '\u25BC detalhes'}
-                                                </span>
-                                              )}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                      {/* Expanded churn details panel */}
-                                      {expandedChurnMonth?.startsWith(`${prodKey}::`) && (() => {
-                                        const expandedPeriod = expandedChurnMonth.split('::')[1];
-                                        const expandedMonthIdx = parseInt(expandedPeriod.split('-')[1], 10) - 1;
-                                        const expandedMonthName = MONTHS[expandedMonthIdx] ?? expandedPeriod;
-                                        const curEntry = historicalData[prodKey]?.[expandedPeriod];
-                                        const curNames = curEntry?.client_names ?? [];
-
-                                        // Get previous month's client names
-                                        let prevPeriod: string;
-                                        if (expandedMonthIdx > 0) {
-                                          prevPeriod = toPeriod(selectedYear, expandedMonthIdx - 1);
-                                        } else {
-                                          const prevYr = (selectedYear - 1) as Year;
-                                          prevPeriod = toPeriod(prevYr, 11);
-                                        }
-                                        const prevEntry = historicalData[prodKey]?.[prevPeriod];
-                                        const prevNames = prevEntry?.client_names ?? [];
-
-                                        const prevNameSet = new Set(prevNames.map(c => c.name));
-                                        const curNameSet = new Set(curNames.map(c => c.name));
-
-                                        const churnedClients = prevNames.filter(c => !curNameSet.has(c.name));
-                                        const newClients = curNames.filter(c => !prevNameSet.has(c.name));
-
-                                        return (
-                                          <div className="mt-2 p-3 rounded border border-sky-200 bg-sky-50/50 dark:bg-sky-950/20 dark:border-sky-800 text-xs">
-                                            <div className="flex items-center justify-between mb-2">
-                                              <span className="font-semibold text-sky-700 dark:text-sky-300">
-                                                Detalhes de churn — {expandedMonthName}/{selectedYear}
-                                              </span>
-                                              <button
-                                                className="text-[10px] text-muted-foreground hover:text-foreground"
-                                                onClick={() => setExpandedChurnMonth(null)}
-                                              >
-                                                fechar
-                                              </button>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                              <div>
-                                                <p className="font-semibold text-negative mb-1">
-                                                  {churnedClients.length} cliente{churnedClients.length !== 1 ? 's' : ''} {churnedClients.length !== 1 ? 'sairam' : 'saiu'}:
-                                                </p>
-                                                {churnedClients.length === 0 ? (
-                                                  <p className="text-muted-foreground italic">Nenhum churn</p>
-                                                ) : (
-                                                  <ul className="space-y-0.5">
-                                                    {churnedClients.map(c => (
-                                                      <li key={c.name} className="flex items-center gap-1">
-                                                        <span className="text-negative">{'\u274C'}</span>
-                                                        <span>{c.name}</span>
-                                                        {c.value > 0 && <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>}
-                                                      </li>
-                                                    ))}
-                                                  </ul>
-                                                )}
-                                              </div>
-                                              <div>
-                                                <p className="font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
-                                                  {newClients.length} cliente{newClients.length !== 1 ? 's' : ''} novo{newClients.length !== 1 ? 's' : ''}:
-                                                </p>
-                                                {newClients.length === 0 ? (
-                                                  <p className="text-muted-foreground italic">Nenhum novo</p>
-                                                ) : (
-                                                  <ul className="space-y-0.5">
-                                                    {newClients.map(c => (
-                                                      <li key={c.name} className="flex items-center gap-1">
-                                                        <span className="text-emerald-500">{'\u2705'}</span>
-                                                        <span>{c.name}</span>
-                                                        {c.value > 0 && <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>}
-                                                      </li>
-                                                    ))}
-                                                  </ul>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })()}
-                                      </>
-                                    )}
-                                    {!data.churnNotApplicable?.[prodKey] && (() => {
-                                      const storedChurn = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
-                                      const currentChurnFlat: number = storedChurn !== undefined
-                                        ? (Array.isArray(storedChurn) ? storedChurn[0] ?? 0 : storedChurn)
-                                        : Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
-                                      return (
-                                      <>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1">
-                                        <span className="text-[10px] text-muted-foreground">Churn base (flat):</span>
-                                        <input
-                                          type="number"
-                                          step="0.1"
-                                          className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={currentChurnFlat}
-                                          onClick={e => e.stopPropagation()}
-                                          onChange={e => {
-                                            const val = Number(e.target.value) || 0;
-                                            const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            // Save as arrays (consistent with reprojectWithChurnArrays)
-                                            const newArrays: Record<number, number[]> = {};
-                                            for (const y of yearsToApply) {
-                                              newArrays[y] = Array(12).fill(val);
-                                            }
-                                            reprojectWithChurnArrays(prodKey, newArrays);
-                                          }}
-                                        />
-                                        <span className="text-[10px] text-muted-foreground">% a.a.</span>
-                                        <span className="text-muted-foreground/30">|</span>
-                                        <span className="text-[10px] text-muted-foreground">Crescimento de churn:</span>
-                                        <input
-                                          type="number"
-                                          step="0.5"
-                                          className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={rowChurnPct[prodKey] ?? 0}
-                                          onClick={e => e.stopPropagation()}
-                                          onChange={e => {
-                                            const v = e.target.value;
-                                            const num = v === '' || v === '-' ? 0 : Number(v);
-                                            setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
-                                          }}
-                                          onBlur={() => {
-                                            const growthPct = rowChurnPct[prodKey] ?? 0;
-                                            const baseVal = currentChurnFlat as number;
-                                            const monthlyIncrement = growthPct / 12;
-                                            const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
-                                            const newMonthlyChurnArrays: Record<number, number[]> = {};
-                                            let currentRate = baseVal;
-                                            for (const y of yearsToApply) {
-                                              const yearRates: number[] = [];
-                                              for (let m = 0; m < 12; m++) {
-                                                currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
-                                                yearRates.push(currentRate);
-                                              }
-                                              newMonthlyChurnArrays[y] = yearRates;
-                                            }
-                                            reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
-                                          }}
-                                          disabled={false}
-                                        />
-                                        <span className="text-[10px] text-muted-foreground">% a.a.</span>
-                                      </div>
-                                      <div className="text-[10px] text-muted-foreground mt-1">
-                                        Churn por ano: {YEARS.map(yr => {
-                                          const stored = data.monthlyChurnRates?.[prodKey]?.[yr];
-                                          if (stored !== undefined && Array.isArray(stored)) {
-                                            const first = stored[0] ?? 0;
-                                            const last = stored[11] ?? stored[stored.length - 1] ?? 0;
-                                            return `${yr}: ${first}→${last}%`;
-                                          }
-                                          const rate = (typeof stored === 'number' ? stored : null)
-                                            ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
-                                          return `${yr}: ${rate}%`;
-                                        }).join(' · ')}
-                                      </div>
-                                      </>
-                                      );
-                                    })()}
-                                    <div className="flex items-center gap-6 text-xs">
-                                      {data.churnNotApplicable?.[prodKey] ? (
-                                        <span className="text-muted-foreground italic">Não se aplica</span>
-                                      ) : (
-                                        (() => {
-                                          const totalChurn = MONTHS.reduce((sum, _, i) => {
-                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                            const prevClients = i === 0
-                                              ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
-                                              : monthly[i - 1];
-                                            return sum + Math.round(prevClients * churnRate);
-                                          }, 0);
-                                          const stored = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
-                                          const annualLabel = stored !== undefined && Array.isArray(stored)
-                                            ? `${stored[0]}→${stored[11]}%`
-                                            : (() => { const r = getChurnMonthly(prodKey, data, selectedYear); return `${Math.round(r * 12 * 100 * 10) / 10}% a.a.`; })();
-                                          const avgRate = getChurnMonthly(prodKey, data, selectedYear);
-                                          return <span className="text-negative">Churn: <strong>{annualLabel}</strong> ({Math.round(avgRate * 10000) / 100}%/mes avg) · <strong>{totalChurn.toLocaleString('pt-BR')}</strong> clientes perdidos/ano</span>;
-                                        })()
-                                      )}
-                                    </div>
-                                  </div>
-                                  )}
-
-                                  {/* ─── Logo Churn & Revenue Churn rows (MRR only) ─── */}
-                                  {(() => {
-                                    const anyHcEntryChurnBlock = Object.values(historicalData[prodKey] ?? {})[0];
-                                    const isNonMrrChurnBlock = anyHcEntryChurnBlock ? !anyHcEntryChurnBlock.is_mrr : false;
-                                    if (isNonMrrChurnBlock || data.churnNotApplicable?.[prodKey]) return null;
-
-                                    // Compute Logo Churn and Revenue Churn for each month
+                                    // ── Compute Logo Churn and Revenue Churn for each month ──
                                     const logoChurnMonthly: number[] = [];
                                     const revenueChurnMonthly: number[] = [];
+                                    const churnPctMonthlyArr: number[] = [];
 
                                     for (let i = 0; i < 12; i++) {
                                       const period = toPeriod(selectedYear, i);
                                       const hist = isHistorical(selectedYear, i);
+
+                                      // Churn rate % for this month
+                                      const hcChurnEntry = hist ? historicalData[prodKey]?.[period] : undefined;
+                                      const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
+                                      const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
+                                      const churnRate = data.churnNotApplicable?.[prodKey] ? 0
+                                        : hcChurnEntry
+                                          ? hcChurnEntry.churn_rate / 100 / 12
+                                          : (hasManualChurn
+                                            ? storedArr[i] / 100 / 12
+                                            : (hist
+                                              ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
+                                              : getChurnForMonth(prodKey, data, selectedYear, i)));
+                                      churnPctMonthlyArr.push(Math.round(churnRate * 100 * 100) / 100);
+
+                                      if (data.churnNotApplicable?.[prodKey]) {
+                                        logoChurnMonthly.push(0);
+                                        revenueChurnMonthly.push(0);
+                                        continue;
+                                      }
 
                                       // Previous month period
                                       let prevPeriodLC: string;
@@ -1909,19 +1640,15 @@ export default function Assumptions() {
                                       const prevEntry = historicalData[prodKey]?.[prevPeriodLC];
 
                                       if (hist && curEntry?.client_names && prevEntry?.client_names) {
-                                        // Historical: calculate from client_names comparison
                                         const curNameSet = new Set(curEntry.client_names.map(c => c.name));
                                         const churned = prevEntry.client_names.filter(c => !curNameSet.has(c.name));
                                         logoChurnMonthly.push(churned.length);
                                         revenueChurnMonthly.push(churned.reduce((sum, c) => sum + (c.value || 0), 0));
                                       } else if (hist && curEntry) {
-                                        // Historical with churned_clients from DB
                                         logoChurnMonthly.push(curEntry.churned_clients ?? 0);
                                         const avgTk = curEntry.avg_ticket || (data.tickets[prodKey as TicketKey] ?? 0);
                                         revenueChurnMonthly.push((curEntry.churned_clients ?? 0) * avgTk);
                                       } else {
-                                        // Projected: estimate from churn_rate x prev_month_clients
-                                        const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
                                         const prevClients = i === 0
                                           ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
                                           : monthly[i - 1];
@@ -1934,70 +1661,299 @@ export default function Assumptions() {
 
                                     const totalLogoChurn = logoChurnMonthly.reduce((s, v) => s + v, 0);
                                     const totalRevenueChurn = revenueChurnMonthly.reduce((s, v) => s + v, 0);
-
-                                    // Annual Logo Churn Rate: totalLogoChurn / avg active clients
                                     const avgActiveClients = monthly.reduce((s, v) => s + v, 0) / 12;
                                     const logoChurnRateAnnual = avgActiveClients > 0 ? (totalLogoChurn / avgActiveClients) * 100 : 0;
-
-                                    // Annual Revenue Churn Rate: totalRevenueChurn / total revenue
                                     const totalRevYear = getAnnualRevenue(prodKey, selectedYear);
                                     const revenueChurnRateAnnual = totalRevYear > 0 ? (totalRevenueChurn / totalRevYear) * 100 : 0;
 
                                     return (
-                                      <div className="space-y-2 pt-1">
-                                        {/* Logo Churn row */}
-                                        <div>
-                                          <p className="text-xs font-semibold text-negative mb-1">Logo Churn — {selectedYear}</p>
+                                      <div className="space-y-2 pt-2">
+                                        <div className="flex items-center gap-3">
+                                          <p className="text-xs font-semibold text-negative">Churn — {selectedYear}</p>
+                                          <button
+                                            className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
+                                            disabled={false}
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              setAssumptions(prev => ({
+                                                ...prev,
+                                                churnNotApplicable: {
+                                                  ...(prev.churnNotApplicable ?? {}),
+                                                  [prodKey]: !(prev.churnNotApplicable?.[prodKey]),
+                                                },
+                                              }));
+                                            }}
+                                          >
+                                            N/A
+                                          </button>
+                                        </div>
+
+                                        {data.churnNotApplicable?.[prodKey] ? (
+                                          <div className="grid grid-cols-12 gap-1.5">
+                                            {MONTHS.map((m) => (
+                                              <div key={m} className="text-center p-1.5 rounded bg-muted/30">
+                                                <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
+                                                <span className="block text-xs tabular-nums font-medium text-muted-foreground mt-1">N/A</span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <>
+                                          {/* ── Unified monthly grid: each cell = logo count (%) + R$ ── */}
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
+                                              const hcChurnPeriod = toPeriod(selectedYear, i);
+                                              const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
+                                              const churnMonthKey = `${prodKey}::${hcChurnPeriod}`;
+                                              const hasClientNames = hcChurnEntry?.client_names && hcChurnEntry.client_names.length > 0;
+                                              const isExpandedCell = expandedChurnMonth === churnMonthKey;
+                                              const pctVal = churnPctMonthlyArr[i];
+                                              const logoVal = logoChurnMonthly[i];
+                                              const revVal = revenueChurnMonthly[i];
+
                                               return (
-                                                <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
-                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                                  <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
-                                                    {logoChurnMonthly[i] > 0 ? logoChurnMonthly[i].toLocaleString('pt-BR') : '\u2014'}
+                                                <div
+                                                  key={m}
+                                                  className={`text-center p-1.5 rounded transition-all ${
+                                                    hist
+                                                      ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50'
+                                                      : 'bg-red-50/50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 border-dashed'
+                                                  } ${isExpandedCell ? 'ring-2 ring-sky-400' : ''} ${hasClientNames ? 'cursor-pointer hover:ring-1 hover:ring-sky-300' : ''}`}
+                                                  onClick={hasClientNames ? (e) => {
+                                                    e.stopPropagation();
+                                                    setExpandedChurnMonth(prev => prev === churnMonthKey ? null : churnMonthKey);
+                                                  } : undefined}
+                                                >
+                                                  {/* Month label + badges */}
+                                                  <p className="text-[9px] text-muted-foreground font-medium leading-tight">
+                                                    {m}
+                                                    {hist && <span className="ml-0.5 opacity-60">{'\uD83D\uDD12'}</span>}
+                                                    {hcChurnEntry && <span className="ml-0.5 text-[7px] text-sky-500 font-bold" title="Dado real da API">API</span>}
+                                                  </p>
+
+                                                  {/* Line 1: Logo count + churn rate % */}
+                                                  <span
+                                                    className={`block text-xs tabular-nums font-semibold mt-0.5 leading-tight ${hcChurnEntry ? 'text-sky-600' : 'text-red-600 dark:text-red-400'} ${hist && !hasClientNames ? 'cursor-pointer hover:underline' : ''}`}
+                                                    onClick={hist && !hasClientNames ? (e) => {
+                                                      e.stopPropagation();
+                                                      if (window.confirm(`Editar churn historico de ${m}?`)) {
+                                                        const val = window.prompt(`${m} — Novo churn (% anual):`, String(Math.round(pctVal * 12 * 100) / 100));
+                                                        if (val !== null) {
+                                                          const annualRate = Number(val) || 0;
+                                                          setAssumptions(prev => {
+                                                            const existing = prev.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
+                                                            const arr = existing && Array.isArray(existing) ? [...existing] : Array(12).fill(annualRate);
+                                                            arr[i] = annualRate;
+                                                            return {
+                                                              ...prev,
+                                                              monthlyChurnRates: {
+                                                                ...(prev.monthlyChurnRates ?? {}),
+                                                                [prodKey]: { ...((prev.monthlyChurnRates ?? {})[prodKey as TicketKey] ?? {}), [selectedYear]: arr },
+                                                              },
+                                                            };
+                                                          });
+                                                        }
+                                                      }
+                                                    } : undefined}
+                                                  >
+                                                    {logoVal > 0
+                                                      ? <>{logoVal} <span className="text-[9px] font-normal opacity-70">(-{pctVal}%)</span></>
+                                                      : pctVal > 0 ? <span className="text-[10px] opacity-60">-{pctVal}%</span> : '\u2014'}
                                                   </span>
+
+                                                  {/* Line 2: Revenue churn in R$ */}
+                                                  <span className="block text-[9px] tabular-nums text-red-500/80 dark:text-red-400/70 mt-0.5 leading-tight">
+                                                    {revVal > 0 ? formatCurrency(revVal) : '\u2014'}
+                                                  </span>
+
+                                                  {/* Expand indicator for historical with client names */}
+                                                  {hasClientNames && (
+                                                    <span className="block text-[7px] text-sky-400 mt-0.5 leading-tight">
+                                                      {isExpandedCell ? '\u25B2 detalhes' : '\u25BC detalhes'}
+                                                    </span>
+                                                  )}
                                                 </div>
                                               );
                                             })}
                                           </div>
-                                        </div>
 
-                                        {/* Revenue Churn row */}
-                                        <div>
-                                          <p className="text-xs font-semibold text-negative mb-1">Revenue Churn — {selectedYear}</p>
-                                          <div className="grid grid-cols-12 gap-1.5">
-                                            {MONTHS.map((m, i) => {
-                                              const hist = isHistorical(selectedYear, i);
-                                              return (
-                                                <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-negative/5 border border-negative/20'}`}>
-                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}</p>
-                                                  <span className="block w-full text-center text-xs tabular-nums font-medium text-negative">
-                                                    {revenueChurnMonthly[i] > 0 ? formatCurrency(revenueChurnMonthly[i]) : '\u2014'}
+                                          {/* Expanded churn details panel */}
+                                          {expandedChurnMonth?.startsWith(`${prodKey}::`) && (() => {
+                                            const expandedPeriod = expandedChurnMonth.split('::')[1];
+                                            const expandedMonthIdx = parseInt(expandedPeriod.split('-')[1], 10) - 1;
+                                            const expandedMonthName = MONTHS[expandedMonthIdx] ?? expandedPeriod;
+                                            const curEntry = historicalData[prodKey]?.[expandedPeriod];
+                                            const curNames = curEntry?.client_names ?? [];
+
+                                            let prevPeriod: string;
+                                            if (expandedMonthIdx > 0) {
+                                              prevPeriod = toPeriod(selectedYear, expandedMonthIdx - 1);
+                                            } else {
+                                              const prevYr = (selectedYear - 1) as Year;
+                                              prevPeriod = toPeriod(prevYr, 11);
+                                            }
+                                            const prevEntry = historicalData[prodKey]?.[prevPeriod];
+                                            const prevNames = prevEntry?.client_names ?? [];
+
+                                            const prevNameSet = new Set(prevNames.map(c => c.name));
+                                            const curNameSet = new Set(curNames.map(c => c.name));
+
+                                            const churnedClients = prevNames.filter(c => !curNameSet.has(c.name));
+                                            const newClients = curNames.filter(c => !prevNameSet.has(c.name));
+
+                                            return (
+                                              <div className="mt-2 p-3 rounded border border-sky-200 bg-sky-50/50 dark:bg-sky-950/20 dark:border-sky-800 text-xs">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <span className="font-semibold text-sky-700 dark:text-sky-300">
+                                                    Detalhes de churn — {expandedMonthName}/{selectedYear}
                                                   </span>
+                                                  <button
+                                                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                                                    onClick={() => setExpandedChurnMonth(null)}
+                                                  >
+                                                    fechar
+                                                  </button>
                                                 </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                  <div>
+                                                    <p className="font-semibold text-negative mb-1">
+                                                      {churnedClients.length} cliente{churnedClients.length !== 1 ? 's' : ''} {churnedClients.length !== 1 ? 'sairam' : 'saiu'}:
+                                                    </p>
+                                                    {churnedClients.length === 0 ? (
+                                                      <p className="text-muted-foreground italic">Nenhum churn</p>
+                                                    ) : (
+                                                      <ul className="space-y-0.5">
+                                                        {churnedClients.map(c => (
+                                                          <li key={c.name} className="flex items-center gap-1">
+                                                            <span className="text-negative">{'\u274C'}</span>
+                                                            <span>{c.name}</span>
+                                                            {c.value > 0 && <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    )}
+                                                  </div>
+                                                  <div>
+                                                    <p className="font-semibold text-emerald-600 dark:text-emerald-400 mb-1">
+                                                      {newClients.length} cliente{newClients.length !== 1 ? 's' : ''} novo{newClients.length !== 1 ? 's' : ''}:
+                                                    </p>
+                                                    {newClients.length === 0 ? (
+                                                      <p className="text-muted-foreground italic">Nenhum novo</p>
+                                                    ) : (
+                                                      <ul className="space-y-0.5">
+                                                        {newClients.map(c => (
+                                                          <li key={c.name} className="flex items-center gap-1">
+                                                            <span className="text-emerald-500">{'\u2705'}</span>
+                                                            <span>{c.name}</span>
+                                                            {c.value > 0 && <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>}
+                                                          </li>
+                                                        ))}
+                                                      </ul>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+                                          </>
+                                        )}
 
-                                        {/* Summary metrics */}
-                                        <div className="flex flex-wrap items-center gap-4 text-xs pt-1">
-                                          <span className="text-negative">
-                                            Logo Churn total: <strong>{totalLogoChurn.toLocaleString('pt-BR')} clientes</strong>
-                                          </span>
-                                          <span className="text-muted-foreground/30">|</span>
-                                          <span className="text-negative">
-                                            Revenue Churn total: <strong>{formatCurrency(totalRevenueChurn)}</strong>
-                                          </span>
-                                          <span className="text-muted-foreground/30">|</span>
-                                          <span className="text-negative">
-                                            Logo Churn Rate: <strong>{logoChurnRateAnnual.toFixed(1)}% a.a.</strong>
-                                          </span>
-                                          <span className="text-muted-foreground/30">|</span>
-                                          <span className="text-negative">
-                                            Revenue Churn Rate: <strong>{revenueChurnRateAnnual.toFixed(1)}% a.a.</strong>
-                                          </span>
+                                        {/* ── Churn base/growth inputs ── */}
+                                        {!data.churnNotApplicable?.[prodKey] && (() => {
+                                          const storedChurn = data.monthlyChurnRates?.[prodKey]?.[selectedYear];
+                                          const currentChurnFlat: number = storedChurn !== undefined
+                                            ? (Array.isArray(storedChurn) ? storedChurn[0] ?? 0 : storedChurn)
+                                            : Math.round(getChurnMonthly(prodKey, data, selectedYear) * 12 * 100 * 10) / 10;
+                                          return (
+                                          <>
+                                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                                            <span className="text-[10px] text-muted-foreground">Churn base (flat):</span>
+                                            <input
+                                              type="number"
+                                              step="0.1"
+                                              className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                              value={currentChurnFlat}
+                                              onClick={e => e.stopPropagation()}
+                                              onChange={e => {
+                                                const val = Number(e.target.value) || 0;
+                                                const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                                const newArrays: Record<number, number[]> = {};
+                                                for (const y of yearsToApply) {
+                                                  newArrays[y] = Array(12).fill(val);
+                                                }
+                                                reprojectWithChurnArrays(prodKey, newArrays);
+                                              }}
+                                            />
+                                            <span className="text-[10px] text-muted-foreground">% a.a.</span>
+                                            <span className="text-muted-foreground/30">|</span>
+                                            <span className="text-[10px] text-muted-foreground">Crescimento de churn:</span>
+                                            <input
+                                              type="number"
+                                              step="0.5"
+                                              className="w-16 bg-secondary border border-border rounded px-2 py-0.5 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
+                                              value={rowChurnPct[prodKey] ?? 0}
+                                              onClick={e => e.stopPropagation()}
+                                              onChange={e => {
+                                                const v = e.target.value;
+                                                const num = v === '' || v === '-' ? 0 : Number(v);
+                                                setRowChurnPctPersist(prev => ({ ...prev, [prodKey]: isNaN(num) ? 0 : num }));
+                                              }}
+                                              onBlur={() => {
+                                                const growthPct = rowChurnPct[prodKey] ?? 0;
+                                                const baseVal = currentChurnFlat as number;
+                                                const monthlyIncrement = growthPct / 12;
+                                                const yearsToApply = YEARS.filter(yr => yr >= selectedYear);
+                                                const newMonthlyChurnArrays: Record<number, number[]> = {};
+                                                let currentRate = baseVal;
+                                                for (const y of yearsToApply) {
+                                                  const yearRates: number[] = [];
+                                                  for (let m = 0; m < 12; m++) {
+                                                    currentRate = Math.max(0, Math.round((currentRate + monthlyIncrement) * 100) / 100);
+                                                    yearRates.push(currentRate);
+                                                  }
+                                                  newMonthlyChurnArrays[y] = yearRates;
+                                                }
+                                                reprojectWithChurnArrays(prodKey, newMonthlyChurnArrays);
+                                              }}
+                                              disabled={false}
+                                            />
+                                            <span className="text-[10px] text-muted-foreground">% a.a.</span>
+                                          </div>
+                                          <div className="text-[10px] text-muted-foreground mt-1">
+                                            Churn por ano: {YEARS.map(yr => {
+                                              const stored = data.monthlyChurnRates?.[prodKey]?.[yr];
+                                              if (stored !== undefined && Array.isArray(stored)) {
+                                                const first = stored[0] ?? 0;
+                                                const last = stored[11] ?? stored[stored.length - 1] ?? 0;
+                                                return `${yr}: ${first}\u2192${last}%`;
+                                              }
+                                              const rate = (typeof stored === 'number' ? stored : null)
+                                                ?? Math.round(getChurnMonthly(prodKey, data, yr) * 12 * 100 * 10) / 10;
+                                              return `${yr}: ${rate}%`;
+                                            }).join(' \u00B7 ')}
+                                          </div>
+                                          </>
+                                          );
+                                        })()}
+
+                                        {/* ── Summary line ── */}
+                                        <div className="flex flex-wrap items-center gap-3 text-xs pt-1 border-t border-red-200/50 dark:border-red-900/30 mt-1">
+                                          {data.churnNotApplicable?.[prodKey] ? (
+                                            <span className="text-muted-foreground italic">Nao se aplica</span>
+                                          ) : (
+                                            <>
+                                              <span className="text-red-600 dark:text-red-400">
+                                                <strong>{totalLogoChurn.toLocaleString('pt-BR')}</strong> churns
+                                                <span className="text-[10px] opacity-70 ml-0.5">({logoChurnRateAnnual.toFixed(1)}% a.a.)</span>
+                                              </span>
+                                              <span className="text-muted-foreground/30">|</span>
+                                              <span className="text-red-600 dark:text-red-400">
+                                                <strong>{formatCurrency(totalRevenueChurn)}</strong> perdido
+                                                <span className="text-[10px] opacity-70 ml-0.5">({revenueChurnRateAnnual.toFixed(1)}% a.a.)</span>
+                                              </span>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                     );
