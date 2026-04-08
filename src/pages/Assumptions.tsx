@@ -1195,15 +1195,18 @@ export default function Assumptions() {
                                 <div className="space-y-4">
                                   {/* Annual targets */}
                                   <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes por ano (soma)</p>
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes ativos em Dezembro</p>
                                     <div className="grid grid-cols-6 gap-2">
                                       {activeYears.map(y => {
-                                        const yrSum = getAnnualClientSum(prodKey as SubProductKey, y);
+                                        const engineMonthlyYr = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                        const decPeriod = toPeriod(y, 11);
+                                        const decApi = historicalData[prodKey]?.[decPeriod];
+                                        const decClients = (decApi && decApi.client_count > 0) ? decApi.client_count : Math.round(engineMonthlyYr[11]);
                                         return (
                                           <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
                                             <span className="block w-full text-center text-sm tabular-nums font-bold text-foreground">
-                                              {yrSum.toLocaleString('pt-BR')}
+                                              {decClients.toLocaleString('pt-BR')}
                                             </span>
                                           </div>
                                         );
@@ -1215,7 +1218,7 @@ export default function Assumptions() {
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
                                       <p className="text-xs font-semibold text-muted-foreground">
-                                        Novos clientes mensais — {selectedYear}
+                                        Clientes Ativos — {selectedYear}
                                         {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
                                       </p>
                                       {prodKey !== 'saasSetup' && (
@@ -1276,6 +1279,98 @@ export default function Assumptions() {
                                           </div>
                                         );
                                       })}
+                                    </div>
+                                  </div>
+
+                                  {/* Novos Clientes — how many NEW clients entered each month */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-emerald-600 mb-2">
+                                      Novos Clientes — {selectedYear}
+                                    </p>
+                                    <div className="grid grid-cols-12 gap-1.5">
+                                      {MONTHS.map((m, i) => {
+                                        const hist = isHistorical(selectedYear, i);
+                                        // Get active clients this month
+                                        const hcPeriodCur = toPeriod(selectedYear, i);
+                                        const hcEntryCur = hist ? historicalData[prodKey]?.[hcPeriodCur] : undefined;
+                                        const activeCur = hcEntryCur ? hcEntryCur.client_count : monthly[i];
+
+                                        // Get active clients previous month
+                                        let activePrev = 0;
+                                        if (i > 0) {
+                                          const hcPeriodPrev = toPeriod(selectedYear, i - 1);
+                                          const hcEntryPrev = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[hcPeriodPrev] : undefined;
+                                          activePrev = hcEntryPrev ? hcEntryPrev.client_count : monthly[i - 1];
+                                        } else if (selectedYear > 2025) {
+                                          // December of previous year
+                                          const prevYr = (selectedYear - 1) as Year;
+                                          const decPeriod = toPeriod(prevYr, 11);
+                                          const decApi = historicalData[prodKey]?.[decPeriod];
+                                          if (decApi && decApi.client_count > 0) {
+                                            activePrev = decApi.client_count;
+                                          } else {
+                                            const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                            activePrev = Math.round(prevYrMonthly[11]);
+                                          }
+                                        }
+
+                                        // Get churned clients this month
+                                        let churnedCur = 0;
+                                        if (hcEntryCur) {
+                                          churnedCur = hcEntryCur.churned_clients ?? 0;
+                                        } else {
+                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                          churnedCur = Math.round(activePrev * churnRate);
+                                        }
+
+                                        // New clients = active - prevActive + churned
+                                        const newClients = Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
+
+                                        return (
+                                          <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-emerald-50 dark:bg-emerald-950/20' : 'bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-200/30'}`}>
+                                            <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntryCur ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
+                                            <span className="block w-full text-center text-xs tabular-nums font-medium text-emerald-700 dark:text-emerald-400">
+                                              {newClients > 0 ? `+${newClients.toLocaleString('pt-BR')}` : '0'}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="flex items-center gap-6 text-xs mt-1">
+                                      <span className="text-emerald-600">
+                                        Total novos no ano: <strong>{
+                                          MONTHS.reduce((sum, _, i) => {
+                                            const hist = isHistorical(selectedYear, i);
+                                            const hcPeriodCur = toPeriod(selectedYear, i);
+                                            const hcEntryCur = hist ? historicalData[prodKey]?.[hcPeriodCur] : undefined;
+                                            const activeCur = hcEntryCur ? hcEntryCur.client_count : monthly[i];
+                                            let activePrev = 0;
+                                            if (i > 0) {
+                                              const hcPeriodPrev = toPeriod(selectedYear, i - 1);
+                                              const hcEntryPrev = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[hcPeriodPrev] : undefined;
+                                              activePrev = hcEntryPrev ? hcEntryPrev.client_count : monthly[i - 1];
+                                            } else if (selectedYear > 2025) {
+                                              const prevYr = (selectedYear - 1) as Year;
+                                              const decPeriod = toPeriod(prevYr, 11);
+                                              const decApi = historicalData[prodKey]?.[decPeriod];
+                                              if (decApi && decApi.client_count > 0) {
+                                                activePrev = decApi.client_count;
+                                              } else {
+                                                const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                                activePrev = Math.round(prevYrMonthly[11]);
+                                              }
+                                            }
+                                            let churnedCur = 0;
+                                            if (hcEntryCur) {
+                                              churnedCur = hcEntryCur.churned_clients ?? 0;
+                                            } else {
+                                              const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                              churnedCur = Math.round(activePrev * churnRate);
+                                            }
+                                            return sum + Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
+                                          }, 0).toLocaleString('pt-BR')
+                                        }</strong>
+                                      </span>
                                     </div>
                                   </div>
 
