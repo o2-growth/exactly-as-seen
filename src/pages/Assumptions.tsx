@@ -349,7 +349,47 @@ export default function Assumptions() {
   });
 
   const [applyAllPct, setApplyAllPct] = useState(() => assumptions.applyAllPct ?? 6);
-  const [rowApplyPct, setRowApplyPct] = useState<Record<string, number>>(() => assumptions.rowApplyPct ?? {});
+  // Growth % per product per year: { caasEnterprise: { 2026: 5, 2027: 7 } }
+  // When a year is set, it cascades to all future years (until overridden)
+  const [rowApplyPct, setRowApplyPct] = useState<Record<string, number | Record<number, number>>>(() => assumptions.rowApplyPct ?? {});
+
+  /** Get growth % for a product and year (cascades: uses closest year <= target) */
+  const getGrowthPct = (key: string, year: number): number => {
+    const val = rowApplyPct[key];
+    if (val === undefined) return 6; // default
+    if (typeof val === 'number') return val; // legacy: single number for all years
+    // Find the closest year <= target
+    const years = Object.keys(val).map(Number).sort();
+    let result = 6;
+    for (const y of years) {
+      if (y <= year) result = val[y];
+    }
+    return result;
+  };
+
+  /** Set growth % for a product + year, cascading to future years */
+  const setGrowthForYear = (key: string, year: number, pct: number) => {
+    setRowApplyPctPersist(prev => {
+      const current = prev[key];
+      let yearMap: Record<number, number>;
+      if (current === undefined || typeof current === 'number') {
+        // Migrate legacy single number
+        yearMap = {};
+        // Set all years from 2025 to the changed year with the old value
+        const oldVal = typeof current === 'number' ? current : 6;
+        for (const y of [2025, 2026, 2027, 2028, 2029, 2030]) {
+          if (y < year) yearMap[y] = oldVal;
+        }
+      } else {
+        yearMap = { ...current };
+      }
+      // Set from this year forward
+      for (const y of [2025, 2026, 2027, 2028, 2029, 2030]) {
+        if (y >= year) yearMap[y] = pct;
+      }
+      return { ...prev, [key]: yearMap };
+    });
+  };
   const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>(() => assumptions.rowTicketGrowthPct ?? {});
   const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>(() => assumptions.rowChurnPct ?? {});
   // Sync local state from assumptions on mount (after async load)
@@ -536,7 +576,7 @@ export default function Assumptions() {
 
   const handleClientChange = (key: SubProductKey, year: Year, monthIdx: number, newCount: number) => {
     // When user edits a month, recalculate subsequent months using current growth %
-    const rate = (rowApplyPct[key] ?? 6) / 100;
+    const rate = getGrowthPct(key, year) / 100;
 
     setAssumptions(prev => {
       const currentOverrides = prev.monthlyClientOverrides ?? {};
@@ -667,14 +707,13 @@ export default function Assumptions() {
   };
 
   const handleApplyRow = (key: SubProductKey, year: Year) => {
-    const pct = rowApplyPct[key] ?? 6;
-    const rate = pct / 100;
     const yearsToApply = YEARS.filter(y => y >= year);
 
-    // Pre-compute growth arrays outside updater to avoid stale closure
+    // Pre-compute growth arrays — each year uses its own cascaded growth %
     const newGrowthArrays: Record<number, number[]> = {};
     for (const y of yearsToApply) {
-      const arr = Array(12).fill(rate);
+      const yearRate = getGrowthPct(key, y) / 100;
+      const arr = Array(12).fill(yearRate);
       for (let m = 0; m < 12; m++) {
         if (isHistorical(y, m)) arr[m] = growthRates[y]?.[key]?.[m] ?? 0.06;
       }
@@ -1179,11 +1218,11 @@ export default function Assumptions() {
                                           type="number"
                                           step="0.1"
                                           className="w-14 bg-secondary border border-border rounded px-1.5 py-0.5 text-right text-[10px] text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={rowApplyPct[rowKey] ?? 6}
+                                          value={getGrowthPct(rowKey, selectedYear)}
                                           onClick={e => e.stopPropagation()}
                                           onChange={e => {
                                             const val = Number(e.target.value) || 0;
-                                            setRowApplyPctPersist(p => ({ ...p, [rowKey]: val }));
+                                            setGrowthForYear(rowKey, selectedYear, val);
                                           }}
                                           onBlur={() => handleApplyRow(row.dataKey as SubProductKey, selectedYear)}
                                           disabled={false}

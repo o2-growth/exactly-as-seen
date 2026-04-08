@@ -122,7 +122,7 @@ export interface Assumptions {
   // ─── Growth percentages (persisted for UX continuity) ───
   growthRates?: Record<number, Record<string, number[]>>;
   applyAllPct?: number;
-  rowApplyPct?: Record<string, number>;
+  rowApplyPct?: Record<string, number | Record<number, number>>;
   rowTicketGrowthPct?: Record<string, number>;
   rowChurnPct?: Record<string, number>;
 
