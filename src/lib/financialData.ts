@@ -60,6 +60,8 @@ export interface Assumptions {
   monthlyTickets?: Partial<Record<TicketKey, Partial<Record<Year, number[]>>>>;
   // Monthly client overrides — direct per-month client counts that bypass geometric interpolation
   monthlyClientOverrides?: Partial<Record<TicketKey, Partial<Record<Year, (number | null)[]>>>>;
+  // Monthly NEW client overrides — how many new clients enter each month (user-editable)
+  monthlyNewClientOverrides?: Partial<Record<TicketKey, Partial<Record<Year, (number | null)[]>>>>;
   // Flags which monthly client overrides were manually edited by the user vs auto-generated previews
   manualMonthlyClientOverrideFlags?: Partial<Record<TicketKey, Partial<Record<Year, boolean[]>>>>;
   // Monthly churn rates per sub-product per year
