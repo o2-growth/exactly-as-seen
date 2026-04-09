@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS, SUB_PRODUCT_LABELS, SubProductClients, Year } from '@/lib/financialData';
+import { YEARS, SUB_PRODUCT_LABELS, SubProductClients, Year, MRR_KEYS, TicketKey } from '@/lib/financialData';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { cacBySector, headcountRatios, namedEmployees2025, salaryRanges, cacPerClient } from '@/data/modelData';
 import {
@@ -118,9 +118,14 @@ export default function ClientsGrowth() {
   const avgCac = (cacPerClient.caas + cacPerClient.saas + cacPerClient.education + cacPerClient.baas) / 4;
   const ltvCacRatio = avgCac > 0 ? ltv / avgCac : 0;
 
-  // MRR / ARR
+  // MRR / ARR — only from recurring products (MRR_KEYS)
   const totalClientsYear = projections.totalClients[selectedYear];
-  const mrr = totalClientsYear * avgTicket;
+  let mrr = 0;
+  for (const key of MRR_KEYS) {
+    const clients = assumptions.subProductClients[key as keyof SubProductClients]?.[selectedYear] ?? 0;
+    const ticket = assumptions.tickets[key as TicketKey] ?? 0;
+    mrr += clients * ticket;
+  }
   const arr = mrr * 12;
 
   // Headcount projections from engine ratios

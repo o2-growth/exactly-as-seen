@@ -24,7 +24,7 @@ function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: n
 }
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG } from '@/lib/financialData';
+import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr } from '@/lib/financialData';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
@@ -1464,7 +1464,7 @@ export default function Assumptions() {
                                   {/* ─── Logo Churn Section (after Novos Clientes) ─── */}
                                   {(() => {
                                     const anyHcEntryLC = Object.values(historicalData[prodKey] ?? {})[0];
-                                    const isProductNonMrrLC = anyHcEntryLC ? !anyHcEntryLC.is_mrr : false;
+                                    const isProductNonMrrLC = anyHcEntryLC ? !anyHcEntryLC.is_mrr : !isProductMrr(prodKey as FinTicketKey);
 
                                     if (isProductNonMrrLC) return (
                                       <div className="space-y-2 pt-1">
@@ -1987,7 +1987,7 @@ export default function Assumptions() {
                                       <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{monthly.reduce((s, v) => s + v, 0).toLocaleString('pt-BR')}</strong></span>
                                       <span className="text-muted-foreground">Dez: <strong className="text-foreground">{monthly[11].toLocaleString('pt-BR')}</strong></span>
                                       {(() => {
-                                        const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? true;
+                                        const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? isProductMrr(prodKey as FinTicketKey);
                                         if (!hcIsMrr) return null;
                                         const decTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[11] ?? ticketVal;
                                         return <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(monthly[11] * decTicket)}</strong></span>;
@@ -1997,7 +1997,7 @@ export default function Assumptions() {
 
                                   {/* ═══ Revenue: Faturamento Base / Incremento / Revenue Churn / Faturamento Total ═══ */}
                                   {(() => {
-                                    const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? true;
+                                    const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? isProductMrr(prodKey as FinTicketKey);
                                     const isProductNonMrr = !hcIsMrr;
                                     const churnApplicable = !isProductNonMrr && !data.churnNotApplicable?.[prodKey];
 
@@ -2053,49 +2053,57 @@ export default function Assumptions() {
                                         const curNames = new Map((apiEntry.client_names || []).map((c: any) => [c.name, c.value ?? 0]));
                                         const prevNames = getPrevClientNamesMap();
 
-                                        // Faturamento Base = Faturamento Total do mes anterior
-                                        if (i === 0) {
+                                        // Faturamento Base = Faturamento Total do mes anterior (only MRR products)
+                                        if (isProductNonMrr) {
+                                          faturamentoBase.push(0);
+                                        } else if (i === 0) {
                                           faturamentoBase.push(prevMonthTotal);
                                         } else {
                                           faturamentoBase.push(faturamentoTotal[i - 1]);
                                         }
 
-                                        // Incremento = novos clientes + upsell dos retidos
-                                        let incrementoRevenue = 0;
-                                        // Novos: clientes deste mes que nao estavam no anterior
-                                        for (const [name, value] of curNames) {
-                                          if (!prevNames.has(name)) incrementoRevenue += value;
-                                        }
-                                        // Upsell: clientes retidos que pagam MAIS (diferenca positiva)
-                                        for (const [name, prevValue] of prevNames) {
-                                          if (curNames.has(name)) {
-                                            const curValue = curNames.get(name) ?? 0;
-                                            if (curValue > prevValue) {
-                                              incrementoRevenue += (curValue - prevValue);
-                                            }
+                                        // Non-MRR: all revenue is "incremento", no base/churn
+                                        if (isProductNonMrr) {
+                                          incremento.push(apiEntry.total_revenue);
+                                          revenueChurnArr.push(0);
+                                        } else {
+                                          // Incremento = novos clientes + upsell dos retidos
+                                          let incrementoRevenue = 0;
+                                          // Novos: clientes deste mes que nao estavam no anterior
+                                          for (const [name, value] of curNames) {
+                                            if (!prevNames.has(name)) incrementoRevenue += value;
                                           }
-                                        }
-                                        incremento.push(incrementoRevenue);
-
-                                        // Revenue Churn = churned (quem saiu) + downsell (quem pagou menos)
-                                        if (churnApplicable) {
-                                          let churnRevenue = 0;
-                                          // Churned: clientes que sairam (valor que pagavam)
-                                          for (const [name, value] of prevNames) {
-                                            if (!curNames.has(name)) churnRevenue += value;
-                                          }
-                                          // Downsell: clientes retidos que pagam MENOS (diferenca negativa)
+                                          // Upsell: clientes retidos que pagam MAIS (diferenca positiva)
                                           for (const [name, prevValue] of prevNames) {
                                             if (curNames.has(name)) {
                                               const curValue = curNames.get(name) ?? 0;
-                                              if (curValue < prevValue) {
-                                                churnRevenue += (prevValue - curValue);
+                                              if (curValue > prevValue) {
+                                                incrementoRevenue += (curValue - prevValue);
                                               }
                                             }
                                           }
-                                          revenueChurnArr.push(churnRevenue);
-                                        } else {
-                                          revenueChurnArr.push(0);
+                                          incremento.push(incrementoRevenue);
+
+                                          // Revenue Churn = churned (quem saiu) + downsell (quem pagou menos)
+                                          if (churnApplicable) {
+                                            let churnRevenue = 0;
+                                            // Churned: clientes que sairam (valor que pagavam)
+                                            for (const [name, value] of prevNames) {
+                                              if (!curNames.has(name)) churnRevenue += value;
+                                            }
+                                            // Downsell: clientes retidos que pagam MENOS (diferenca negativa)
+                                            for (const [name, prevValue] of prevNames) {
+                                              if (curNames.has(name)) {
+                                                const curValue = curNames.get(name) ?? 0;
+                                                if (curValue < prevValue) {
+                                                  churnRevenue += (prevValue - curValue);
+                                                }
+                                              }
+                                            }
+                                            revenueChurnArr.push(churnRevenue);
+                                          } else {
+                                            revenueChurnArr.push(0);
+                                          }
                                         }
 
                                         // Faturamento Total = real API value
@@ -2103,53 +2111,66 @@ export default function Assumptions() {
                                       } else {
                                         // ── Projected / fallback months ──
 
-                                        // Line 1: Faturamento Base = previous month's total
-                                        if (i === 0) {
-                                          faturamentoBase.push(prevMonthTotal);
-                                        } else {
-                                          faturamentoBase.push(faturamentoTotal[i - 1]);
-                                        }
-
-                                        // Line 2: Incremento = new clients × ticket
-                                        const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
-                                        let prevClients = 0;
-                                        if (i > 0) {
-                                          const prevPeriod = toPeriod(selectedYear, i - 1);
-                                          const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
-                                          prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
-                                        } else if (prevDecApi) {
-                                          prevClients = prevDecApi.client_count;
-                                        } else if (prevYrMonthly) {
-                                          prevClients = Math.round(prevYrMonthly[11]);
-                                        }
-                                        let newClients = 0;
-                                        if (storedNew !== null && storedNew !== undefined) {
-                                          newClients = storedNew;
-                                        } else {
-                                          const activeCur = monthly[i];
-                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                          const churned = Math.round(prevClients * churnRate);
-                                          newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
-                                        }
-                                        incremento.push(newClients * monthTicket);
-
-                                        // Line 3: Revenue Churn = churned clients × previous ticket
-                                        if (churnApplicable) {
-                                          const prevTk = i > 0
-                                            ? (data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? ticketVal)
-                                            : (selectedYear > 2025 ? (data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
-                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                          const logoChurn = Math.round(prevClients * churnRate);
-                                          revenueChurnArr.push(logoChurn * prevTk);
-                                        } else {
+                                        if (isProductNonMrr) {
+                                          // Non-MRR: no base accumulation, revenue = clients × ticket
+                                          faturamentoBase.push(0);
+                                          const monthRevenue = Math.round(monthly[i]) * monthTicket;
+                                          incremento.push(monthRevenue);
                                           revenueChurnArr.push(0);
-                                        }
-
-                                        // Line 4: Faturamento Total = Base + Incremento - Churn
-                                        if (hist && apiEntry && apiEntry.total_revenue > 0) {
-                                          faturamentoTotal.push(apiEntry.total_revenue);
+                                          if (hist && apiEntry && apiEntry.total_revenue > 0) {
+                                            faturamentoTotal.push(apiEntry.total_revenue);
+                                          } else {
+                                            faturamentoTotal.push(monthRevenue);
+                                          }
                                         } else {
-                                          faturamentoTotal.push(faturamentoBase[i] + incremento[i] - revenueChurnArr[i]);
+                                          // Line 1: Faturamento Base = previous month's total
+                                          if (i === 0) {
+                                            faturamentoBase.push(prevMonthTotal);
+                                          } else {
+                                            faturamentoBase.push(faturamentoTotal[i - 1]);
+                                          }
+
+                                          // Line 2: Incremento = new clients × ticket
+                                          const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
+                                          let prevClients = 0;
+                                          if (i > 0) {
+                                            const prevPeriod = toPeriod(selectedYear, i - 1);
+                                            const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
+                                            prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
+                                          } else if (prevDecApi) {
+                                            prevClients = prevDecApi.client_count;
+                                          } else if (prevYrMonthly) {
+                                            prevClients = Math.round(prevYrMonthly[11]);
+                                          }
+                                          let newClients = 0;
+                                          if (storedNew !== null && storedNew !== undefined) {
+                                            newClients = storedNew;
+                                          } else {
+                                            const activeCur = monthly[i];
+                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                            const churned = Math.round(prevClients * churnRate);
+                                            newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
+                                          }
+                                          incremento.push(newClients * monthTicket);
+
+                                          // Line 3: Revenue Churn = churned clients × previous ticket
+                                          if (churnApplicable) {
+                                            const prevTk = i > 0
+                                              ? (data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? ticketVal)
+                                              : (selectedYear > 2025 ? (data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
+                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                            const logoChurn = Math.round(prevClients * churnRate);
+                                            revenueChurnArr.push(logoChurn * prevTk);
+                                          } else {
+                                            revenueChurnArr.push(0);
+                                          }
+
+                                          // Line 4: Faturamento Total = Base + Incremento - Churn
+                                          if (hist && apiEntry && apiEntry.total_revenue > 0) {
+                                            faturamentoTotal.push(apiEntry.total_revenue);
+                                          } else {
+                                            faturamentoTotal.push(faturamentoBase[i] + incremento[i] - revenueChurnArr[i]);
+                                          }
                                         }
                                       }
                                     }
@@ -2160,7 +2181,8 @@ export default function Assumptions() {
 
                                     return (
                                       <>
-                                        {/* ── 1. Faturamento Base (read-only, gray) ── */}
+                                        {/* ── 1. Faturamento Base (read-only, gray) — only for MRR products ── */}
+                                        {!isProductNonMrr && (
                                         <div className="space-y-2 pt-1">
                                           <p className="text-xs font-semibold text-muted-foreground">Faturamento Base — {selectedYear}</p>
                                           <div className="grid grid-cols-12 gap-1.5">
@@ -2180,6 +2202,7 @@ export default function Assumptions() {
                                             <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(faturamentoBase.reduce((s, v) => s + v, 0))}</strong></span>
                                           </div>
                                         </div>
+                                        )}
 
                                         {/* ── 2. Incremento (editable for projected, green, drill-down for historical) ── */}
                                         <div className="space-y-2 pt-1">

@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
@@ -1830,10 +1830,23 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
 
 // ─── KPI HELPER ───
 
-export function computeKPIs(model: FullModelOutput, year: Year) {
+export function computeKPIs(model: FullModelOutput, year: Year, assumptions?: Assumptions) {
   const y = model.years[year];
   const lastMonth = y.monthlyData[11];
-  const mrr = lastMonth.grossRevenue * 1000; // Back to BRL from R$k
+  // MRR: only from recurring products (MRR_KEYS)
+  let mrr: number;
+  if (assumptions) {
+    let mrrSum = 0;
+    for (const key of MRR_KEYS) {
+      const clients = assumptions.subProductClients[key as keyof typeof assumptions.subProductClients]?.[year] ?? 0;
+      const ticket = assumptions.tickets[key as TicketKey] ?? 0;
+      mrrSum += clients * ticket;
+    }
+    mrr = mrrSum;
+  } else {
+    // Fallback: total gross revenue (legacy behavior)
+    mrr = lastMonth.grossRevenue * 1000;
+  }
   return {
     grossRevenue: y.grossRevenue,
     netRevenue: y.netRevenue,

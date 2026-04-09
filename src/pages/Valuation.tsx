@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS, Year, SCENARIO_MULTIPLIERS } from '@/lib/financialData';
+import { YEARS, Year, SCENARIO_MULTIPLIERS, MRR_KEYS, TicketKey } from '@/lib/financialData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
 import { formatCurrency, formatNumber } from '@/lib/formatters';
 import { Input } from '@/components/ui/input';
@@ -222,18 +222,17 @@ export default function Valuation() {
     return { year: y, ebitda, valuation: ebitda * ebitdaMultiple };
   }), [projections, ebitdaMultiple, activeYears]);
 
-  // ARR valuation (MRR from sub-product clients × tickets)
+  // ARR valuation (MRR only from recurring products defined in MRR_KEYS)
   const arrValuations = useMemo(() => {
     const { subProductClients, tickets } = assumptions;
     return activeYears.map(y => {
-      const mrr =
-        (subProductClients.caasAssessoria[y] * tickets.caasAssessoria +
-         subProductClients.caasEnterprise[y] * tickets.caasEnterprise +
-         subProductClients.caasCorporate[y] * tickets.caasCorporate +
-         subProductClients.saasOxy[y] * tickets.saasOxy +
-         subProductClients.saasOxyGenio[y] * tickets.saasOxyGenio +
-         subProductClients.educationDonoCFO[y] * tickets.educationDonoCFO +
-         subProductClients.baas[y] * tickets.baas) / 1000; // R$ thousands
+      let mrrTotal = 0;
+      for (const key of MRR_KEYS) {
+        const clients = subProductClients[key as keyof typeof subProductClients]?.[y] ?? 0;
+        const ticket = tickets[key as TicketKey] ?? 0;
+        mrrTotal += clients * ticket;
+      }
+      const mrr = mrrTotal / 1000; // R$ thousands
       const arr = mrr * 12;
       return { year: y, mrr, arr, valuation: arr * arrMultiple };
     });
