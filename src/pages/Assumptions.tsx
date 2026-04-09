@@ -837,6 +837,7 @@ export default function Assumptions() {
         const manualFlags = prev.manualMonthlyClientOverrideFlags?.[key as TicketKey]?.[y as Year];
 
         const newClientsArr: (number | null)[] = Array(12).fill(null);
+        let foundBase = false; // track if we found the first manual base value
         for (let m = 0; m < 12; m++) {
           if (isHistorical(y, m)) {
             // Historical: compute new from active differences
@@ -846,9 +847,11 @@ export default function Assumptions() {
             const churned = Math.floor(activePrevM * churnRate);
             newClientsArr[m] = Math.max(0, activeCur - activePrevM + churned);
             prevNew = newClientsArr[m]!;
-          } else if (!isFutureYear && manualFlags?.[m] && existingNew?.[m] !== null && existingNew?.[m] !== undefined) {
+          } else if (!isFutureYear && !foundBase && manualFlags?.[m] && existingNew?.[m] !== null && existingNew?.[m] !== undefined) {
+            // First projected month with manual value → use as growth base
             newClientsArr[m] = existingNew[m]!;
             prevNew = existingNew[m]!;
+            foundBase = true;
           } else {
             prevNew = Math.max(0, Math.round(prevNew * (1 + arr[m])));
             newClientsArr[m] = prevNew;
