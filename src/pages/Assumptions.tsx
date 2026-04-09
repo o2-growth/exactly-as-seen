@@ -2117,12 +2117,11 @@ export default function Assumptions() {
                                         // ── Projected / fallback months ──
 
                                         // Compute newClients (shared by MRR and non-MRR paths)
+                                        // Uses same prevClients logic as the Novos Clientes display above
                                         const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
                                         let prevClients = 0;
                                         if (i > 0) {
-                                          const prevPeriod = toPeriod(selectedYear, i - 1);
-                                          const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
-                                          prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
+                                          prevClients = monthly[i - 1];
                                         } else if (prevDecApi) {
                                           prevClients = prevDecApi.client_count;
                                         } else if (prevYrMonthly) {
