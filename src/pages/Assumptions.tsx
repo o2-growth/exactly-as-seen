@@ -212,8 +212,11 @@ function getChurnForMonth(key: SubProductKey, data: AssumptionsType, year: Year,
   if (key === 'baas' || key === 'baasFranquia' || key === 'baasMasterFranquia') {
     return data.churnBaas / 100 / 12;
   }
-  if (key === 'taxAT' || key === 'taxGPT' || key === 'taxRCT' || key === 'taxRT' || key === 'taxDTC') {
-    return 0;
+  if (key === 'taxAT') {
+    return data.churnCaas / 100 / 12; // taxAT is MRR (recurring advisory), uses CaaS churn rate
+  }
+  if (key === 'taxGPT' || key === 'taxRCT' || key === 'taxRT' || key === 'taxDTC') {
+    return 0; // non-MRR tax products — no churn
   }
   return 0;
 }
