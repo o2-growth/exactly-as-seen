@@ -393,6 +393,7 @@ export default function Assumptions() {
   const [rowTicketGrowthPct, setRowTicketGrowthPct] = useState<Record<string, number>>(() => assumptions.rowTicketGrowthPct ?? {});
   const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>(() => assumptions.rowChurnPct ?? {});
   const [expandedChurnMonth, setExpandedChurnMonth] = useState<string | null>(null);
+  const [expandedRevenueMonth, setExpandedRevenueMonth] = useState<string | null>(null);
   // Sync local state from assumptions on mount (after async load)
   const initialSyncDone = React.useRef(false);
   React.useEffect(() => {
@@ -2133,9 +2134,25 @@ export default function Assumptions() {
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
+                                              const revPeriod = toPeriod(selectedYear, i);
+                                              const revApiEntry = hist ? historicalData[prodKey]?.[revPeriod] : undefined;
+                                              const revHasClientNames = revApiEntry?.client_names && revApiEntry.client_names.length > 0;
+                                              const revMonthKey = `${prodKey}::${revPeriod}`;
+                                              const isRevExpanded = expandedRevenueMonth === revMonthKey;
                                               return (
-                                                <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-emerald-50 dark:bg-emerald-950/20 opacity-60' : 'bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-200/30'}`}>
-                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                                <div
+                                                  key={m}
+                                                  className={`text-center space-y-1 p-1.5 rounded ${
+                                                    hist
+                                                      ? 'bg-emerald-50 dark:bg-emerald-950/20'
+                                                      : 'bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-200/30'
+                                                  } ${isRevExpanded ? 'ring-2 ring-emerald-400' : ''} ${revHasClientNames ? 'cursor-pointer hover:ring-1 hover:ring-emerald-300' : ''}`}
+                                                  onClick={revHasClientNames ? (e) => {
+                                                    e.stopPropagation();
+                                                    setExpandedRevenueMonth(prev => prev === revMonthKey ? null : revMonthKey);
+                                                  } : undefined}
+                                                >
+                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' \uD83D\uDD12' : ''}</p>
                                                   {hist ? (
                                                     <span className="block w-full text-center text-xs tabular-nums font-medium text-emerald-700 dark:text-emerald-400">
                                                       {formatCurrencyFull(receitaIncremental[i])}
@@ -2153,10 +2170,72 @@ export default function Assumptions() {
                                                       }}
                                                     />
                                                   )}
+                                                  {revHasClientNames && (
+                                                    <span className="block text-[7px] text-emerald-400 mt-0.5 leading-tight">
+                                                      {isRevExpanded ? '\u25B2 detalhes' : '\u25BC detalhes'}
+                                                    </span>
+                                                  )}
                                                 </div>
                                               );
                                             })}
                                           </div>
+
+                                          {/* Expanded new clients details panel — below Receita Incremental grid */}
+                                          {expandedRevenueMonth?.startsWith(`${prodKey}::`) && (() => {
+                                            const expandedRevPeriod = expandedRevenueMonth.split('::')[1];
+                                            const expandedRevMonthIdx = parseInt(expandedRevPeriod.split('-')[1], 10) - 1;
+                                            const expandedRevMonthName = MONTHS[expandedRevMonthIdx] ?? expandedRevPeriod;
+                                            const curRevEntry = historicalData[prodKey]?.[expandedRevPeriod];
+                                            const curRevNames = curRevEntry?.client_names ?? [];
+
+                                            let prevRevPeriod: string;
+                                            if (expandedRevMonthIdx > 0) {
+                                              prevRevPeriod = toPeriod(selectedYear, expandedRevMonthIdx - 1);
+                                            } else {
+                                              const prevYrRev = (selectedYear - 1) as Year;
+                                              prevRevPeriod = toPeriod(prevYrRev, 11);
+                                            }
+                                            const prevRevEntry = historicalData[prodKey]?.[prevRevPeriod];
+                                            const prevRevNames = prevRevEntry?.client_names ?? [];
+
+                                            const prevRevNameSet = new Set(prevRevNames.map(c => c.name));
+                                            const newRevClients = curRevNames.filter(c => !prevRevNameSet.has(c.name));
+                                            const newRevTotal = newRevClients.reduce((sum, c) => sum + (c.value || 0), 0);
+
+                                            return (
+                                              <div className="mt-2 p-3 rounded border border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-800 text-xs">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                                                    {newRevClients.length} novo{newRevClients.length !== 1 ? 's' : ''} cliente{newRevClients.length !== 1 ? 's' : ''}: {expandedRevMonthName}/{selectedYear}
+                                                  </span>
+                                                  <button
+                                                    className="text-[10px] text-muted-foreground hover:text-foreground"
+                                                    onClick={(e) => { e.stopPropagation(); setExpandedRevenueMonth(null); }}
+                                                  >
+                                                    fechar
+                                                  </button>
+                                                </div>
+                                                {newRevClients.length === 0 ? (
+                                                  <p className="text-muted-foreground italic">Nenhum cliente novo neste m{'\u00EA'}s</p>
+                                                ) : (
+                                                  <ul className="space-y-0.5">
+                                                    {newRevClients.map(c => (
+                                                      <li key={c.name} className="flex items-center gap-1">
+                                                        <span className="text-emerald-500">{'\u2705'}</span>
+                                                        <span>{c.name}</span>
+                                                        <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                )}
+                                                <div className="mt-2 pt-1.5 border-t border-emerald-200 dark:border-emerald-800 flex justify-between">
+                                                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">Total:</span>
+                                                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">{formatCurrency(newRevTotal)}</span>
+                                                </div>
+                                              </div>
+                                            );
+                                          })()}
+
                                           <div className="flex items-center gap-6 text-xs">
                                             <span className="text-emerald-600">Total ano: <strong>{formatCurrencyFull(receitaIncremental.reduce((s, v) => s + v, 0))}</strong></span>
                                           </div>
