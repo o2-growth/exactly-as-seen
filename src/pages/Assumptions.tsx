@@ -2696,14 +2696,13 @@ export default function Assumptions() {
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
               { label: `Pres. IRPJ (${(PRES_IRPJ * 100).toFixed(0)}% × 15%)`, computed: () => PRES_IRPJ * 0.15 * 100 },
-              { label: `AD.IRPJ (${(PRES_IRPJ * 100).toFixed(0)}% × 10%)`, computed: () => PRES_IRPJ * 0.10 * 100 },
               { label: `Pres. CSLL (${(PRES_CSLL * 100).toFixed(0)}% × 9%)`, computed: () => PRES_CSLL * 0.09 * 100 },
-              { label: 'TOTAL efetivo (%)', computed: (cfg) => {
+              { label: 'TOTAL efetivo (sem AD.IRPJ)', computed: (cfg) => {
                 const irpj = PRES_IRPJ * 0.15 * 100;
-                const adicional = PRES_IRPJ * 0.10 * 100;
                 const csll = PRES_CSLL * 0.09 * 100;
-                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + adicional + csll;
+                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
               }, isTotal: true },
+              { label: 'AD.IRPJ (global, máx 3,20%)', computed: () => PRES_IRPJ * 0.10 * 100 },
             ];
 
             const fullLabels: Record<string, string> = {
