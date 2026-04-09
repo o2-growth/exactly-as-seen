@@ -2059,18 +2059,38 @@ export default function Assumptions() {
                                           faturamentoBase.push(faturamentoTotal[i - 1]);
                                         }
 
-                                        // Incremento = soma EXATA dos valores dos novos clientes deste mes
+                                        // Incremento = novos clientes + upsell dos retidos
                                         let incrementoRevenue = 0;
+                                        // Novos: clientes deste mes que nao estavam no anterior
                                         for (const [name, value] of curNames) {
                                           if (!prevNames.has(name)) incrementoRevenue += value;
                                         }
+                                        // Upsell: clientes retidos que pagam MAIS (diferenca positiva)
+                                        for (const [name, prevValue] of prevNames) {
+                                          if (curNames.has(name)) {
+                                            const curValue = curNames.get(name) ?? 0;
+                                            if (curValue > prevValue) {
+                                              incrementoRevenue += (curValue - prevValue);
+                                            }
+                                          }
+                                        }
                                         incremento.push(incrementoRevenue);
 
-                                        // Revenue Churn = soma EXATA dos valores dos churned no mes anterior
+                                        // Revenue Churn = churned (quem saiu) + downsell (quem pagou menos)
                                         if (churnApplicable) {
                                           let churnRevenue = 0;
+                                          // Churned: clientes que sairam (valor que pagavam)
                                           for (const [name, value] of prevNames) {
                                             if (!curNames.has(name)) churnRevenue += value;
+                                          }
+                                          // Downsell: clientes retidos que pagam MENOS (diferenca negativa)
+                                          for (const [name, prevValue] of prevNames) {
+                                            if (curNames.has(name)) {
+                                              const curValue = curNames.get(name) ?? 0;
+                                              if (curValue < prevValue) {
+                                                churnRevenue += (prevValue - curValue);
+                                              }
+                                            }
                                           }
                                           revenueChurnArr.push(churnRevenue);
                                         } else {
