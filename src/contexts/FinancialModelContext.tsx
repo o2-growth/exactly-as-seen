@@ -105,6 +105,18 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           fixed.taxClients = { ...DEFAULT_ASSUMPTIONS.taxClients };
         }
 
+        // Migration: reset subProductTaxRates to pick up corrected defaults (32% presumido, ISS by category)
+        // Old configs had wrong rates: CaaS ISS 0% / base 8%/12%, Expansão mix 80/20, Education ISS 5%
+        if (fixed.subProductTaxRates) {
+          const anyOld = Object.values(fixed.subProductTaxRates).some(
+            (cfg: any) => cfg?.tipoReceita === 'produto_saas' || cfg?.tipoReceita === 'expansao_misto' || cfg?.tipoReceita === 'mrr_saas' || cfg?.iss === 0
+          );
+          if (anyOld) {
+            delete fixed.subProductTaxRates;
+            localStorage.removeItem('o2_assumptions');
+          }
+        }
+
         // Ensure cacPerProduct has all keys
         if (fixed.cacPerProduct) {
           fixed.cacPerProduct = {
