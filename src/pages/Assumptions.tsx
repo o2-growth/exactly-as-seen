@@ -1994,21 +1994,38 @@ export default function Assumptions() {
                                     </div>
                                   </div>
 
-                                  {/* ═══ Revenue Triangle: Base / Incremental / Total ═══ */}
+                                  {/* ═══ Revenue: Faturamento Base / Incremento / Revenue Churn / Faturamento Total ═══ */}
                                   {(() => {
                                     const hcIsMrr = Object.values(historicalData[prodKey] ?? {})[0]?.is_mrr ?? true;
-                                    // Previous year clients for month 0 base calculation
-                                    const prevYrMonthlyRev = selectedYear > 2025
+                                    const isProductNonMrr = !hcIsMrr;
+                                    const churnApplicable = !isProductNonMrr && !data.churnNotApplicable?.[prodKey];
+
+                                    // Previous year December data for month 0 base
+                                    const prevYrMonthly = selectedYear > 2025
                                       ? getMonthlyClients(prodKey as SubProductKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)
                                       : null;
                                     const prevDecPeriod = selectedYear > 2025 ? toPeriod((selectedYear - 1) as Year, 11) : '';
                                     const prevDecApi = selectedYear > 2025 ? historicalData[prodKey]?.[prevDecPeriod] : undefined;
 
+                                    // Determine previous December total revenue for Faturamento Base[0]
+                                    let prevMonthTotal = 0;
+                                    if (selectedYear > 2025) {
+                                      // Try API total_revenue for Dec of previous year
+                                      if (prevDecApi && prevDecApi.total_revenue > 0) {
+                                        prevMonthTotal = prevDecApi.total_revenue;
+                                      } else {
+                                        // Engine: Dec clients * Dec ticket
+                                        const prevDecClients = prevYrMonthly ? Math.round(prevYrMonthly[11]) : 0;
+                                        const prevDecTk = data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal;
+                                        prevMonthTotal = prevDecClients * prevDecTk;
+                                      }
+                                    }
+
                                     // Build arrays for each month
-                                    const receitaBase: number[] = [];
-                                    const receitaIncremental: number[] = [];
+                                    const faturamentoBase: number[] = [];
+                                    const incremento: number[] = [];
                                     const revenueChurnArr: number[] = [];
-                                    const receitaTotal: number[] = [];
+                                    const faturamentoTotal: number[] = [];
 
                                     for (let i = 0; i < 12; i++) {
                                       const hist = isHistorical(selectedYear, i);
@@ -2016,29 +2033,16 @@ export default function Assumptions() {
                                       const period = toPeriod(selectedYear, i);
                                       const apiEntry = hist ? historicalData[prodKey]?.[period] : undefined;
 
+                                      // ── Line 1: Faturamento Base = Faturamento Total do mes anterior ──
+                                      if (i === 0) {
+                                        faturamentoBase.push(prevMonthTotal);
+                                      } else {
+                                        faturamentoBase.push(faturamentoTotal[i - 1]);
+                                      }
+
+                                      // ── Line 2: Incremento = Novos Clientes × Ticket(m) ──
                                       if (hist && apiEntry && apiEntry.total_revenue > 0) {
-                                        // Historical with API data — use total_revenue, estimate components
-                                        const totalRev = apiEntry.total_revenue;
-                                        // Ativos(m-1): previous month clients
-                                        let prevClients = 0;
-                                        if (i > 0) {
-                                          const prevPeriod = toPeriod(selectedYear, i - 1);
-                                          const prevApi = historicalData[prodKey]?.[prevPeriod];
-                                          prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
-                                        } else if (prevDecApi) {
-                                          prevClients = prevDecApi.client_count;
-                                        } else if (prevYrMonthlyRev) {
-                                          prevClients = Math.round(prevYrMonthlyRev[11]);
-                                        }
-                                        // Opcao B: Base usa ticket do mes ANTERIOR
-                                        const prevTk = i > 0
-                                          ? (data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? ticketVal)
-                                          : (selectedYear > 2025 ? (data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
-                                        const base = prevClients * prevTk;
-                                        const churned = apiEntry.churned_clients ?? 0;
-                                        const revChurn = churned * prevTk;
-                                        // Receita Incremental = Novos Clientes × Ticket do mes
-                                        // Calcular novos clientes do historico via client_names
+                                        // Historical: count new clients from client_names comparison
                                         let newClientsCount = 0;
                                         const curNames = new Set((apiEntry.client_names || []).map((c: any) => c.name));
                                         if (i > 0) {
@@ -2054,13 +2058,10 @@ export default function Assumptions() {
                                         } else {
                                           newClientsCount = apiEntry.client_count;
                                         }
-                                        const incremental = newClientsCount * monthTicket;
-                                        receitaBase.push(base);
-                                        revenueChurnArr.push(revChurn);
-                                        receitaIncremental.push(incremental);
-                                        receitaTotal.push(totalRev);
+                                        incremento.push(newClientsCount * monthTicket);
                                       } else {
-                                        // Projected (or hist without API revenue) — use formula
+                                        // Projected: stored new clients or engine-derived
+                                        const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
                                         let prevClients = 0;
                                         if (i > 0) {
                                           const prevPeriod = toPeriod(selectedYear, i - 1);
@@ -2068,17 +2069,9 @@ export default function Assumptions() {
                                           prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
                                         } else if (prevDecApi) {
                                           prevClients = prevDecApi.client_count;
-                                        } else if (prevYrMonthlyRev) {
-                                          prevClients = Math.round(prevYrMonthlyRev[11]);
+                                        } else if (prevYrMonthly) {
+                                          prevClients = Math.round(prevYrMonthly[11]);
                                         }
-                                        // Opcao B: Base usa ticket do mes ANTERIOR
-                                        const prevTkProj = i > 0
-                                          ? (data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? ticketVal)
-                                          : (selectedYear > 2025 ? (data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
-                                        const base = prevClients * prevTkProj;
-
-                                        // New clients for incremental
-                                        const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
                                         let newClients = 0;
                                         if (storedNew !== null && storedNew !== undefined) {
                                           newClients = storedNew;
@@ -2088,49 +2081,94 @@ export default function Assumptions() {
                                           const churned = Math.round(prevClients * churnRate);
                                           newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
                                         }
-                                        const incremental = newClients * monthTicket;
+                                        incremento.push(newClients * monthTicket);
+                                      }
 
-                                        // Revenue churn
-                                        const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                        const churnedClients = Math.round(prevClients * churnRate);
+                                      // ── Line 3: Revenue Churn = Churned × Ticket(m-1) ──
+                                      if (churnApplicable) {
                                         const prevTk = i > 0
                                           ? (data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? ticketVal)
                                           : (selectedYear > 2025 ? (data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
-                                        const revChurn = churnedClients * prevTk;
 
-                                        receitaBase.push(base);
-                                        revenueChurnArr.push(revChurn);
-                                        receitaIncremental.push(incremental);
-                                        receitaTotal.push(base - revChurn + incremental);
+                                        if (hist && apiEntry?.client_names) {
+                                          let prevPeriodRC: string;
+                                          if (i > 0) {
+                                            prevPeriodRC = toPeriod(selectedYear, i - 1);
+                                          } else {
+                                            prevPeriodRC = toPeriod((selectedYear - 1) as Year, 11);
+                                          }
+                                          const prevEntry = historicalData[prodKey]?.[prevPeriodRC];
+                                          if (prevEntry?.client_names) {
+                                            const curNameSet = new Set(apiEntry.client_names.map((c: any) => c.name));
+                                            const churned = prevEntry.client_names.filter((c: any) => !curNameSet.has(c.name));
+                                            revenueChurnArr.push(churned.reduce((sum: number, c: any) => sum + (c.value || 0), 0));
+                                          } else {
+                                            const churnedCount = apiEntry.churned_clients ?? 0;
+                                            revenueChurnArr.push(churnedCount * prevTk);
+                                          }
+                                        } else if (hist && apiEntry) {
+                                          const avgTk = apiEntry.avg_ticket || prevTk;
+                                          revenueChurnArr.push((apiEntry.churned_clients ?? 0) * avgTk);
+                                        } else {
+                                          // Projected: logo_churn × ticket(m-1)
+                                          let prevClients = 0;
+                                          if (i > 0) {
+                                            const prevPeriod = toPeriod(selectedYear, i - 1);
+                                            const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
+                                            prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
+                                          } else if (prevDecApi) {
+                                            prevClients = prevDecApi.client_count;
+                                          } else if (prevYrMonthly) {
+                                            prevClients = Math.round(prevYrMonthly[11]);
+                                          }
+                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                          const logoChurn = Math.round(prevClients * churnRate);
+                                          revenueChurnArr.push(logoChurn * prevTk);
+                                        }
+                                      } else {
+                                        revenueChurnArr.push(0);
+                                      }
+
+                                      // ── Line 4: Faturamento Total = Base + Incremento - Revenue Churn ──
+                                      if (hist && apiEntry && apiEntry.total_revenue > 0) {
+                                        // Historical: use real API total_revenue
+                                        faturamentoTotal.push(apiEntry.total_revenue);
+                                      } else {
+                                        // Projected: formula
+                                        faturamentoTotal.push(faturamentoBase[i] + incremento[i] - revenueChurnArr[i]);
                                       }
                                     }
 
+                                    const totalRevenueChurn = revenueChurnArr.reduce((s, v) => s + v, 0);
+                                    const totalRevYear = faturamentoTotal.reduce((s, v) => s + v, 0);
+                                    const revenueChurnRateAnnual = totalRevYear > 0 ? (totalRevenueChurn / totalRevYear) * 100 : 0;
+
                                     return (
                                       <>
-                                        {/* ── 1. Receita Base (read-only, neutral) ── */}
+                                        {/* ── 1. Faturamento Base (read-only, gray) ── */}
                                         <div className="space-y-2 pt-1">
-                                          <p className="text-xs font-semibold text-muted-foreground">Receita Base (MRR) — {selectedYear}</p>
+                                          <p className="text-xs font-semibold text-muted-foreground">Faturamento Base — {selectedYear}</p>
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
                                               return (
                                                 <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-secondary/20 border border-border/50'}`}>
-                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' \uD83D\uDD12' : ''}</p>
                                                   <span className="block w-full text-center text-xs tabular-nums font-medium text-muted-foreground">
-                                                    {formatCurrencyFull(receitaBase[i])}
+                                                    {formatCurrencyFull(faturamentoBase[i])}
                                                   </span>
                                                 </div>
                                               );
                                             })}
                                           </div>
                                           <div className="flex items-center gap-6 text-xs">
-                                            <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(receitaBase.reduce((s, v) => s + v, 0))}</strong></span>
+                                            <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(faturamentoBase.reduce((s, v) => s + v, 0))}</strong></span>
                                           </div>
                                         </div>
 
-                                        {/* ── 2. Receita Incremental (editable for projected, green) ── */}
+                                        {/* ── 2. Incremento (editable for projected, green, drill-down for historical) ── */}
                                         <div className="space-y-2 pt-1">
-                                          <p className="text-xs font-semibold text-emerald-600">Receita Incremental — {selectedYear}</p>
+                                          <p className="text-xs font-semibold text-emerald-600">Incremento — {selectedYear}</p>
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
@@ -2155,17 +2193,17 @@ export default function Assumptions() {
                                                   <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' \uD83D\uDD12' : ''}</p>
                                                   {hist ? (
                                                     <span className="block w-full text-center text-xs tabular-nums font-medium text-emerald-700 dark:text-emerald-400">
-                                                      {formatCurrencyFull(receitaIncremental[i])}
+                                                      {formatCurrencyFull(incremento[i])}
                                                     </span>
                                                   ) : (
                                                     <CurrencyInput
-                                                      value={Math.round(receitaIncremental[i])}
+                                                      value={Math.round(incremento[i])}
                                                       disabled={prodKey === 'saasSetup'}
                                                       className="text-emerald-700 dark:text-emerald-400 !text-xs !text-center !px-0.5 !py-0 !border-emerald-200/30"
                                                       onChange={v => {
                                                         // Back-calculate implied new clients from incremental revenue
-                                                        const monthTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
-                                                        const impliedNew = monthTicket > 0 ? Math.round(v / monthTicket) : 0;
+                                                        const mTicket = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? ticketVal;
+                                                        const impliedNew = mTicket > 0 ? Math.round(v / mTicket) : 0;
                                                         handleClientChange(prodKey as SubProductKey, selectedYear, i, impliedNew);
                                                       }}
                                                     />
@@ -2180,7 +2218,7 @@ export default function Assumptions() {
                                             })}
                                           </div>
 
-                                          {/* Expanded new clients details panel — below Receita Incremental grid */}
+                                          {/* Expanded new clients details panel — below Incremento grid */}
                                           {expandedRevenueMonth?.startsWith(`${prodKey}::`) && (() => {
                                             const expandedRevPeriod = expandedRevenueMonth.split('::')[1];
                                             const expandedRevMonthIdx = parseInt(expandedRevPeriod.split('-')[1], 10) - 1;
@@ -2237,155 +2275,81 @@ export default function Assumptions() {
                                           })()}
 
                                           <div className="flex items-center gap-6 text-xs">
-                                            <span className="text-emerald-600">Total ano: <strong>{formatCurrencyFull(receitaIncremental.reduce((s, v) => s + v, 0))}</strong></span>
+                                            <span className="text-emerald-600">Total ano: <strong>{formatCurrencyFull(incremento.reduce((s, v) => s + v, 0))}</strong></span>
                                           </div>
                                         </div>
 
-                                        {/* ── 3. Receita Total (read-only, bold) ── */}
+                                        {/* ── 3. Revenue Churn (read-only, red) ── */}
+                                        {churnApplicable && (
+                                          <div className="space-y-2 pt-2">
+                                            <div className="space-y-1.5">
+                                              <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Revenue Churn — {selectedYear}</p>
+                                              <div className="grid grid-cols-12 gap-1.5">
+                                                {MONTHS.map((m, i) => {
+                                                  const hist = isHistorical(selectedYear, i);
+                                                  const hcChurnPeriod = toPeriod(selectedYear, i);
+                                                  const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
+                                                  const revVal = revenueChurnArr[i];
+
+                                                  return (
+                                                    <div
+                                                      key={m}
+                                                      className={`text-center p-1.5 rounded transition-all ${
+                                                        hist
+                                                          ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50'
+                                                          : 'bg-red-50/50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 border-dashed'
+                                                      }`}
+                                                    >
+                                                      <p className="text-[9px] text-muted-foreground font-medium leading-tight">
+                                                        {m}
+                                                        {hist && <span className="ml-0.5 opacity-60">{'\uD83D\uDD12'}</span>}
+                                                        {hcChurnEntry && <span className="ml-0.5 text-[7px] text-sky-500 font-bold" title="Dado real da API">API</span>}
+                                                      </p>
+                                                      <span className={`block text-xs tabular-nums font-bold mt-0.5 leading-tight ${hcChurnEntry ? 'text-sky-600' : 'text-red-600 dark:text-red-400'}`}>
+                                                        {revVal > 0
+                                                          ? formatCurrency(revVal)
+                                                          : '\u2014'}
+                                                      </span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+
+                                            {/* ── Revenue Churn Summary ── */}
+                                            <div className="flex flex-wrap items-center gap-3 text-xs pt-1 border-t border-red-200/50 dark:border-red-900/30 mt-1">
+                                              <span className="text-red-600 dark:text-red-400">
+                                                Revenue Churn: <strong>{formatCurrency(totalRevenueChurn)}</strong>
+                                                <span className="text-[10px] opacity-70 ml-0.5">({revenueChurnRateAnnual.toFixed(1)}% a.a.)</span>
+                                              </span>
+                                            </div>
+                                          </div>
+                                        )}
+
+                                        {/* ── 4. Faturamento Total (read-only, bold) ── */}
                                         <div className="space-y-2 pt-1">
-                                          <p className="text-xs font-bold text-foreground">Receita Total — {selectedYear}</p>
+                                          <p className="text-xs font-bold text-foreground">Faturamento Total — {selectedYear}</p>
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
                                               return (
                                                 <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40 opacity-60' : 'bg-accent/20 border border-accent/30'}`}>
-                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}</p>
+                                                  <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' \uD83D\uDD12' : ''}</p>
                                                   <span className="block w-full text-center text-xs tabular-nums font-bold text-foreground">
-                                                    {formatCurrencyFull(receitaTotal[i])}
+                                                    {formatCurrencyFull(faturamentoTotal[i])}
                                                   </span>
                                                 </div>
                                               );
                                             })}
                                           </div>
                                           <div className="flex items-center gap-6 text-xs">
-                                            <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(receitaTotal.reduce((s, v) => s + v, 0))}</strong></span>
+                                            <span className="text-muted-foreground">Total ano: <strong className="text-foreground">{formatCurrencyFull(totalRevYear)}</strong></span>
                                             {hcIsMrr && (
-                                              <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(receitaTotal[11])}</strong></span>
+                                              <span className="text-muted-foreground">MRR Dez: <strong className="text-foreground">{formatCurrencyFull(faturamentoTotal[11])}</strong></span>
                                             )}
                                           </div>
                                         </div>
                                       </>
-                                    );
-                                  })()}
-
-                                  {/* ─── Revenue Churn Section ─── */}
-                                  {(() => {
-                                    const anyHcEntryRC = Object.values(historicalData[prodKey] ?? {})[0];
-                                    const isProductNonMrrRC = anyHcEntryRC ? !anyHcEntryRC.is_mrr : false;
-
-                                    if (isProductNonMrrRC || data.churnNotApplicable?.[prodKey]) return null;
-
-                                    // ── Compute Revenue Churn for each month ──
-                                    const revenueChurnMonthlyRC: number[] = [];
-
-                                    for (let i = 0; i < 12; i++) {
-                                      const period = toPeriod(selectedYear, i);
-                                      const hist = isHistorical(selectedYear, i);
-
-                                      const hcChurnEntry = hist ? historicalData[prodKey]?.[period] : undefined;
-                                      const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
-                                      const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
-                                      const churnRate = hcChurnEntry
-                                          ? hcChurnEntry.churn_rate / 100 / 12
-                                          : (hasManualChurn
-                                            ? storedArr[i] / 100 / 12
-                                            : (hist
-                                              ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
-                                              : getChurnForMonth(prodKey, data, selectedYear, i)));
-
-                                      let prevPeriodRC: string;
-                                      if (i > 0) {
-                                        prevPeriodRC = toPeriod(selectedYear, i - 1);
-                                      } else {
-                                        const prevYr = (selectedYear - 1) as Year;
-                                        prevPeriodRC = toPeriod(prevYr, 11);
-                                      }
-
-                                      const curEntry = historicalData[prodKey]?.[period];
-                                      const prevEntry = historicalData[prodKey]?.[prevPeriodRC];
-
-                                      if (hist && curEntry?.client_names && prevEntry?.client_names) {
-                                        const curNameSet = new Set(curEntry.client_names.map(c => c.name));
-                                        const churned = prevEntry.client_names.filter(c => !curNameSet.has(c.name));
-                                        revenueChurnMonthlyRC.push(churned.reduce((sum, c) => sum + (c.value || 0), 0));
-                                      } else if (hist && curEntry) {
-                                        const avgTk = curEntry.avg_ticket || (data.tickets[prodKey as TicketKey] ?? 0);
-                                        revenueChurnMonthlyRC.push((curEntry.churned_clients ?? 0) * avgTk);
-                                      } else {
-                                        const prevClients = i === 0
-                                          ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
-                                          : monthly[i - 1];
-                                        const logoChurnRC = Math.round(prevClients * churnRate);
-                                        const tk = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i] ?? (data.tickets[prodKey as TicketKey] ?? 0);
-                                        revenueChurnMonthlyRC.push(logoChurnRC * tk);
-                                      }
-                                    }
-
-                                    const totalRevenueChurnRC = revenueChurnMonthlyRC.reduce((s, v) => s + v, 0);
-                                    const totalRevYearRC = getAnnualRevenue(prodKey, selectedYear);
-                                    const revenueChurnRateAnnualRC = totalRevYearRC > 0 ? (totalRevenueChurnRC / totalRevYearRC) * 100 : 0;
-
-                                    // Compute per-month revenue churn rate %
-                                    const revenueChurnPctMonthlyRC: number[] = [];
-                                    for (let i = 0; i < 12; i++) {
-                                      let prevMonthRevenue = 0;
-                                      if (i > 0) {
-                                        const prevTk = data.monthlyTickets?.[prodKey]?.[selectedYear]?.[i - 1] ?? (data.tickets[prodKey as TicketKey] ?? 0);
-                                        prevMonthRevenue = monthly[i - 1] * prevTk;
-                                      } else if (selectedYear > 2025) {
-                                        const prevYrClients = getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                        const prevTk = data.monthlyTickets?.[prodKey]?.[(selectedYear - 1) as Year]?.[11] ?? (data.tickets[prodKey as TicketKey] ?? 0);
-                                        prevMonthRevenue = Math.round(prevYrClients[11]) * prevTk;
-                                      }
-                                      revenueChurnPctMonthlyRC.push(prevMonthRevenue > 0 ? Math.round((revenueChurnMonthlyRC[i] / prevMonthRevenue) * 100 * 10) / 10 : 0);
-                                    }
-
-                                    return (
-                                      <div className="space-y-2 pt-2">
-                                        {/* ═══ Revenue Churn Grid ═══ */}
-                                        <div className="space-y-1.5">
-                                          <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Revenue Churn — {selectedYear}</p>
-                                          <div className="grid grid-cols-12 gap-1.5">
-                                            {MONTHS.map((m, i) => {
-                                              const hist = isHistorical(selectedYear, i);
-                                              const hcChurnPeriod = toPeriod(selectedYear, i);
-                                              const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
-                                              const revVal = revenueChurnMonthlyRC[i];
-                                              const revPct = revenueChurnPctMonthlyRC[i];
-
-                                              return (
-                                                <div
-                                                  key={m}
-                                                  className={`text-center p-1.5 rounded transition-all ${
-                                                    hist
-                                                      ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50'
-                                                      : 'bg-red-50/50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 border-dashed'
-                                                  }`}
-                                                >
-                                                  <p className="text-[9px] text-muted-foreground font-medium leading-tight">
-                                                    {m}
-                                                    {hist && <span className="ml-0.5 opacity-60">{'\uD83D\uDD12'}</span>}
-                                                    {hcChurnEntry && <span className="ml-0.5 text-[7px] text-sky-500 font-bold" title="Dado real da API">API</span>}
-                                                  </p>
-                                                  <span className={`block text-xs tabular-nums font-bold mt-0.5 leading-tight ${hcChurnEntry ? 'text-sky-600' : 'text-red-600 dark:text-red-400'}`}>
-                                                    {revVal > 0
-                                                      ? <>{formatCurrency(revVal)} <span className="text-[9px] font-normal text-muted-foreground">({revPct}%)</span></>
-                                                      : '\u2014'}
-                                                  </span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-
-                                        {/* ── Revenue Churn Summary ── */}
-                                        <div className="flex flex-wrap items-center gap-3 text-xs pt-1 border-t border-red-200/50 dark:border-red-900/30 mt-1">
-                                          <span className="text-red-600 dark:text-red-400">
-                                            Revenue: <strong>{formatCurrency(totalRevenueChurnRC)}</strong>
-                                            <span className="text-[10px] opacity-70 ml-0.5">({revenueChurnRateAnnualRC.toFixed(1)}% a.a.)</span>
-                                          </span>
-                                        </div>
-                                      </div>
                                     );
                                   })()}
 
