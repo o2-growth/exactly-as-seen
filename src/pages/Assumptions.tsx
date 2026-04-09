@@ -2110,10 +2110,32 @@ export default function Assumptions() {
                                       } else {
                                         // ── Projected / fallback months ──
 
+                                        // Compute newClients (shared by MRR and non-MRR paths)
+                                        const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
+                                        let prevClients = 0;
+                                        if (i > 0) {
+                                          const prevPeriod = toPeriod(selectedYear, i - 1);
+                                          const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
+                                          prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
+                                        } else if (prevDecApi) {
+                                          prevClients = prevDecApi.client_count;
+                                        } else if (prevYrMonthly) {
+                                          prevClients = Math.round(prevYrMonthly[11]);
+                                        }
+                                        let newClients = 0;
+                                        if (storedNew !== null && storedNew !== undefined) {
+                                          newClients = storedNew;
+                                        } else {
+                                          const activeCur = monthly[i];
+                                          const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
+                                          const churned = Math.round(prevClients * churnRate);
+                                          newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
+                                        }
+
                                         if (isProductNonMrr) {
-                                          // Non-MRR: no base accumulation, revenue = clients × ticket
+                                          // Non-MRR: revenue = only NEW clients × ticket (no base)
                                           faturamentoBase.push(0);
-                                          const monthRevenue = Math.round(monthly[i]) * monthTicket;
+                                          const monthRevenue = newClients * monthTicket;
                                           incremento.push(monthRevenue);
                                           revenueChurnArr.push(0);
                                           if (hist && apiEntry && apiEntry.total_revenue > 0) {
@@ -2130,26 +2152,6 @@ export default function Assumptions() {
                                           }
 
                                           // Line 2: Incremento = new clients × ticket
-                                          const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
-                                          let prevClients = 0;
-                                          if (i > 0) {
-                                            const prevPeriod = toPeriod(selectedYear, i - 1);
-                                            const prevApi = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[prevPeriod] : undefined;
-                                            prevClients = prevApi ? prevApi.client_count : monthly[i - 1];
-                                          } else if (prevDecApi) {
-                                            prevClients = prevDecApi.client_count;
-                                          } else if (prevYrMonthly) {
-                                            prevClients = Math.round(prevYrMonthly[11]);
-                                          }
-                                          let newClients = 0;
-                                          if (storedNew !== null && storedNew !== undefined) {
-                                            newClients = storedNew;
-                                          } else {
-                                            const activeCur = monthly[i];
-                                            const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                            const churned = Math.round(prevClients * churnRate);
-                                            newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
-                                          }
                                           incremento.push(newClients * monthTicket);
 
                                           // Line 3: Revenue Churn = churned clients × previous ticket
