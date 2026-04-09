@@ -25,6 +25,7 @@ function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: n
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr } from '@/lib/financialData';
+import { TAX_PREMISES, type TaxPremise } from '@/data/taxPremises';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
@@ -2644,6 +2645,31 @@ export default function Assumptions() {
 
 
 
+          {/* Constantes Globais — Lucro Presumido */}
+          <div className="gradient-card p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Landmark className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Constantes Globais — Lucro Presumido</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {[
+                { label: 'IRPJ alíquota base', value: '15%' },
+                { label: 'CSLL alíquota base', value: '9%' },
+                { label: 'AD.IRPJ alíquota', value: '10%' },
+                { label: 'Limite isenção AD/mês', value: 'R$ 20.000' },
+                { label: 'Base presumida', value: '32%' },
+              ].map(c => (
+                <div key={c.label} className="kpi-card text-center py-2">
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider">{c.label}</p>
+                  <p className="text-lg font-bold text-foreground">{c.value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-muted-foreground">
+              <span className="font-semibold text-foreground">AD.IRPJ:</span> Adicional de 10% sobre a base presumida IRPJ que exceder R$ 20.000/mês — calculado globalmente sobre o consolidado da empresa, não por subcategoria.
+            </div>
+          </div>
+
           {/* Matriz por Categoria */}
           {(() => {
             const TAX_CATEGORIES: { id: string; label: string; keys: FinTicketKey[] }[] = [
@@ -2654,6 +2680,10 @@ export default function Assumptions() {
               { id: 'tax', label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
             ];
             // Each row: { label, field (if editable), computed (if calculated) }
+            // Lucro Presumido: base 32%/32% para todos os produtos (serviço)
+            // IRPJ base: 15%, CSLL base: 9%, Adicional IRPJ: 10% (sobre excedente R$20k/mês)
+            const PRES_IRPJ = 0.32;
+            const PRES_CSLL = 0.32;
             const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
               { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
               { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
@@ -2663,13 +2693,13 @@ export default function Assumptions() {
               { label: '2.06  ICMS (%)', field: 'icms' },
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
-              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100 },
-              { label: 'Adicional de IRPJ (% máx)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100 },
-              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100 },
+              { label: `Pres. IRPJ (${(PRES_IRPJ * 100).toFixed(0)}% × 15%)`, computed: () => PRES_IRPJ * 0.15 * 100 },
+              { label: `AD.IRPJ (${(PRES_IRPJ * 100).toFixed(0)}% × 10%)`, computed: () => PRES_IRPJ * 0.10 * 100 },
+              { label: `Pres. CSLL (${(PRES_CSLL * 100).toFixed(0)}% × 9%)`, computed: () => PRES_CSLL * 0.09 * 100 },
               { label: 'TOTAL efetivo (%)', computed: (cfg) => {
-                const irpj = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.15 * 100;
-                const adicional = (cfg.tipoReceita === 'servico' ? 0.32 : 0.08) * 0.10 * 100;
-                const csll = (cfg.tipoReceita === 'servico' ? 0.32 : 0.12) * 0.09 * 100;
+                const irpj = PRES_IRPJ * 0.15 * 100;
+                const adicional = PRES_IRPJ * 0.10 * 100;
+                const csll = PRES_CSLL * 0.09 * 100;
                 return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + adicional + csll;
               }, isTotal: true },
             ];
@@ -2681,6 +2711,20 @@ export default function Assumptions() {
               baas: 'Oxy Hacker', baasFranquia: 'Franquia', baasMasterFranquia: 'Master Franquia',
               taxAT: 'AT', taxGPT: 'GPT', taxRCT: 'RCT', taxRT: 'RT', taxDTC: 'DTC',
             };
+
+            // Map TicketKey → TAX_PREMISES key for audit tooltips
+            const premiseKeyMap: Record<string, string> = {
+              caasAssessoria: 'CaaS/Serviços Especializados', caasEnterprise: 'CaaS/Enterprise', caasCorporate: 'CaaS/Corporate',
+              caasParceiros: 'CaaS/Parceiros', caasSetup: 'CaaS/BPO Financeiro',
+              saasOxy: 'SaaS/Oxy', saasOxyGenio: 'SaaS/Oxy + Gênio', saasSetup: 'SaaS/Setup',
+              saasParceiros: 'SaaS/Parceiros', saasOxyGenioEsp: 'SaaS/Oxy + Gênio + Especialista',
+              educationDonoCFO: 'Education/Dono CFO', educationEN: 'Education/Engenheiro de Negócios',
+              educationFR: 'Education/Financeiro Raiz', educationFSP: 'Education/Finance Sales Program',
+              baas: 'Expansão/Oxy Hacker - Micro Franqueado', baasFranquia: 'Expansão/Franquia', baasMasterFranquia: 'Expansão/Master Franquia',
+              taxAT: 'Tax/Assessoria Tributária', taxGPT: 'Tax/Gestão Passivo Tributário',
+              taxRCT: 'Tax/Recuperação Crédito Tributário', taxRT: 'Tax/Reforma Tributária', taxDTC: 'Tax/Diagnóstico Tributário & Compliance',
+            };
+            const getPremise = (k: string): TaxPremise | null => TAX_PREMISES[premiseKeyMap[k]] ?? null;
 
             const getConfig = (key: FinTicketKey): SubProductTaxConfig => {
               return getSubProductTaxRate(key, data as AssumptionsType);
@@ -2733,11 +2777,17 @@ export default function Assumptions() {
                       <thead>
                         <tr className="border-b border-border/50">
                           <th className="text-left py-2 px-3 font-medium text-muted-foreground min-w-[140px]">Dedução</th>
-                          {cat.keys.map(k => (
-                            <th key={k} className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap">
-                              {fullLabels[k] ?? k}
-                            </th>
-                          ))}
+                          {cat.keys.map(k => {
+                            const premise = getPremise(k);
+                            return (
+                              <th key={k} className="text-center py-2 px-2 font-medium text-muted-foreground whitespace-nowrap group relative">
+                                <span className="cursor-help" title={premise ? `${premise.perfilAplicado} | Total: ${(premise.totalEfetivo * 100).toFixed(2)}% | ${premise.baseLegal}` : ''}>
+                                  {fullLabels[k] ?? k}
+                                  {premise && <span className="ml-1 text-[9px] text-primary opacity-60">i</span>}
+                                </span>
+                              </th>
+                            );
+                          })}
                         </tr>
                       </thead>
                       <tbody>
@@ -2789,7 +2839,7 @@ export default function Assumptions() {
                 ))}
                 <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>Deduções (PIS + COFINS + ISS) abatidas da Receita Bruta. IRPJ + CSLL incidem sobre a base presumida: CaaS e Setup → 8%/12% (produto, ISS 0%); MRR SaaS (assinaturas) → 32% (serviço, ISS 2,9%); Education e Tax → 32% (serviço, ISS 5%); Expansão → mix 80/20: 80% produto (8%/12%) + 20% serviço (32%), ISS 1%. Tributos sempre incidem, independente de lucro ou prejuízo (Lucro Presumido).</span>
+                  <span>Lucro Presumido — base 32% para IRPJ e CSLL (todos os produtos = serviço). Deduções sobre Receita Bruta: PIS 0,65% + COFINS 3% + ISS (SaaS 2,9% | Education 2% | demais 5%). IRPJ efetivo = 32% × 15% = 4,80%. CSLL efetivo = 32% × 9% = 2,88%. AD.IRPJ = 10% sobre base presumida excedente a R$20.000/mês (calculado globalmente). Tributos incidem independente de lucro ou prejuízo.</span>
                 </div>
               </div>
             );

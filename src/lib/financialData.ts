@@ -190,29 +190,20 @@ export function isProductMrr(key: TicketKey): boolean {
 }
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
-  const isExpansao = EXPANSAO_KEYS.includes(key);
-  const isSetup = key === 'caasSetup' || key === 'saasSetup';
-  const isCaas = CAAS_KEYS.includes(key);
-  const isSaasSubscription = ['saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp', 'saasParceiros'].includes(key);
+  // Lucro Presumido — todas as subcategorias usam base 32%/32%
+  // ISS varia por categoria:
+  //   SaaS: 2,9% (regime especial tech POA)
+  //   Education: 2% (educação POA)
+  //   CaaS, Tax, Expansão: 5% (serviço padrão)
+  const isSaas = SAAS_KEYS.includes(key);
+  const isEducation = EDUCATION_KEYS.includes(key);
 
-  // MRR SaaS (assinaturas recorrentes) → mrr_saas: base 32%/32%, ISS 2,9%
-  // CaaS + Setup → produto_saas: base 8%/12%, ISS 0%
-  // Expansão → expansao_misto: 80% produto + 20% serviço, ISS reduzido
-  // Education, Tax → servico: base 32%/32%, ISS 5%
-  let tipoReceita: string;
   let iss: number;
-
-  if (isSaasSubscription) {
-    tipoReceita = 'mrr_saas';
+  if (isSaas) {
     iss = 2.9;
-  } else if (isCaas || isSetup) {
-    tipoReceita = 'produto_saas';
-    iss = 0;
-  } else if (isExpansao) {
-    tipoReceita = 'expansao_misto';
-    iss = 1.0;
+  } else if (isEducation) {
+    iss = 2.0;
   } else {
-    tipoReceita = 'servico';
     iss = 5.0;
   }
 
@@ -220,7 +211,7 @@ export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConf
     pis: 0.65, cofins: 3.0,
     iss,
     csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
-    tipoReceita,
+    tipoReceita: 'servico',
   };
 }
 
