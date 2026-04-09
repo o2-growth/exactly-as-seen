@@ -2036,7 +2036,24 @@ export default function Assumptions() {
                                         const base = prevClients * prevTk;
                                         const churned = apiEntry.churned_clients ?? 0;
                                         const revChurn = churned * prevTk;
-                                        const incremental = totalRev - base + revChurn;
+                                        // Receita Incremental = Novos Clientes × Ticket do mes
+                                        // Calcular novos clientes do historico via client_names
+                                        let newClientsCount = 0;
+                                        const curNames = new Set((apiEntry.client_names || []).map((c: any) => c.name));
+                                        if (i > 0) {
+                                          const prevPeriodN = toPeriod(selectedYear, i - 1);
+                                          const prevApiN = historicalData[prodKey]?.[prevPeriodN];
+                                          const prevNames = new Set((prevApiN?.client_names || []).map((c: any) => c.name));
+                                          newClientsCount = [...curNames].filter(n => !prevNames.has(n)).length;
+                                        } else if (selectedYear > 2025) {
+                                          const decPrevPeriod = toPeriod((selectedYear - 1) as Year, 11);
+                                          const decPrevApi = historicalData[prodKey]?.[decPrevPeriod];
+                                          const prevNames = new Set((decPrevApi?.client_names || []).map((c: any) => c.name));
+                                          newClientsCount = [...curNames].filter(n => !prevNames.has(n)).length;
+                                        } else {
+                                          newClientsCount = apiEntry.client_count;
+                                        }
+                                        const incremental = newClientsCount * monthTicket;
                                         receitaBase.push(base);
                                         revenueChurnArr.push(revChurn);
                                         receitaIncremental.push(incremental);
