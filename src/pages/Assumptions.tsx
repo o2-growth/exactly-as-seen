@@ -394,6 +394,7 @@ export default function Assumptions() {
   const [rowChurnPct, setRowChurnPct] = useState<Record<string, number>>(() => assumptions.rowChurnPct ?? {});
   const [expandedChurnMonth, setExpandedChurnMonth] = useState<string | null>(null);
   const [expandedRevenueMonth, setExpandedRevenueMonth] = useState<string | null>(null);
+  const [expandedRevChurnMonth, setExpandedRevChurnMonth] = useState<string | null>(null);
   // Sync local state from assumptions on mount (after async load)
   const initialSyncDone = React.useRef(false);
   React.useEffect(() => {
@@ -2293,7 +2294,7 @@ export default function Assumptions() {
                                           </div>
                                         </div>
 
-                                        {/* ── 3. Revenue Churn (read-only, red) ── */}
+                                        {/* ── 3. Revenue Churn (read-only, red, click-to-expand drill-down) ── */}
                                         {churnApplicable && (
                                           <div className="space-y-2 pt-2">
                                             <div className="space-y-1.5">
@@ -2304,6 +2305,9 @@ export default function Assumptions() {
                                                   const hcChurnPeriod = toPeriod(selectedYear, i);
                                                   const hcChurnEntry = hist ? historicalData[prodKey]?.[hcChurnPeriod] : undefined;
                                                   const revVal = revenueChurnArr[i];
+                                                  const rcMonthKey = `${prodKey}::${hcChurnPeriod}`;
+                                                  const rcHasClientNames = hcChurnEntry?.client_names && hcChurnEntry.client_names.length > 0;
+                                                  const isRcExpanded = expandedRevChurnMonth === rcMonthKey;
 
                                                   return (
                                                     <div
@@ -2312,7 +2316,11 @@ export default function Assumptions() {
                                                         hist
                                                           ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50'
                                                           : 'bg-red-50/50 dark:bg-red-950/15 border border-red-100 dark:border-red-900/30 border-dashed'
-                                                      }`}
+                                                      } ${isRcExpanded ? 'ring-2 ring-red-400' : ''} ${rcHasClientNames ? 'cursor-pointer hover:ring-1 hover:ring-red-300' : ''}`}
+                                                      onClick={rcHasClientNames ? (e) => {
+                                                        e.stopPropagation();
+                                                        setExpandedRevChurnMonth(prev => prev === rcMonthKey ? null : rcMonthKey);
+                                                      } : undefined}
                                                     >
                                                       <p className="text-[9px] text-muted-foreground font-medium leading-tight">
                                                         {m}
@@ -2324,10 +2332,127 @@ export default function Assumptions() {
                                                           ? formatCurrency(revVal)
                                                           : '\u2014'}
                                                       </span>
+                                                      {rcHasClientNames && (
+                                                        <span className="block text-[7px] text-red-400 mt-0.5 leading-tight">
+                                                          {isRcExpanded ? '\u25B2 detalhes' : '\u25BC detalhes'}
+                                                        </span>
+                                                      )}
                                                     </div>
                                                   );
                                                 })}
                                               </div>
+
+                                              {/* Expanded Revenue Churn details panel — below Revenue Churn grid */}
+                                              {expandedRevChurnMonth?.startsWith(`${prodKey}::`) && (() => {
+                                                const rcExpandedPeriod = expandedRevChurnMonth.split('::')[1];
+                                                const rcExpandedMonthIdx = parseInt(rcExpandedPeriod.split('-')[1], 10) - 1;
+                                                const rcExpandedMonthName = MONTHS[rcExpandedMonthIdx] ?? rcExpandedPeriod;
+                                                const rcCurEntry = historicalData[prodKey]?.[rcExpandedPeriod];
+                                                const rcCurNames = rcCurEntry?.client_names ?? [];
+
+                                                let rcPrevPeriod: string;
+                                                if (rcExpandedMonthIdx > 0) {
+                                                  rcPrevPeriod = toPeriod(selectedYear, rcExpandedMonthIdx - 1);
+                                                } else {
+                                                  const rcPrevYr = (selectedYear - 1) as Year;
+                                                  rcPrevPeriod = toPeriod(rcPrevYr, 11);
+                                                }
+                                                const rcPrevEntry = historicalData[prodKey]?.[rcPrevPeriod];
+                                                const rcPrevNames = rcPrevEntry?.client_names ?? [];
+
+                                                const rcCurNameMap = new Map(rcCurNames.map(c => [c.name, c.value]));
+                                                const rcPrevNameMap = new Map(rcPrevNames.map(c => [c.name, c.value]));
+
+                                                // Churned: in M-1 but NOT in M
+                                                const rcChurnedClients = rcPrevNames.filter(c => !rcCurNameMap.has(c.name));
+                                                const rcChurnedTotal = rcChurnedClients.reduce((sum, c) => sum + (c.value || 0), 0);
+
+                                                // Downsell: in both M-1 and M, but M value < M-1 value
+                                                const rcDownsellClients: { name: string; prevValue: number; curValue: number; diff: number }[] = [];
+                                                for (const prev of rcPrevNames) {
+                                                  if (rcCurNameMap.has(prev.name)) {
+                                                    const curVal = rcCurNameMap.get(prev.name) ?? 0;
+                                                    if (curVal < prev.value) {
+                                                      rcDownsellClients.push({
+                                                        name: prev.name,
+                                                        prevValue: prev.value,
+                                                        curValue: curVal,
+                                                        diff: prev.value - curVal,
+                                                      });
+                                                    }
+                                                  }
+                                                }
+                                                const rcDownsellTotal = rcDownsellClients.reduce((sum, c) => sum + c.diff, 0);
+                                                const rcGrandTotal = rcChurnedTotal + rcDownsellTotal;
+
+                                                return (
+                                                  <div className="mt-2 p-3 rounded border border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800 text-xs">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                      <span className="font-semibold text-red-700 dark:text-red-300">
+                                                        Revenue Churn — {rcExpandedMonthName}/{selectedYear}
+                                                      </span>
+                                                      <button
+                                                        className="text-[10px] text-muted-foreground hover:text-foreground"
+                                                        onClick={(e) => { e.stopPropagation(); setExpandedRevChurnMonth(null); }}
+                                                      >
+                                                        fechar
+                                                      </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                      {/* Section 1: Churned (sairam) */}
+                                                      <div>
+                                                        <p className="font-semibold text-red-600 dark:text-red-400 mb-1">
+                                                          Churned (sa{'\u00ED'}ram) — {rcChurnedClients.length} cliente{rcChurnedClients.length !== 1 ? 's' : ''}
+                                                        </p>
+                                                        {rcChurnedClients.length === 0 ? (
+                                                          <p className="text-muted-foreground italic">Nenhum churn</p>
+                                                        ) : (
+                                                          <ul className="space-y-0.5">
+                                                            {rcChurnedClients.map(c => (
+                                                              <li key={c.name} className="flex items-center gap-1">
+                                                                <span className="text-red-500">{'\u274C'}</span>
+                                                                <span>{c.name}</span>
+                                                                <span className="text-muted-foreground ml-auto">{formatCurrency(c.value)}</span>
+                                                              </li>
+                                                            ))}
+                                                          </ul>
+                                                        )}
+                                                      </div>
+                                                      {/* Section 2: Downsell (reduziram) */}
+                                                      <div>
+                                                        <p className="font-semibold text-orange-600 dark:text-orange-400 mb-1">
+                                                          Downsell (reduziram) — {rcDownsellClients.length} cliente{rcDownsellClients.length !== 1 ? 's' : ''}
+                                                        </p>
+                                                        {rcDownsellClients.length === 0 ? (
+                                                          <p className="text-muted-foreground italic">Nenhum downsell</p>
+                                                        ) : (
+                                                          <ul className="space-y-0.5">
+                                                            {rcDownsellClients.map(c => (
+                                                              <li key={c.name} className="flex items-start gap-1">
+                                                                <span className="text-orange-500 shrink-0">{'\u2B07\uFE0F'}</span>
+                                                                <span className="truncate">{c.name}</span>
+                                                                <span className="text-muted-foreground ml-auto whitespace-nowrap">
+                                                                  {formatCurrency(c.prevValue)} {'\u2192'} {formatCurrency(c.curValue)}{' '}
+                                                                  <span className="text-red-500">(-{formatCurrency(c.diff)})</span>
+                                                                </span>
+                                                              </li>
+                                                            ))}
+                                                          </ul>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                    <div className="mt-2 pt-1.5 border-t border-red-200 dark:border-red-800 flex justify-between">
+                                                      <span className="font-semibold text-red-700 dark:text-red-300">Total Revenue Churn:</span>
+                                                      <span className="font-semibold text-red-700 dark:text-red-300">{formatCurrency(rcGrandTotal)}</span>
+                                                    </div>
+                                                    {(rcChurnedClients.length > 0 && rcDownsellClients.length > 0) && (
+                                                      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                                                        <span>Churned: {formatCurrency(rcChurnedTotal)} + Downsell: {formatCurrency(rcDownsellTotal)}</span>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })()}
                                             </div>
 
                                             {/* ── Revenue Churn Summary ── */}
