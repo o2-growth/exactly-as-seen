@@ -2052,21 +2052,21 @@ export default function Assumptions() {
                                         const curNames = new Map((apiEntry.client_names || []).map((c: any) => [c.name, c.value ?? 0]));
                                         const prevNames = getPrevClientNamesMap();
 
-                                        // Faturamento Base = sum of M-1 values for clients retained in M
-                                        let baseRevenue = 0;
-                                        for (const [name, value] of prevNames) {
-                                          if (curNames.has(name)) baseRevenue += value;
+                                        // Faturamento Base = Faturamento Total do mes anterior
+                                        if (i === 0) {
+                                          faturamentoBase.push(prevMonthTotal);
+                                        } else {
+                                          faturamentoBase.push(faturamentoTotal[i - 1]);
                                         }
-                                        faturamentoBase.push(baseRevenue);
 
-                                        // Incremento = sum of M values for clients NOT in M-1 (new clients)
+                                        // Incremento = soma EXATA dos valores dos novos clientes deste mes
                                         let incrementoRevenue = 0;
                                         for (const [name, value] of curNames) {
                                           if (!prevNames.has(name)) incrementoRevenue += value;
                                         }
                                         incremento.push(incrementoRevenue);
 
-                                        // Revenue Churn = sum of M-1 values for clients NOT in M (churned)
+                                        // Revenue Churn = soma EXATA dos valores dos churned no mes anterior
                                         if (churnApplicable) {
                                           let churnRevenue = 0;
                                           for (const [name, value] of prevNames) {
