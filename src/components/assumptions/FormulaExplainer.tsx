@@ -51,6 +51,14 @@ export function FormulaExplainer({ explanation, className = '', iconSize = 13 }:
             ))}
           </div>
 
+          {/* Example */}
+          {explanation.example && (
+            <div className="bg-muted/50 rounded px-2 py-1.5">
+              <span className="text-[10px] font-semibold text-muted-foreground">EXEMPLO</span>
+              <p className="text-[11px] font-mono text-foreground mt-0.5">{explanation.example}</p>
+            </div>
+          )}
+
           {/* Result */}
           <div className="border-t border-border pt-2 flex items-center justify-between">
             <span className="text-[10px] font-semibold text-muted-foreground">RESULTADO</span>

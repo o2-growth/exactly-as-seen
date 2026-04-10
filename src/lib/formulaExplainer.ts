@@ -23,6 +23,7 @@ export interface FormulaExplanation {
   formula: string;
   steps: FormulaStep[];
   result: string;
+  example?: string;
 }
 
 // ─── REVENUE ───
@@ -50,6 +51,7 @@ export function explainRevenue(
       { label: 'Receita anual', value: formatCurrencyFull(totalRev), source: 'Σ meses' },
     ],
     result: formatCurrencyFull(totalRev),
+    example: `Ex: ${avgClients.toFixed(0)} clientes (média) × ${formatCurrencyFull(Math.round(totalRev / Math.max(totalClients, 1)))} (ticket médio) = ${formatCurrencyFull(Math.round(totalRev / 12))}/mês → ${formatCurrencyFull(totalRev)}/ano`,
   };
 }
 
@@ -82,6 +84,7 @@ export function explainClients(
       { label: 'Soma no ano (client-meses)', value: Math.round(total).toLocaleString('pt-BR'), source: 'Σ 12 meses' },
     ],
     result: Math.round(total).toLocaleString('pt-BR'),
+    example: `Ex: ${prevDec} (Dez/${year - 1}) + novos − churn = ${jan} (Jan/${year}) … ${dec} (Dez/${year})`,
   };
 }
 
@@ -125,6 +128,7 @@ export function explainTaxEffective(
     formula: 'PIS + COFINS + ISS + IRPJ efetivo + CSLL efetivo + retidos',
     steps,
     result: `${total.toFixed(2)}%`,
+    example: `Ex: ${rates.pis.toFixed(2)}% + ${rates.cofins.toFixed(2)}% + ${rates.iss.toFixed(2)}%${rates.icms > 0 ? ` + ${rates.icms.toFixed(2)}%` : ''} + (${eff.irpj.toFixed(0)}% × 15%) + (${eff.csll.toFixed(0)}% × 9%) = ${total.toFixed(2)}%`,
   };
 }
 
@@ -158,6 +162,7 @@ export function explainCOS(
       formula: 'Σ (ceil(clientes/ratio) × salário) × 12',
       steps,
       result: formatCurrencyFull(total),
+      example: `Ex: ceil(${caasEnd}/${cos.pfdClientsPerOne}) = ${numPFD} PFDs × ${formatCurrencyFull(cos.pfdSalary)} × 12 = ${formatCurrencyFull(numPFD * cos.pfdSalary * 12)} (só PFD)`,
     };
   }
 
@@ -168,7 +173,7 @@ export function explainCOS(
       { label: 'Receita Education', value: formatCurrencyFull(eduRev), source: 'Motor de cálculo' },
       { label: 'Taxa de custo', value: `${(cos.eduCostRate * 100).toFixed(0)}%`, source: 'Premissa COS' },
     );
-    return { title: `COS Education — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost) };
+    return { title: `COS Education — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost), example: `Ex: ${formatCurrencyFull(eduRev)} × ${(cos.eduCostRate * 100).toFixed(0)}% = ${formatCurrencyFull(cost)}` };
   }
 
   if (buKey === 'expansao') {
@@ -178,7 +183,7 @@ export function explainCOS(
       { label: 'Receita Expansão', value: formatCurrencyFull(rev), source: 'Motor de cálculo' },
       { label: 'Taxa de custo', value: `${(cos.expansaoCostRate * 100).toFixed(0)}%`, source: 'Premissa COS' },
     );
-    return { title: `COS Expansão — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost) };
+    return { title: `COS Expansão — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost), example: `Ex: ${formatCurrencyFull(rev)} × ${(cos.expansaoCostRate * 100).toFixed(0)}% = ${formatCurrencyFull(cost)}` };
   }
 
   if (buKey === 'tax') {
@@ -188,7 +193,7 @@ export function explainCOS(
       { label: 'Receita Tax', value: formatCurrencyFull(rev), source: 'Motor de cálculo' },
       { label: 'Taxa de custo', value: `${(cos.taxCostRate * 100).toFixed(0)}%`, source: 'Premissa COS' },
     );
-    return { title: `COS Tax — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost) };
+    return { title: `COS Tax — ${year}`, formula: 'Receita × Taxa', steps, result: formatCurrencyFull(cost), example: `Ex: ${formatCurrencyFull(rev)} × ${(cos.taxCostRate * 100).toFixed(0)}% = ${formatCurrencyFull(cost)}` };
   }
 
   return { title: `COS ${buKey} — ${year}`, formula: '', steps: [], result: '—' };
@@ -215,6 +220,7 @@ export function explainKPI(
         { label: 'Tax', value: formatCurrency(yr.taxRevenue * 1000), source: 'BU Tax' },
       ],
       result: formatCurrency(yr.grossRevenue * 1000),
+      example: `Ex: ${formatCurrency(yr.caasRevenue * 1000)} + ${formatCurrency(yr.saasRevenue * 1000)} + ${formatCurrency(yr.educationRevenue * 1000)} + ${formatCurrency(yr.baasRevenue * 1000)} + ${formatCurrency(yr.taxRevenue * 1000)} = ${formatCurrency(yr.grossRevenue * 1000)}`,
     };
   }
 
@@ -232,6 +238,7 @@ export function explainKPI(
         { label: 'Headcount', value: formatCurrency(yr.headcount * 1000), source: 'Folha de Pagamento' },
       ],
       result: formatCurrency(yr.ebitda * 1000),
+      example: `Ex: ${formatCurrency(yr.grossProfit * 1000)} − ${formatCurrency(Math.abs(yr.commissions + yr.marketing + yr.sga + yr.headcount) * 1000)} (opex) = ${formatCurrency(yr.ebitda * 1000)}`,
     };
   }
 
@@ -245,6 +252,7 @@ export function explainKPI(
         { label: 'Receita Líquida', value: formatCurrency(yr.netRevenue * 1000), source: 'Receita Bruta − Deduções' },
       ],
       result: `${gm.toFixed(1)}%`,
+      example: `Ex: ${formatCurrency(yr.grossProfit * 1000)} ÷ ${formatCurrency(yr.netRevenue * 1000)} × 100 = ${gm.toFixed(1)}%`,
     };
   }
 
@@ -258,6 +266,7 @@ export function explainKPI(
         { label: 'Receita Líquida', value: formatCurrency(yr.netRevenue * 1000), source: 'Receita Bruta − Deduções' },
       ],
       result: `${em.toFixed(1)}%`,
+      example: `Ex: ${formatCurrency(yr.ebitda * 1000)} ÷ ${formatCurrency(yr.netRevenue * 1000)} × 100 = ${em.toFixed(1)}%`,
     };
   }
 
@@ -284,6 +293,7 @@ export function explainKPI(
         { label: 'IRPJ + CSLL + Ad. IRPJ', value: formatCurrency(yr.taxes * 1000), source: 'Lucro Presumido' },
       ],
       result: formatCurrency(yr.netIncome * 1000),
+      example: `Ex: ${formatCurrency(yr.ebt * 1000)} − ${formatCurrency(Math.abs(yr.taxes) * 1000)} (impostos) = ${formatCurrency(yr.netIncome * 1000)}`,
     };
   }
 
@@ -313,6 +323,7 @@ export function explainTicket(
       { label: 'Média anual', value: formatCurrencyFull(Math.round(avg)), source: 'Σ tickets / 12' },
     ],
     result: formatCurrencyFull(Math.round(avg)),
+    example: `Ex: ${formatCurrencyFull(ticketBase)} (base) → ${formatCurrencyFull(jan)} (Jan) → ${formatCurrencyFull(dec)} (Dez), média = ${formatCurrencyFull(Math.round(avg))}`,
   };
 }
 
@@ -353,6 +364,7 @@ export function explainChurn(
       { label: 'Taxa anual efetiva', value: `${annualRate.toFixed(1)}%`, source: 'Churns / Média ativos' },
     ],
     result: Math.round(totalChurned).toLocaleString('pt-BR'),
+    example: `Ex: ${Math.round(monthly[0])} ativos × ${rateJan.toFixed(2)}% = ${(monthly[0] * rateJan / 100).toFixed(1)} churns (Jan/${year})`,
   };
 }
 
@@ -398,6 +410,7 @@ export function explainNovosClientes(
       { label: 'Total novos no ano', value: Math.round(totalNew).toLocaleString('pt-BR'), source: 'Σ 12 meses' },
     ],
     result: Math.round(totalNew).toLocaleString('pt-BR'),
+    example: `Ex: ${Math.round(monthly[0])} (Jan) − ${Math.round(prevDec)} (Dez/${year - 1}) = ${Math.round(janNew)} novos (Jan/${year})`,
   };
 }
 
@@ -429,6 +442,7 @@ export function explainClientesAtivos(
       { label: 'Crescimento anual', value: `${growth.toFixed(1)}%`, source: 'Dez/Dez anterior' },
     ],
     result: dec.toLocaleString('pt-BR'),
+    example: `Ex: ${prevDec} (Dez/${year - 1}) + novos − churn = ${jan} (Jan/${year}), crescimento ${growth.toFixed(1)}% a.a.`,
   };
 }
 
@@ -472,6 +486,7 @@ export function explainFaturamentoBase(
       { label: 'Total ano', value: formatCurrencyFull(Math.round(total)), source: 'Σ 12 meses' },
     ],
     result: formatCurrencyFull(Math.round(total)),
+    example: `Ex: ${Math.round(year > 2025 ? prevDecRev > 0 ? monthly[0] : 0 : monthly[0])} clientes (Dez/${year - 1}) × ${formatCurrencyFull(Math.round(assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase))} = ${formatCurrencyFull(Math.round(fatBase[0]))} (Jan)`,
   };
 }
 
@@ -510,6 +525,11 @@ export function explainIncremento(
       { label: 'Total ano', value: formatCurrencyFull(Math.round(total)), source: 'Σ 12 meses' },
     ],
     result: formatCurrencyFull(Math.round(total)),
+    example: (() => {
+      const newJan = Math.max(0, monthly[0] - prevDec);
+      const ticketJan = assumptions.monthlyTickets?.[key]?.[year]?.[0] ?? ticketBase;
+      return `Ex: ${Math.round(newJan)} novos × ${formatCurrencyFull(Math.round(ticketJan))} = ${formatCurrencyFull(Math.round(incremento[0]))} (Jan)`;
+    })(),
   };
 }
 
@@ -550,5 +570,11 @@ export function explainRevenueChurn(
       { label: 'Total revenue churn', value: formatCurrencyFull(Math.round(totalRevChurn)), source: 'Σ 12 meses' },
     ],
     result: formatCurrencyFull(Math.round(totalRevChurn)),
+    example: (() => {
+      const rate0 = isArray ? (churnRates as number[])[0] : rateFlat;
+      const churned0 = prevDec * (rate0 / 100);
+      const ticket0 = assumptions.monthlyTickets?.[key]?.[year]?.[0] ?? ticketBase;
+      return `Ex: ${prevDec.toFixed(0)} × ${rate0.toFixed(2)}% = ${churned0.toFixed(1)} churns × ${formatCurrencyFull(Math.round(ticket0))} = ${formatCurrencyFull(Math.round(churned0 * ticket0))} (Jan)`;
+    })(),
   };
 }
