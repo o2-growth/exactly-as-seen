@@ -295,8 +295,29 @@ export default function Assumptions() {
         }
         newInYear += Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
       } else {
+        // Projected month: honor user override if set, else compute from engine delta
+        // (mirrors the correct pattern used in the Revenue decomposition projection branch)
         const storedNew = data.monthlyNewClientOverrides?.[key]?.[year]?.[i];
-        newInYear += storedNew ?? 0;
+        if (storedNew !== null && storedNew !== undefined) {
+          newInYear += storedNew;
+        } else {
+          const activeCur = engineMonthly[i];
+          let activePrev = 0;
+          if (i > 0) {
+            activePrev = engineMonthly[i - 1];
+          } else if (year > 2025) {
+            const prevYr = (year - 1) as Year;
+            const decPeriodP = toPeriod(prevYr, 11);
+            const decApiP = historicalData[key]?.[decPeriodP];
+            if (decApiP && decApiP.client_count > 0) {
+              activePrev = decApiP.client_count;
+            } else {
+              activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+            }
+          }
+          const churnedCur = Math.round(activePrev * getChurnForMonth(key, data, year, i));
+          newInYear += Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
+        }
       }
     }
 
@@ -1525,8 +1546,24 @@ export default function Assumptions() {
                                               else { churnedCur = Math.round((activePrev) * getChurnForMonth(prodKey, data, selectedYear, i)); }
                                               return sum + Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
                                             } else {
+                                              // Projected month: honor override if set, else compute from engine delta
                                               const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
-                                              return sum + (storedNew ?? 0);
+                                              if (storedNew !== null && storedNew !== undefined) {
+                                                return sum + storedNew;
+                                              }
+                                              const activeCurP = monthly[i];
+                                              let activePrevP = 0;
+                                              if (i > 0) {
+                                                activePrevP = monthly[i - 1];
+                                              } else if (selectedYear > 2025) {
+                                                const prevYr = (selectedYear - 1) as Year;
+                                                const decPeriodP = toPeriod(prevYr, 11);
+                                                const decApiP = historicalData[prodKey]?.[decPeriodP];
+                                                if (decApiP && decApiP.client_count > 0) { activePrevP = decApiP.client_count; }
+                                                else { activePrevP = Math.round(getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]); }
+                                              }
+                                              const churnedCurP = Math.round(activePrevP * getChurnForMonth(prodKey, data, selectedYear, i));
+                                              return sum + Math.max(0, Math.round(activeCurP) - Math.round(activePrevP) + churnedCurP);
                                             }
                                           }, 0).toLocaleString('pt-BR')
                                         }</strong>
