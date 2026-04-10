@@ -273,29 +273,28 @@ export function isProductMrr(key: TicketKey): boolean {
 }
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
-  // Lucro Presumido — todas as subcategorias usam base 32%/32%
-  // ISS varia por categoria:
-  //   SaaS: 2,9% (regime especial tech POA)
-  //   Education: 2% (educação POA)
-  //   CaaS, Tax, Expansão: 5% (serviço padrão)
   const isSaas = SAAS_KEYS.includes(key);
   const isEducation = EDUCATION_KEYS.includes(key);
 
-  let iss: number;
+  // Determine default profile based on category
+  let perfilTributario: string;
   if (isSaas) {
-    iss = 2.9;
+    perfilTributario = 'saasTech';
   } else if (isEducation) {
-    iss = 2.0;
+    perfilTributario = 'education';
   } else {
-    iss = 5.0;
+    perfilTributario = 'servico';
   }
 
+  const profile = TAX_PROFILES[perfilTributario];
+
   return {
-    pis: 0.65, cofins: 3.0,
-    iss,
-    csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
-    presumidoIRPJ: 32, presumidoCSLL: 32,
+    pis: profile.pis, cofins: profile.cofins,
+    iss: profile.iss,
+    csllRetido: 0, pisRetido: 0, icms: profile.icms, irrfRetido: 0, cofinsRetido: 0,
+    presumidoIRPJ: profile.presumidoIRPJ, presumidoCSLL: profile.presumidoCSLL,
     tipoReceita: 'servico',
+    perfilTributario,
   };
 }
 
