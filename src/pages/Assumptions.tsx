@@ -2960,7 +2960,10 @@ export default function Assumptions() {
                                 const cellValue = rowDef.computed!(cfg);
                                 return (
                                   <td key={k} className={`py-1.5 px-2 text-center tabular-nums ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {cellValue.toFixed(2).replace('.', ',')}%
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      {cellValue.toFixed(2).replace('.', ',')}%
+                                      {isTotal && <FormulaExplainer explanation={explainTaxEffective(k, fullLabels[k] ?? k, data as AssumptionsType)} iconSize={10} />}
+                                    </div>
                                   </td>
                                 );
                               })}
