@@ -655,6 +655,106 @@ function EditableCell({
 }
 
 // ============================================================
+// CÉLULA DE MIX (SERVIÇO / PRODUTO)
+// ============================================================
+
+interface MixCellProps {
+  chave: string;
+  valor: number | undefined;
+  onUpdate: (chave: string, val: number) => void;
+  onClear: (chave: string) => void;
+}
+
+function MixCell({ chave, valor, onUpdate, onClear }: MixCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const hasMix = valor !== undefined && valor !== null;
+
+  const handleStartEdit = () => {
+    setInputValue(hasMix ? String(valor) : '');
+    setEditing(true);
+  };
+
+  const handleCommit = () => {
+    const v = inputValue.trim();
+    if (v === '' || v === '-') {
+      onClear(chave);
+    } else {
+      const num = parseFloat(v.replace(',', '.'));
+      if (!isNaN(num) && num >= 0 && num <= 100) {
+        onUpdate(chave, num);
+      }
+    }
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleCommit();
+    if (e.key === 'Escape') setEditing(false);
+  };
+
+  return (
+    <td
+      style={{
+        ...tdNum,
+        background: hasMix ? '#FFE0B2' : '#FFF9E6',
+        cursor: 'text',
+        border: hasMix ? '2px solid #FF9800' : '1px solid #E0C800',
+        padding: '4px 8px',
+        position: 'relative',
+      }}
+      onClick={!editing ? handleStartEdit : undefined}
+    >
+      {editing ? (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          placeholder="vazio = sem mix"
+          style={{
+            width: '100%', padding: 2, fontSize: 11, fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 700, border: '2px solid #FF9800', borderRadius: 2,
+            textAlign: 'center', outline: 'none', background: '#FFFFFF', color: '#494949',
+          }}
+        />
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, position: 'relative' }}>
+          {hasMix ? (
+            <>
+              <span style={{ fontWeight: 700, color: '#E65100', fontSize: 11 }}>
+                {valor}% serv
+              </span>
+              <span style={{ fontSize: 9, color: '#787878' }}>
+                / {100 - valor}% prod
+              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onClear(chave); }}
+                title="Remover mix"
+                style={{
+                  position: 'absolute', right: -6, top: -10, width: 14, height: 14,
+                  borderRadius: '50%', border: '1px solid #C62828', background: '#FFFFFF',
+                  color: '#C62828', fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                  padding: 0, lineHeight: 1, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <span style={{ color: '#AAAAAA', fontSize: 10, fontStyle: 'italic' }}>—</span>
+          )}
+        </div>
+      )}
+    </td>
+  );
+}
+
+// ============================================================
 // SUBCOMPONENTES
 // ============================================================
 
