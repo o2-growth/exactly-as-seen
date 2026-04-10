@@ -45,7 +45,7 @@ import {
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
-import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI } from '@/lib/formulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
