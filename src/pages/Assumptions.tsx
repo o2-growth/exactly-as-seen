@@ -44,6 +44,8 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
+import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
@@ -1097,17 +1099,21 @@ export default function Assumptions() {
           const ni = niNode?.annual[selectedYear] ?? model.years[selectedYear].netIncome;
           const gmPct = nr > 0 ? ((gp / nr) * 100).toFixed(1) : '0';
           const emPct = nr > 0 ? ((ebitda / nr) * 100).toFixed(1) : '0';
-          return [
-            { label: 'Receita Bruta', value: formatCurrency(gr * 1000) },
-            { label: 'EBITDA', value: formatCurrency(ebitda * 1000) },
-            { label: 'Margem Bruta', value: `${gmPct}%` },
-            { label: 'Margem EBITDA', value: `${emPct}%` },
-            { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR') },
-            { label: 'Resultado Líq.', value: formatCurrency(ni * 1000) },
+          const kpiDefs: { label: string; value: string; kpiCode: 'grossRevenue' | 'ebitda' | 'grossMargin' | 'ebitdaMargin' | 'clients' | 'netIncome' }[] = [
+            { label: 'Receita Bruta', value: formatCurrency(gr * 1000), kpiCode: 'grossRevenue' },
+            { label: 'EBITDA', value: formatCurrency(ebitda * 1000), kpiCode: 'ebitda' },
+            { label: 'Margem Bruta', value: `${gmPct}%`, kpiCode: 'grossMargin' },
+            { label: 'Margem EBITDA', value: `${emPct}%`, kpiCode: 'ebitdaMargin' },
+            { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR'), kpiCode: 'clients' },
+            { label: 'Resultado Líq.', value: formatCurrency(ni * 1000), kpiCode: 'netIncome' },
           ];
+          return kpiDefs;
         })().map(kpi => (
           <div key={kpi.label} className="gradient-card p-3 space-y-1">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+              <FormulaExplainer explanation={explainKPI(kpi.kpiCode, selectedYear, model)} iconSize={11} />
+            </div>
             <p className="text-sm font-bold tabular-nums">{kpi.value}</p>
           </div>
         ))}
@@ -1240,13 +1246,19 @@ export default function Assumptions() {
                               </div>
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold">
-                              {row.dataKey ? getAnnualClientSum(row.dataKey as SubProductKey, selectedYear).toLocaleString('pt-BR') : '—'}
+                              <div className="flex items-center justify-end gap-1">
+                                {row.dataKey ? getAnnualClientSum(row.dataKey as SubProductKey, selectedYear).toLocaleString('pt-BR') : '—'}
+                                {row.dataKey && <FormulaExplainer explanation={explainClients(row.dataKey as TicketKey, row.label, selectedYear, data)} iconSize={11} />}
+                              </div>
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold text-emerald-600">
-                              {row.dataKey ? (() => {
-                                const rev = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
-                                return formatCurrency(rev);
-                              })() : '—'}
+                              <div className="flex items-center justify-end gap-1">
+                                {row.dataKey ? (() => {
+                                  const rev = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
+                                  return formatCurrency(rev);
+                                })() : '—'}
+                                {row.dataKey && <FormulaExplainer explanation={explainRevenue(row.dataKey as TicketKey, row.label, selectedYear, data, model)} iconSize={11} />}
+                              </div>
                             </td>
                           </tr>
 
@@ -2948,7 +2960,10 @@ export default function Assumptions() {
                                 const cellValue = rowDef.computed!(cfg);
                                 return (
                                   <td key={k} className={`py-1.5 px-2 text-center tabular-nums ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
-                                    {cellValue.toFixed(2).replace('.', ',')}%
+                                    <div className="flex items-center justify-center gap-0.5">
+                                      {cellValue.toFixed(2).replace('.', ',')}%
+                                      {isTotal && <FormulaExplainer explanation={explainTaxEffective(k, fullLabels[k] ?? k, data as AssumptionsType)} iconSize={10} />}
+                                    </div>
                                   </td>
                                 );
                               })}
@@ -3239,13 +3254,33 @@ export default function Assumptions() {
                         {yearImpact.map(yi => (
                           <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
                             <td className="px-2 py-2 font-medium">{yi.year}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.caasCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.caasCost * 12)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('caas', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.saasSubCost * 12)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.setupCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.eduCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.eduCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('education', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.csCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.expansaoCost)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.taxCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.expansaoCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('expansao', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.taxCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('tax', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.grandTotal)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
