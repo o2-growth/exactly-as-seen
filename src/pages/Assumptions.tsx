@@ -3254,7 +3254,12 @@ export default function Assumptions() {
                         {yearImpact.map(yi => (
                           <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
                             <td className="px-2 py-2 font-medium">{yi.year}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.caasCost * 12)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.caasCost * 12)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('caas', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.saasSubCost * 12)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.setupCost * 12)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.eduCost)}</td>
