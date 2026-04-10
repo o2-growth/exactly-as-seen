@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { Scenario } from '@/lib/financialData';
+import { FileDown, Sun, Moon, Menu } from 'lucide-react';
+import PeriodFilter from './PeriodFilter';
 import { FileDown, Sun, Moon, Menu } from 'lucide-react';
 import PeriodFilter from './PeriodFilter';
 
@@ -26,7 +26,7 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
-  const { scenario, setScenario } = useFinancialModel();
+  const { currentVersion } = useVersionHistory();
   const { currentVersion } = useVersionHistory();
   const { dark, toggle: toggleTheme } = useTheme();
 
