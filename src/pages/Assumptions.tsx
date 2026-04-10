@@ -344,24 +344,112 @@ export default function Assumptions() {
     return Math.round(activeAtStart + newInYear);
   };
 
-  /** Get annual revenue using API data for historical months, engine for projected */
+  /** Get annual revenue using same faturamentoTotal logic as expanded section */
   const getAnnualRevenue = (key: SubProductKey, year: Year): number => {
-    const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-    const tk = data.tickets[key as TicketKey] ?? 0;
-    let total = 0;
-    for (let m = 0; m < 12; m++) {
-      const period = toPeriod(year, m);
-      const apiEntry = historicalData[key]?.[period];
-      if (apiEntry && apiEntry.total_revenue > 0) {
-        total += apiEntry.total_revenue;
-      } else if (isHistorical(year, m) && apiEntry) {
-        total += 0;
+    const monthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    const ticketVal = data.tickets[key as TicketKey] ?? 0;
+    const hcIsMrr = isProductMrr(key as FinTicketKey);
+    const churnApplicable = hcIsMrr && !data.churnNotApplicable?.[key];
+
+    // Previous year December data for month 0 base
+    const prevYrMonthly = year > 2025
+      ? getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)
+      : null;
+    const prevDecPeriod = year > 2025 ? toPeriod((year - 1) as Year, 11) : '';
+    const prevDecApi = year > 2025 ? historicalData[key]?.[prevDecPeriod] : undefined;
+
+    let prevMonthTotal = 0;
+    if (year > 2025) {
+      if (prevDecApi && prevDecApi.total_revenue > 0) {
+        prevMonthTotal = prevDecApi.total_revenue;
       } else {
-        const monthTicket = data.monthlyTickets?.[key]?.[year]?.[m] ?? tk;
-        total += engineMonthly[m] * monthTicket;
+        const prevDecClients = prevYrMonthly ? Math.round(prevYrMonthly[11]) : 0;
+        const prevDecTk = data.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketVal;
+        prevMonthTotal = prevDecClients * prevDecTk;
       }
     }
-    return total;
+
+    const faturamentoTotal: number[] = [];
+
+    for (let i = 0; i < 12; i++) {
+      const hist = isHistorical(year, i);
+      const monthTicket = data.monthlyTickets?.[key]?.[year]?.[i] ?? ticketVal;
+      const period = toPeriod(year, i);
+      const apiEntry = hist ? historicalData[key]?.[period] : undefined;
+
+      // Historical with API data
+      if (hist && apiEntry && (!hcIsMrr || (apiEntry.total_revenue > 0 && apiEntry.client_names))) {
+        faturamentoTotal.push(apiEntry.total_revenue);
+      } else if (!hcIsMrr) {
+        // Non-MRR projected: revenue = newClients × ticket
+        const storedNew = data.monthlyNewClientOverrides?.[key]?.[year]?.[i];
+        let prevClients = 0;
+        if (i > 0) {
+          prevClients = monthly[i - 1];
+        } else if (prevDecApi) {
+          prevClients = prevDecApi.client_count;
+        } else if (prevYrMonthly) {
+          prevClients = Math.round(prevYrMonthly[11]);
+        }
+        let newClients = 0;
+        if (storedNew !== null && storedNew !== undefined) {
+          newClients = storedNew;
+        } else {
+          const activeCur = monthly[i];
+          const churnRate = getChurnForMonth(key, data, year, i);
+          const churned = Math.round(prevClients * churnRate);
+          newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
+        }
+        const monthRevenue = newClients * monthTicket;
+        if (hist && apiEntry && apiEntry.total_revenue > 0) {
+          faturamentoTotal.push(apiEntry.total_revenue);
+        } else {
+          faturamentoTotal.push(monthRevenue);
+        }
+      } else {
+        // MRR projected: Base + Incremento - Churn
+        const base = i === 0 ? prevMonthTotal : faturamentoTotal[i - 1];
+
+        const storedNew = data.monthlyNewClientOverrides?.[key]?.[year]?.[i];
+        let prevClients = 0;
+        if (i > 0) {
+          prevClients = monthly[i - 1];
+        } else if (prevDecApi) {
+          prevClients = prevDecApi.client_count;
+        } else if (prevYrMonthly) {
+          prevClients = Math.round(prevYrMonthly[11]);
+        }
+        let newClients = 0;
+        if (storedNew !== null && storedNew !== undefined) {
+          newClients = storedNew;
+        } else {
+          const activeCur = monthly[i];
+          const churnRate = getChurnForMonth(key, data, year, i);
+          const churned = Math.round(prevClients * churnRate);
+          newClients = Math.max(0, Math.round(activeCur) - Math.round(prevClients) + churned);
+        }
+
+        const inc = newClients * monthTicket;
+
+        let revChurn = 0;
+        if (churnApplicable) {
+          const prevTk = i > 0
+            ? (data.monthlyTickets?.[key]?.[year]?.[i - 1] ?? ticketVal)
+            : (year > 2025 ? (data.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketVal) : ticketVal);
+          const churnRate = getChurnForMonth(key, data, year, i);
+          const logoChurn = Math.round(prevClients * churnRate);
+          revChurn = logoChurn * prevTk;
+        }
+
+        if (hist && apiEntry && apiEntry.total_revenue > 0) {
+          faturamentoTotal.push(apiEntry.total_revenue);
+        } else {
+          faturamentoTotal.push(base + inc - revChurn);
+        }
+      }
+    }
+
+    return faturamentoTotal.reduce((s, v) => s + v, 0);
   };
 
   // Use filteredYears for the year selector; fall back to all YEARS if empty
