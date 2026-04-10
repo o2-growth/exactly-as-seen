@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computeFullModel, computeKPIs, FullModelOutput, AnnualOutput } from '@/engine/calculationsEngine';
-import { DEFAULT_ASSUMPTIONS, Assumptions, YEARS, Year } from '@/lib/financialData';
+import { DEFAULT_ASSUMPTIONS, Assumptions, YEARS, Year, getDefaultSubProductTaxConfig } from '@/lib/financialData';
 import { expectedOutputs } from '@/data/modelData';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
@@ -198,6 +198,33 @@ describe('Engine: Sales deductions', () => {
       expect(modelNoTax.years[y].deductions).toBeLessThan(0);
       // Same deductions as with tax enabled
       expectClose(modelNoTax.years[y].deductions, model.years[y].deductions, 0.1);
+    }
+  });
+
+  it('mix order does not change deductions or taxes for Expansão products', () => {
+    const baseBaas = getDefaultSubProductTaxConfig('baas');
+    const baseFranquia = getDefaultSubProductTaxConfig('baasFranquia');
+    const baseMaster = getDefaultSubProductTaxConfig('baasMasterFranquia');
+
+    const modelA = getModel({
+      subProductTaxRates: {
+        baas: { ...baseBaas, perfilTributario: 'mix', taxSlices: [{ profileKey: 'ebook', pct: 20 }, { profileKey: 'servico', pct: 80 }] },
+        baasFranquia: { ...baseFranquia, perfilTributario: 'mix', taxSlices: [{ profileKey: 'ebook', pct: 20 }, { profileKey: 'servico', pct: 80 }] },
+        baasMasterFranquia: { ...baseMaster, perfilTributario: 'mix', taxSlices: [{ profileKey: 'ebook', pct: 20 }, { profileKey: 'servico', pct: 80 }] },
+      },
+    });
+
+    const modelB = getModel({
+      subProductTaxRates: {
+        baas: { ...baseBaas, perfilTributario: 'mix', taxSlices: [{ profileKey: 'servico', pct: 80 }, { profileKey: 'ebook', pct: 20 }] },
+        baasFranquia: { ...baseFranquia, perfilTributario: 'mix', taxSlices: [{ profileKey: 'servico', pct: 80 }, { profileKey: 'ebook', pct: 20 }] },
+        baasMasterFranquia: { ...baseMaster, perfilTributario: 'mix', taxSlices: [{ profileKey: 'servico', pct: 80 }, { profileKey: 'ebook', pct: 20 }] },
+      },
+    });
+
+    for (const year of [2027, 2028, 2029, 2030] as Year[]) {
+      expect(modelA.years[year].deductions).toBeCloseTo(modelB.years[year].deductions, 10);
+      expect(modelA.years[year].taxes).toBeCloseTo(modelB.years[year].taxes, 10);
     }
   });
 });

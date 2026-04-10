@@ -30,7 +30,22 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, type TaxSlice, computeMixPresumido, TAX_PROFILES, TAX_PROFILE_KEYS, SLICE_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido, getEffectiveTaxRates, resolveSlices } from '@/lib/financialData';
+import {
+  getSubProductTaxRate,
+  type TicketKey,
+  type SubProductTaxConfig,
+  type TaxSlice,
+  TAX_PROFILES,
+  TAX_PROFILE_KEYS,
+  SLICE_PROFILE_KEYS,
+  applyTaxProfile,
+  getEffectiveTaxRates,
+  getMixTaxSlices,
+  swapOrUpdateMixSliceProfile,
+  updateMixSlicePct,
+  addMixTaxSlice,
+  removeMixTaxSlice,
+} from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -151,15 +166,16 @@ export function useEditablePremises() {
       if (!ticketKey) return base;
 
       const cfg = getSubProductTaxRate(ticketKey, assumptions);
+      const effRates = getEffectiveTaxRates(cfg);
       // Convert engine config back to TAX_PREMISES decimal format
       const merged: TaxPremise = {
         ...base,
-        pis: cfg.pis / 100,           // 0.65 → 0.0065
-        cofins: cfg.cofins / 100,     // 3.0 → 0.03
-        iss: cfg.iss / 100,           // 5.0 → 0.05
-        icms: cfg.icms / 100,         // 0 → 0
-        presumidoIRPJ: cfg.presumidoIRPJ / 100,  // 32 → 0.32
-        presumidoCSLL: cfg.presumidoCSLL / 100,   // 32 → 0.32
+        pis: effRates.pis / 100,
+        cofins: effRates.cofins / 100,
+        iss: effRates.iss / 100,
+        icms: effRates.icms / 100,
+        presumidoIRPJ: effRates.presumidoIRPJ / 100,
+        presumidoCSLL: effRates.presumidoCSLL / 100,
         irpjEfetivo: 0, csllEfetivo: 0, totalEfetivo: 0,
       };
       merged.irpjEfetivo = merged.presumidoIRPJ * TAX_CONSTANTS.IRPJ_BASE;
@@ -494,23 +510,27 @@ export default function PremissasPage() {
                           slices={cfg?.taxSlices}
                           onSelectProfile={(chave, profileKey) => {
                             if (!ticketKey) return;
-                            const current = getSubProductTaxRate(ticketKey, assumptions);
-                            const updated = applyTaxProfile(current, profileKey);
-                            setAssumptions(prev => ({
-                              ...prev,
-                              subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
-                            }));
+                            setAssumptions(prev => {
+                              const current = getSubProductTaxRate(ticketKey, prev);
+                              const updated = applyTaxProfile(current, profileKey);
+                              return {
+                                ...prev,
+                                subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
+                              };
+                            });
                           }}
                           onUpdateSlices={(chave, slices) => {
                             if (!ticketKey) return;
-                            const current = getSubProductTaxRate(ticketKey, assumptions);
-                            setAssumptions(prev => ({
-                              ...prev,
-                              subProductTaxRates: {
-                                ...(prev.subProductTaxRates ?? {}),
-                                [ticketKey]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined },
-                              },
-                            }));
+                            setAssumptions(prev => {
+                              const current = getSubProductTaxRate(ticketKey, prev);
+                              return {
+                                ...prev,
+                                subProductTaxRates: {
+                                  ...(prev.subProductTaxRates ?? {}),
+                                  [ticketKey]: { ...current, taxSlices: getMixTaxSlices(slices), perfilTributario: 'mix', mixServicoPct: undefined },
+                                },
+                              };
+                            });
                           }}
                         />
                         <EditableCell chave={chave} field="pis" valor={currentPis}
@@ -740,23 +760,18 @@ interface ProfileDropdownCellProps {
 
 function ProfileDropdownCell({ chave, currentProfile, slices, onSelectProfile, onUpdateSlices }: ProfileDropdownCellProps) {
   const isMix = currentProfile === 'mix';
-  const profileLabel = currentProfile ? (TAX_PROFILES[currentProfile]?.label || currentProfile) : '—';
-  const currentSlices = slices?.length ? slices : [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }];
+  const currentSlices = getMixTaxSlices(slices);
   const sliceSum = currentSlices.reduce((s, sl) => s + sl.pct, 0);
   const isValid = Math.abs(sliceSum - 100) < 0.01;
 
-  const updateSlice = (idx: number, field: 'profileKey' | 'pct', val: string | number) => {
-    const updated = currentSlices.map((s, i) => i === idx ? { ...s, [field]: val } : s);
-    onUpdateSlices(chave, updated);
+  const updateSliceProfile = (idx: number, profileKey: string) => {
+    onUpdateSlices(chave, swapOrUpdateMixSliceProfile(currentSlices, idx, profileKey));
   };
-  const addSlice = () => {
-    const remaining = Math.max(0, 100 - sliceSum);
-    onUpdateSlices(chave, [...currentSlices, { profileKey: 'servico', pct: remaining }]);
+  const updateSlicePctValue = (idx: number, pct: number) => {
+    onUpdateSlices(chave, updateMixSlicePct(currentSlices, idx, pct));
   };
-  const removeSlice = (idx: number) => {
-    if (currentSlices.length <= 1) return;
-    onUpdateSlices(chave, currentSlices.filter((_, i) => i !== idx));
-  };
+  const addSlice = () => onUpdateSlices(chave, addMixTaxSlice(currentSlices));
+  const removeSlice = (idx: number) => onUpdateSlices(chave, removeMixTaxSlice(currentSlices, idx));
 
   return (
     <td style={{
@@ -789,7 +804,7 @@ function ProfileDropdownCell({ chave, currentProfile, slices, onSelectProfile, o
             <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 3 }}>
               <select
                 value={sl.profileKey}
-                onChange={e => updateSlice(si, 'profileKey', e.target.value)}
+                onChange={e => updateSliceProfile(si, e.target.value)}
                 style={{ flex: 1, fontSize: 9, border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
               >
                 {SLICE_PROFILE_KEYS.map(k => (
@@ -800,7 +815,7 @@ function ProfileDropdownCell({ chave, currentProfile, slices, onSelectProfile, o
                 type="number"
                 min="0" max="100" step="5"
                 value={sl.pct}
-                onChange={e => updateSlice(si, 'pct', Number(e.target.value) || 0)}
+                onChange={e => updateSlicePctValue(si, Number(e.target.value) || 0)}
                 style={{ width: 40, fontSize: 9, textAlign: 'center', border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
               />
               <span style={{ fontSize: 8 }}>%</span>
