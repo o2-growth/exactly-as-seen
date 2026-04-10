@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
 import { FileDown, Sun, Moon, Menu } from 'lucide-react';
 import PeriodFilter from './PeriodFilter';
-import { FileDown, Sun, Moon, Menu } from 'lucide-react';
-import PeriodFilter from './PeriodFilter';
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -26,7 +24,6 @@ interface AppHeaderProps {
 }
 
 export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
-  const { currentVersion } = useVersionHistory();
   const { currentVersion } = useVersionHistory();
   const { dark, toggle: toggleTheme } = useTheme();
 
