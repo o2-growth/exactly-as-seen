@@ -44,6 +44,8 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
+import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
