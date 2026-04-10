@@ -30,7 +30,7 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido, TAX_PROFILES, TAX_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido } from '@/lib/financialData';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, type TaxSlice, computeMixPresumido, TAX_PROFILES, TAX_PROFILE_KEYS, SLICE_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido, getEffectiveTaxRates, resolveSlices } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -465,20 +465,23 @@ export default function PremissasPage() {
                     const chave = `${p.categoria}/${p.subcategoria}`;
                     const ticketKey = PREMISE_TO_TICKET[chave];
                     const cfg = ticketKey ? getSubProductTaxRate(ticketKey, assumptions) : null;
-                    const eff = cfg ? getEffectivePresumido(cfg) : { irpj: p.presumidoIRPJ * 100, csll: p.presumidoCSLL * 100 };
+                    const effRates = cfg ? getEffectiveTaxRates(cfg) : null;
+                    const eff = effRates ? { irpj: effRates.presumidoIRPJ, csll: effRates.presumidoCSLL } : { irpj: p.presumidoIRPJ * 100, csll: p.presumidoCSLL * 100 };
                     const displayPresIRPJ = eff.irpj / 100;
                     const displayPresCSLL = eff.csll / 100;
                     const displayIrpjEfetivo = eff.irpj / 100 * 0.15;
                     const displayCsllEfetivo = eff.csll / 100 * 0.09;
-                    const currentPis = cfg ? cfg.pis / 100 : p.pis;
-                    const currentCofins = cfg ? cfg.cofins / 100 : p.cofins;
-                    const currentIss = cfg ? cfg.iss / 100 : p.iss;
-                    const currentIcms = cfg ? cfg.icms / 100 : p.icms;
+                    const currentPis = effRates ? effRates.pis / 100 : (cfg ? cfg.pis / 100 : p.pis);
+                    const currentCofins = effRates ? effRates.cofins / 100 : (cfg ? cfg.cofins / 100 : p.cofins);
+                    const currentIss = effRates ? effRates.iss / 100 : (cfg ? cfg.iss / 100 : p.iss);
+                    const currentIcms = effRates ? effRates.icms / 100 : (cfg ? cfg.icms / 100 : p.icms);
                     const displayTotal = currentPis + currentCofins + currentIss + currentIcms + displayIrpjEfetivo + displayCsllEfetivo;
                     const currentProfile = cfg?.perfilTributario || '';
+                    const isMix = currentProfile === 'mix';
                     const isProfileLocked = currentProfile && currentProfile !== 'custom' && currentProfile !== 'mix';
                     return (
-                      <tr key={chave} style={{
+                      <React.Fragment key={chave}>
+                      <tr style={{
                         background: i % 2 === 0 ? '#FFFFFF' : '#F9F9F9',
                         borderBottom: '1px solid #F2F2F2',
                       }}>
@@ -488,7 +491,7 @@ export default function PremissasPage() {
                         <ProfileDropdownCell
                           chave={chave}
                           currentProfile={currentProfile}
-                          mixValue={cfg?.mixServicoPct}
+                          slices={cfg?.taxSlices}
                           onSelectProfile={(chave, profileKey) => {
                             if (!ticketKey) return;
                             const current = getSubProductTaxRate(ticketKey, assumptions);
@@ -498,36 +501,35 @@ export default function PremissasPage() {
                               subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
                             }));
                           }}
-                          onUpdateMix={(chave, val) => {
+                          onUpdateSlices={(chave, slices) => {
                             if (!ticketKey) return;
                             const current = getSubProductTaxRate(ticketKey, assumptions);
-                            const mix = computeMixPresumido(val);
                             setAssumptions(prev => ({
                               ...prev,
                               subProductTaxRates: {
                                 ...(prev.subProductTaxRates ?? {}),
-                                [ticketKey]: { ...current, mixServicoPct: val, presumidoIRPJ: mix.irpj, presumidoCSLL: mix.csll, perfilTributario: 'mix' },
+                                [ticketKey]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined },
                               },
                             }));
                           }}
                         />
-                        <EditableCell chave={chave} field="pis" valor={p.pis}
+                        <EditableCell chave={chave} field="pis" valor={currentPis}
                           modificado={isFieldOverridden(chave, 'pis')}
-                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
-                        <EditableCell chave={chave} field="cofins" valor={p.cofins}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked || isMix} />
+                        <EditableCell chave={chave} field="cofins" valor={currentCofins}
                           modificado={isFieldOverridden(chave, 'cofins')}
-                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
-                        <EditableCell chave={chave} field="iss" valor={p.iss}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked || isMix} />
+                        <EditableCell chave={chave} field="iss" valor={currentIss}
                           modificado={isFieldOverridden(chave, 'iss')}
-                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
-                        <EditableCell chave={chave} field="icms" valor={p.icms}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked || isMix} />
+                        <EditableCell chave={chave} field="icms" valor={currentIcms}
                           modificado={isFieldOverridden(chave, 'icms')}
-                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
-                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresIRPJ)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked || isMix} />
+                        <td style={{ ...tdNum, fontWeight: isMix ? 700 : 400, color: isMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresIRPJ)} {isMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
-                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresCSLL)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        <td style={{ ...tdNum, fontWeight: isMix ? 700 : 400, color: isMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresCSLL)} {isMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
                         <td style={tdNumCalc}>{fmtPct(displayIrpjEfetivo)}</td>
                         <td style={tdNumCalc}>{fmtPct(displayCsllEfetivo)}</td>
@@ -538,6 +540,32 @@ export default function PremissasPage() {
                           {fmtPct(displayTotal)}
                         </td>
                       </tr>
+                      {/* Slice detail rows when mix is active */}
+                      {isMix && cfg?.taxSlices?.map((slice, si) => {
+                        const sp = TAX_PROFILES[slice.profileKey] ?? TAX_PROFILES.servico;
+                        const sliceIrpjEf = sp.presumidoIRPJ / 100 * 0.15;
+                        const sliceCsllEf = sp.presumidoCSLL / 100 * 0.09;
+                        const sliceTotal = sp.pis / 100 + sp.cofins / 100 + sp.iss / 100 + sp.icms / 100 + sliceIrpjEf + sliceCsllEf;
+                        return (
+                          <tr key={`${chave}-slice-${si}`} style={{ background: '#FFF8E1', fontSize: 10 }}>
+                            <td style={{ ...td, paddingLeft: 32, color: '#E65100', fontStyle: 'italic' }}>
+                              ↳ {sp.label} ({slice.pct}%)
+                            </td>
+                            <td style={td}></td>
+                            <td style={td}></td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.pis / 100)}</td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.cofins / 100)}</td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.iss / 100)}</td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.icms / 100)}</td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.presumidoIRPJ / 100)}</td>
+                            <td style={{ ...tdNum, color: '#E65100' }}>{fmtPct(sp.presumidoCSLL / 100)}</td>
+                            <td style={{ ...tdNumCalc, color: '#E65100' }}>{fmtPct(sliceIrpjEf)}</td>
+                            <td style={{ ...tdNumCalc, color: '#E65100' }}>{fmtPct(sliceCsllEf)}</td>
+                            <td style={{ ...tdNum, color: '#E65100', fontWeight: 600 }}>{fmtPct(sliceTotal)}</td>
+                          </tr>
+                        );
+                      })}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
@@ -699,29 +727,35 @@ function EditableCell({
 }
 
 // ============================================================
-// DROPDOWN DE PERFIL TRIBUTÁRIO
+// DROPDOWN DE PERFIL TRIBUTÁRIO + SLICE EDITOR
 // ============================================================
 
 interface ProfileDropdownCellProps {
   chave: string;
   currentProfile: string;
-  mixValue: number | undefined;
+  slices: TaxSlice[] | undefined;
   onSelectProfile: (chave: string, profileKey: string) => void;
-  onUpdateMix: (chave: string, val: number) => void;
+  onUpdateSlices: (chave: string, slices: TaxSlice[]) => void;
 }
 
-function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile, onUpdateMix }: ProfileDropdownCellProps) {
-  const [editingMix, setEditingMix] = useState(false);
-  const [mixInput, setMixInput] = useState('');
+function ProfileDropdownCell({ chave, currentProfile, slices, onSelectProfile, onUpdateSlices }: ProfileDropdownCellProps) {
   const isMix = currentProfile === 'mix';
   const profileLabel = currentProfile ? (TAX_PROFILES[currentProfile]?.label || currentProfile) : '—';
+  const currentSlices = slices?.length ? slices : [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }];
+  const sliceSum = currentSlices.reduce((s, sl) => s + sl.pct, 0);
+  const isValid = Math.abs(sliceSum - 100) < 0.01;
 
-  const handleMixCommit = () => {
-    const v = parseFloat(mixInput.replace(',', '.'));
-    if (!isNaN(v) && v >= 0 && v <= 100) {
-      onUpdateMix(chave, v);
-    }
-    setEditingMix(false);
+  const updateSlice = (idx: number, field: 'profileKey' | 'pct', val: string | number) => {
+    const updated = currentSlices.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    onUpdateSlices(chave, updated);
+  };
+  const addSlice = () => {
+    const remaining = Math.max(0, 100 - sliceSum);
+    onUpdateSlices(chave, [...currentSlices, { profileKey: 'servico', pct: remaining }]);
+  };
+  const removeSlice = (idx: number) => {
+    if (currentSlices.length <= 1) return;
+    onUpdateSlices(chave, currentSlices.filter((_, i) => i !== idx));
   };
 
   return (
@@ -731,6 +765,7 @@ function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile,
       border: currentProfile ? '2px solid #FF9800' : '1px solid #E0C800',
       padding: '4px 4px',
       minWidth: 130,
+      verticalAlign: 'top',
     }}>
       <select
         value={currentProfile || ''}
@@ -749,31 +784,47 @@ function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile,
         ))}
       </select>
       {isMix && (
-        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          {editingMix ? (
-            <input
-              type="text"
-              value={mixInput}
-              onChange={e => setMixInput(e.target.value)}
-              onBlur={handleMixCommit}
-              onKeyDown={e => { if (e.key === 'Enter') handleMixCommit(); if (e.key === 'Escape') setEditingMix(false); }}
-              autoFocus
-              placeholder="% serviço"
-              style={{
-                width: 60, fontSize: 10, fontWeight: 700, textAlign: 'center',
-                border: '2px solid #FF9800', borderRadius: 2, padding: '1px 2px',
-                background: '#FFF', color: '#494949', outline: 'none',
-              }}
-            />
-          ) : (
-            <span
-              onClick={() => { setMixInput(String(mixValue ?? 50)); setEditingMix(true); }}
-              style={{ fontSize: 10, fontWeight: 700, color: '#E65100', cursor: 'pointer' }}
-              title="Clique para editar % serviço"
-            >
-              {mixValue ?? 50}% serv / {100 - (mixValue ?? 50)}% prod
+        <div style={{ marginTop: 4, background: '#FFF8E1', border: '1px solid #FFE082', borderRadius: 4, padding: 4 }}>
+          {currentSlices.map((sl, si) => (
+            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 3 }}>
+              <select
+                value={sl.profileKey}
+                onChange={e => updateSlice(si, 'profileKey', e.target.value)}
+                style={{ flex: 1, fontSize: 9, border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
+              >
+                {SLICE_PROFILE_KEYS.map(k => (
+                  <option key={k} value={k}>{TAX_PROFILES[k].label}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="0" max="100" step="5"
+                value={sl.pct}
+                onChange={e => updateSlice(si, 'pct', Number(e.target.value) || 0)}
+                style={{ width: 40, fontSize: 9, textAlign: 'center', border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
+              />
+              <span style={{ fontSize: 8 }}>%</span>
+              {currentSlices.length > 1 && (
+                <button
+                  onClick={() => removeSlice(si)}
+                  style={{ fontSize: 10, color: '#C62828', cursor: 'pointer', border: 'none', background: 'none', padding: 0, fontWeight: 700 }}
+                  title="Remover fatia"
+                >✕</button>
+              )}
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+            <button
+              onClick={addSlice}
+              style={{ fontSize: 9, color: '#1565C0', cursor: 'pointer', border: 'none', background: 'none', padding: 0, fontWeight: 700 }}
+            >+ Fatia</button>
+            <span style={{
+              fontSize: 9, fontWeight: 700,
+              color: isValid ? '#2E7D32' : '#C62828',
+            }}>
+              Σ {sliceSum}%{!isValid && ' ⚠'}
             </span>
-          )}
+          </div>
         </div>
       )}
     </td>
