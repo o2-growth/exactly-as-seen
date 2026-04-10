@@ -215,6 +215,7 @@ function fmtBRL(value: number): string {
 // ============================================================
 
 export default function PremissasPage() {
+  const { assumptions } = useFinancialModel();
   const {
     overrides,
     updateField,
