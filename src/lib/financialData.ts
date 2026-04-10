@@ -399,28 +399,104 @@ export function isProductMrr(key: TicketKey): boolean {
 }
 
 export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConfig {
-  const isSaas = SAAS_KEYS.includes(key);
-  const isEducation = EDUCATION_KEYS.includes(key);
+  const base: Omit<SubProductTaxConfig, 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'perfilTributario' | 'tipoReceita'> = {
+    csllRetido: 0, pisRetido: 0, irrfRetido: 0, cofinsRetido: 0,
+  };
 
-  // Determine default profile based on category
-  let perfilTributario: string;
-  if (isSaas) {
-    perfilTributario = 'saasTech';
-  } else if (isEducation) {
-    perfilTributario = 'education';
-  } else {
-    perfilTributario = 'servico';
+  // ── CaaS (all 5): Mix Serviço 50% + E-book 50% ──
+  if (CAAS_KEYS.includes(key)) {
+    const p = TAX_PROFILES.servico;
+    return {
+      ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+      presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+      tipoReceita: 'servico', perfilTributario: 'mix',
+      taxSlices: [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }],
+    };
   }
 
-  const profile = TAX_PROFILES[perfilTributario];
+  // ── SaaS ──
+  if (SAAS_KEYS.includes(key)) {
+    // Setup: E-book (single profile)
+    if (key === 'saasSetup') {
+      const p = TAX_PROFILES.ebook;
+      return {
+        ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+        presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+        tipoReceita: 'servico', perfilTributario: 'ebook',
+      };
+    }
+    // Oxy+Gênio+Especialista: Mix Serviço 30% + E-book 70%
+    if (key === 'saasOxyGenioEsp') {
+      const p = TAX_PROFILES.servico;
+      return {
+        ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+        presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+        tipoReceita: 'servico', perfilTributario: 'mix',
+        taxSlices: [{ profileKey: 'servico', pct: 15 }, { profileKey: 'ebook', pct: 70 }, { profileKey: 'servico', pct: 15 }],
+      };
+    }
+    // Oxy, Oxy+Gênio, Parceiros: Mix Serviço 20% + E-book 80%
+    const p = TAX_PROFILES.servico;
+    return {
+      ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+      presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+      tipoReceita: 'servico', perfilTributario: 'mix',
+      taxSlices: [{ profileKey: 'servico', pct: 20 }, { profileKey: 'ebook', pct: 80 }],
+    };
+  }
 
+  // ── Education (all 4): E-book (single profile) ──
+  if (EDUCATION_KEYS.includes(key)) {
+    const p = TAX_PROFILES.ebook;
+    return {
+      ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+      presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+      tipoReceita: 'servico', perfilTributario: 'ebook',
+    };
+  }
+
+  // ── Expansão (all 3): Mix Serviço 10% + Education 10% + E-book 80% ──
+  if (EXPANSAO_KEYS.includes(key)) {
+    const p = TAX_PROFILES.servico;
+    return {
+      ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+      presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+      tipoReceita: 'servico', perfilTributario: 'mix',
+      taxSlices: [
+        { profileKey: 'servico', pct: 10 },
+        { profileKey: 'education', pct: 10 },
+        { profileKey: 'ebook', pct: 80 },
+      ],
+    };
+  }
+
+  // ── Tax ──
+  if (TAX_KEYS.includes(key)) {
+    // Assessoria Tributária: Serviço (single profile)
+    if (key === 'taxAT') {
+      const p = TAX_PROFILES.servico;
+      return {
+        ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+        presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+        tipoReceita: 'servico', perfilTributario: 'servico',
+      };
+    }
+    // All others: Mix Serviço 50% + E-book 50%
+    const p = TAX_PROFILES.servico;
+    return {
+      ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+      presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+      tipoReceita: 'servico', perfilTributario: 'mix',
+      taxSlices: [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }],
+    };
+  }
+
+  // Fallback: Serviço
+  const p = TAX_PROFILES.servico;
   return {
-    pis: profile.pis, cofins: profile.cofins,
-    iss: profile.iss,
-    csllRetido: 0, pisRetido: 0, icms: profile.icms, irrfRetido: 0, cofinsRetido: 0,
-    presumidoIRPJ: profile.presumidoIRPJ, presumidoCSLL: profile.presumidoCSLL,
-    tipoReceita: 'servico',
-    perfilTributario,
+    ...base, pis: p.pis, cofins: p.cofins, iss: p.iss, icms: p.icms,
+    presumidoIRPJ: p.presumidoIRPJ, presumidoCSLL: p.presumidoCSLL,
+    tipoReceita: 'servico', perfilTributario: 'servico',
   };
 }
 
