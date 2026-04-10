@@ -45,7 +45,7 @@ import {
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
-import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI } from '@/lib/formulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
@@ -1319,10 +1319,13 @@ export default function Assumptions() {
 
                                   {/* Clientes Ativos — READ-ONLY calculated: Ativos(m) = Ativos(m-1) + Novos(m) - Churn(m) */}
                                   <div>
-                                    <p className="text-xs font-semibold text-muted-foreground mb-2">
-                                      Clientes Ativos — {selectedYear}
-                                      {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
-                                    </p>
+                                    <div className="flex items-center gap-1 mb-2">
+                                      <p className="text-xs font-semibold text-muted-foreground">
+                                        Clientes Ativos — {selectedYear}
+                                        {prodKey === 'saasSetup' && <span className="ml-2 text-[9px] text-primary font-normal">(auto: Enterprise + Corporate + Oxy + Oxy+Gênio + Oxy+Gênio+Esp)</span>}
+                                      </p>
+                                      <FormulaExplainer explanation={explainClientesAtivos(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                    </div>
                                     <div className="grid grid-cols-12 gap-1.5">
                                       {MONTHS.map((m, i) => {
                                         const hist = isHistorical(selectedYear, i);
@@ -1347,9 +1350,12 @@ export default function Assumptions() {
                                   {/* Novos Clientes — EDITABLE: user inputs new clients per month */}
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-semibold text-emerald-600">
-                                        Novos Clientes — {selectedYear}
-                                      </p>
+                                      <div className="flex items-center gap-1">
+                                        <p className="text-xs font-semibold text-emerald-600">
+                                          Novos Clientes — {selectedYear}
+                                        </p>
+                                        <FormulaExplainer explanation={explainNovosClientes(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                      </div>
                                       {prodKey !== 'saasSetup' && (
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
@@ -1553,7 +1559,10 @@ export default function Assumptions() {
                                       <div className="space-y-2 pt-2">
                                         {/* ── Header with N/A toggle ── */}
                                         <div className="flex items-center gap-3">
-                                          <p className="text-xs font-semibold text-negative">Logo Churn — {selectedYear}</p>
+                                          <div className="flex items-center gap-1">
+                                            <p className="text-xs font-semibold text-negative">Logo Churn — {selectedYear}</p>
+                                            <FormulaExplainer explanation={explainChurn(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                          </div>
                                           <button
                                             className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${data.churnNotApplicable?.[prodKey] ? 'bg-muted text-muted-foreground ring-1 ring-border' : 'bg-secondary/60 text-muted-foreground/60 hover:bg-secondary'}`}
                                             disabled={false}
@@ -1898,7 +1907,10 @@ export default function Assumptions() {
                                   {/* Ticket mensal + summary */}
                                   <div className="space-y-2 pt-1">
                                     <div className="flex items-center justify-between mb-2">
-                                      <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
+                                      <div className="flex items-center gap-1">
+                                        <p className="text-xs font-semibold text-muted-foreground">Ticket (R$/mês) — {selectedYear}</p>
+                                        <FormulaExplainer explanation={explainTicket(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                      </div>
                                       <div className="flex items-center gap-2">
                                         <span className="text-[10px] text-muted-foreground">Crescimento:</span>
                                          <input
@@ -2203,7 +2215,10 @@ export default function Assumptions() {
                                         {/* ── 1. Faturamento Base (read-only, gray) — only for MRR products ── */}
                                         {!isProductNonMrr && (
                                         <div className="space-y-2 pt-1">
-                                          <p className="text-xs font-semibold text-muted-foreground">Faturamento Base — {selectedYear}</p>
+                                          <div className="flex items-center gap-1">
+                                            <p className="text-xs font-semibold text-muted-foreground">Faturamento Base — {selectedYear}</p>
+                                            <FormulaExplainer explanation={explainFaturamentoBase(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                          </div>
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
@@ -2225,7 +2240,10 @@ export default function Assumptions() {
 
                                         {/* ── 2. Incremento (editable for projected, green, drill-down for historical) ── */}
                                         <div className="space-y-2 pt-1">
-                                          <p className="text-xs font-semibold text-emerald-600">Incremento — {selectedYear}</p>
+                                          <div className="flex items-center gap-1">
+                                            <p className="text-xs font-semibold text-emerald-600">Incremento — {selectedYear}</p>
+                                            <FormulaExplainer explanation={explainIncremento(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                          </div>
                                           <div className="grid grid-cols-12 gap-1.5">
                                             {MONTHS.map((m, i) => {
                                               const hist = isHistorical(selectedYear, i);
@@ -2340,7 +2358,10 @@ export default function Assumptions() {
                                         {churnApplicable && (
                                           <div className="space-y-2 pt-2">
                                             <div className="space-y-1.5">
-                                              <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Revenue Churn — {selectedYear}</p>
+                                              <div className="flex items-center gap-1">
+                                                <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">Revenue Churn — {selectedYear}</p>
+                                                <FormulaExplainer explanation={explainRevenueChurn(prodKey as FinTicketKey, row.label, selectedYear, data)} iconSize={11} />
+                                              </div>
                                               <div className="grid grid-cols-12 gap-1.5">
                                                 {MONTHS.map((m, i) => {
                                                   const hist = isHistorical(selectedYear, i);

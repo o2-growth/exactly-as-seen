@@ -289,3 +289,266 @@ export function explainKPI(
 
   return { title: '', formula: '', steps: [], result: '' };
 }
+
+// ─── TICKET ───
+
+export function explainTicket(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const ticketBase = assumptions.tickets[key] ?? 0;
+  const monthlyTickets = assumptions.monthlyTickets?.[key]?.[year];
+  const jan = monthlyTickets?.[0] ?? ticketBase;
+  const dec = monthlyTickets?.[11] ?? ticketBase;
+  const sum = Array.from({ length: 12 }, (_, i) => monthlyTickets?.[i] ?? ticketBase).reduce((s, v) => s + v, 0);
+  const avg = sum / 12;
+
+  return {
+    title: `Ticket ${label} — ${year}`,
+    formula: 'Ticket(m) = Ticket_base × (1 + crescimento%)^m',
+    steps: [
+      { label: 'Ticket base (flat)', value: formatCurrencyFull(ticketBase), source: 'Premissa "Ticket"' },
+      { label: `Jan/${year}`, value: formatCurrencyFull(jan), source: 'Primeiro mês' },
+      { label: `Dez/${year}`, value: formatCurrencyFull(dec), source: 'Último mês' },
+      { label: 'Média anual', value: formatCurrencyFull(Math.round(avg)), source: 'Σ tickets / 12' },
+    ],
+    result: formatCurrencyFull(Math.round(avg)),
+  };
+}
+
+// ─── CHURN ───
+
+export function explainChurn(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const churnRates = assumptions.monthlyChurnRates?.[key]?.[year];
+  const isArray = Array.isArray(churnRates);
+  const rateJan = isArray ? (churnRates as number[])[0] : (typeof churnRates === 'number' ? churnRates : 0);
+  const rateDec = isArray ? (churnRates as number[])[11] : rateJan;
+
+  let totalChurned = 0;
+  let totalActive = 0;
+  for (let i = 0; i < 12; i++) {
+    const rate = isArray ? (churnRates as number[])[i] : rateJan;
+    const prevActive = i === 0
+      ? (year > 2025
+        ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides)[11]
+        : monthly[0])
+      : monthly[i - 1];
+    totalChurned += prevActive * (rate / 100);
+    totalActive += monthly[i];
+  }
+  const avgActive = totalActive / 12;
+  const annualRate = avgActive > 0 ? (totalChurned / avgActive) * 100 : 0;
+
+  return {
+    title: `Logo Churn ${label} — ${year}`,
+    formula: 'Churn(m) = Ativos(m-1) × Taxa_mensal(%)',
+    steps: [
+      { label: 'Taxa mensal Jan', value: `${rateJan.toFixed(2)}%`, source: 'Premissa churn' },
+      { label: 'Taxa mensal Dez', value: `${rateDec.toFixed(2)}%`, source: isArray ? 'Crescimento progressivo' : 'Flat' },
+      { label: 'Total churns no ano', value: Math.round(totalChurned).toLocaleString('pt-BR'), source: 'Σ mensal' },
+      { label: 'Taxa anual efetiva', value: `${annualRate.toFixed(1)}%`, source: 'Churns / Média ativos' },
+    ],
+    result: Math.round(totalChurned).toLocaleString('pt-BR'),
+  };
+}
+
+// ─── NOVOS CLIENTES ───
+
+export function explainNovosClientes(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const newOverrides = assumptions.monthlyNewClientOverrides?.[key]?.[year];
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+
+  // Compute new clients per month (delta + churn)
+  let prevDec = 0;
+  if (year > 2025) {
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    prevDec = prev[11];
+  } else {
+    prevDec = monthly[0]; // approximate
+  }
+
+  let totalNew = 0;
+  for (let i = 0; i < 12; i++) {
+    const nv = newOverrides?.[i];
+    if (nv !== null && nv !== undefined) {
+      totalNew += nv;
+    } else {
+      const prev = i === 0 ? prevDec : monthly[i - 1];
+      const diff = monthly[i] - prev;
+      if (diff > 0) totalNew += diff;
+    }
+  }
+
+  const janNew = newOverrides?.[0] ?? Math.max(0, monthly[0] - prevDec);
+  const decNew = newOverrides?.[11] ?? Math.max(0, monthly[11] - (monthly[10] ?? 0));
+
+  return {
+    title: `Novos Clientes ${label} — ${year}`,
+    formula: 'Novos(m) = Ativos(m) − Ativos(m-1) + Churn(m)',
+    steps: [
+      { label: `Jan/${year}`, value: Math.round(janNew).toLocaleString('pt-BR'), source: 'Primeiro mês' },
+      { label: `Dez/${year}`, value: Math.round(decNew).toLocaleString('pt-BR'), source: 'Último mês' },
+      { label: 'Total novos no ano', value: Math.round(totalNew).toLocaleString('pt-BR'), source: 'Σ 12 meses' },
+    ],
+    result: Math.round(totalNew).toLocaleString('pt-BR'),
+  };
+}
+
+// ─── CLIENTES ATIVOS ───
+
+export function explainClientesAtivos(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const jan = Math.round(monthly[0]);
+  const dec = Math.round(monthly[11]);
+
+  let prevDec = 0;
+  if (year > 2025) {
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    prevDec = Math.round(prev[11]);
+  }
+
+  const growth = prevDec > 0 ? ((dec / prevDec - 1) * 100) : 0;
+
+  return {
+    title: `Clientes Ativos ${label} — ${year}`,
+    formula: 'Ativos(m) = Ativos(m-1) + Novos(m) − Churn(m)',
+    steps: [
+      { label: `Base (Dez/${year - 1})`, value: prevDec.toLocaleString('pt-BR'), source: 'Ano anterior' },
+      { label: `Jan/${year}`, value: jan.toLocaleString('pt-BR'), source: 'Primeiro mês' },
+      { label: `Dez/${year}`, value: dec.toLocaleString('pt-BR'), source: 'Último mês' },
+      { label: 'Crescimento anual', value: `${growth.toFixed(1)}%`, source: 'Dez/Dez anterior' },
+    ],
+    result: dec.toLocaleString('pt-BR'),
+  };
+}
+
+// ─── FATURAMENTO BASE ───
+
+export function explainFaturamentoBase(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const ticketBase = assumptions.tickets[key] ?? 0;
+
+  // Previous December revenue
+  let prevDecRev = 0;
+  if (year > 2025) {
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prevTicket = assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase;
+    prevDecRev = prev[11] * prevTicket;
+  }
+
+  // Compute faturamento base for each month (MRR from previous month)
+  const fatBase: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    if (i === 0) {
+      fatBase.push(prevDecRev);
+    } else {
+      const prevClients = monthly[i - 1];
+      const prevTicket = assumptions.monthlyTickets?.[key]?.[year]?.[i - 1] ?? ticketBase;
+      fatBase.push(prevClients * prevTicket);
+    }
+  }
+  const total = fatBase.reduce((s, v) => s + v, 0);
+
+  return {
+    title: `Faturamento Base ${label} — ${year}`,
+    formula: 'FatBase(m) = Clientes(m-1) × Ticket(m-1)',
+    steps: [
+      { label: `MRR Dez/${year - 1}`, value: formatCurrencyFull(Math.round(prevDecRev)), source: 'Mês anterior ao ano' },
+      { label: `FatBase Jan/${year}`, value: formatCurrencyFull(Math.round(fatBase[0])), source: 'Primeiro mês' },
+      { label: `FatBase Dez/${year}`, value: formatCurrencyFull(Math.round(fatBase[11])), source: 'Último mês' },
+      { label: 'Total ano', value: formatCurrencyFull(Math.round(total)), source: 'Σ 12 meses' },
+    ],
+    result: formatCurrencyFull(Math.round(total)),
+  };
+}
+
+// ─── INCREMENTO ───
+
+export function explainIncremento(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const ticketBase = assumptions.tickets[key] ?? 0;
+
+  let prevDec = 0;
+  if (year > 2025) {
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    prevDec = prev[11];
+  } else {
+    prevDec = monthly[0];
+  }
+
+  const incremento: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const prevClients = i === 0 ? prevDec : monthly[i - 1];
+    const newClients = Math.max(0, monthly[i] - prevClients);
+    const mt = assumptions.monthlyTickets?.[key]?.[year]?.[i] ?? ticketBase;
+    incremento.push(newClients * mt);
+  }
+  const total = incremento.reduce((s, v) => s + v, 0);
+
+  return {
+    title: `Incremento ${label} — ${year}`,
+    formula: 'Incremento(m) = Novos(m) × Ticket(m)',
+    steps: [
+      { label: `Jan/${year}`, value: formatCurrencyFull(Math.round(incremento[0])), source: 'Primeiro mês' },
+      { label: `Dez/${year}`, value: formatCurrencyFull(Math.round(incremento[11])), source: 'Último mês' },
+      { label: 'Total ano', value: formatCurrencyFull(Math.round(total)), source: 'Σ 12 meses' },
+    ],
+    result: formatCurrencyFull(Math.round(total)),
+  };
+}
+
+// ─── REVENUE CHURN ───
+
+export function explainRevenueChurn(
+  key: TicketKey, label: string, year: Year,
+  assumptions: Assumptions,
+): FormulaExplanation {
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const ticketBase = assumptions.tickets[key] ?? 0;
+  const churnRates = assumptions.monthlyChurnRates?.[key]?.[year];
+  const isArray = Array.isArray(churnRates);
+  const rateFlat = typeof churnRates === 'number' ? churnRates : 0;
+
+  let prevDec = 0;
+  if (year > 2025) {
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    prevDec = prev[11];
+  } else {
+    prevDec = monthly[0];
+  }
+
+  let totalRevChurn = 0;
+  for (let i = 0; i < 12; i++) {
+    const prevClients = i === 0 ? prevDec : monthly[i - 1];
+    const rate = isArray ? (churnRates as number[])[i] : rateFlat;
+    const churned = prevClients * (rate / 100);
+    const mt = assumptions.monthlyTickets?.[key]?.[year]?.[i] ?? ticketBase;
+    totalRevChurn += churned * mt;
+  }
+
+  return {
+    title: `Revenue Churn ${label} — ${year}`,
+    formula: 'RevChurn(m) = Churned(m) × Ticket(m)',
+    steps: [
+      { label: 'Ticket base', value: formatCurrencyFull(ticketBase), source: 'Premissa ticket' },
+      { label: 'Total revenue churn', value: formatCurrencyFull(Math.round(totalRevChurn)), source: 'Σ 12 meses' },
+    ],
+    result: formatCurrencyFull(Math.round(totalRevChurn)),
+  };
+}
