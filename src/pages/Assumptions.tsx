@@ -1099,17 +1099,21 @@ export default function Assumptions() {
           const ni = niNode?.annual[selectedYear] ?? model.years[selectedYear].netIncome;
           const gmPct = nr > 0 ? ((gp / nr) * 100).toFixed(1) : '0';
           const emPct = nr > 0 ? ((ebitda / nr) * 100).toFixed(1) : '0';
-          return [
-            { label: 'Receita Bruta', value: formatCurrency(gr * 1000) },
-            { label: 'EBITDA', value: formatCurrency(ebitda * 1000) },
-            { label: 'Margem Bruta', value: `${gmPct}%` },
-            { label: 'Margem EBITDA', value: `${emPct}%` },
-            { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR') },
-            { label: 'Resultado Líq.', value: formatCurrency(ni * 1000) },
+          const kpiDefs: { label: string; value: string; kpiCode: 'grossRevenue' | 'ebitda' | 'grossMargin' | 'ebitdaMargin' | 'clients' | 'netIncome' }[] = [
+            { label: 'Receita Bruta', value: formatCurrency(gr * 1000), kpiCode: 'grossRevenue' },
+            { label: 'EBITDA', value: formatCurrency(ebitda * 1000), kpiCode: 'ebitda' },
+            { label: 'Margem Bruta', value: `${gmPct}%`, kpiCode: 'grossMargin' },
+            { label: 'Margem EBITDA', value: `${emPct}%`, kpiCode: 'ebitdaMargin' },
+            { label: 'Clientes', value: model.years[selectedYear].totalClients.toLocaleString('pt-BR'), kpiCode: 'clients' },
+            { label: 'Resultado Líq.', value: formatCurrency(ni * 1000), kpiCode: 'netIncome' },
           ];
+          return kpiDefs;
         })().map(kpi => (
           <div key={kpi.label} className="gradient-card p-3 space-y-1">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+            <div className="flex items-center gap-1">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{kpi.label}</p>
+              <FormulaExplainer explanation={explainKPI(kpi.kpiCode, selectedYear, model)} iconSize={11} />
+            </div>
             <p className="text-sm font-bold tabular-nums">{kpi.value}</p>
           </div>
         ))}
