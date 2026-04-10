@@ -19,7 +19,7 @@ function useTheme() {
   return { dark, toggle: () => setDark(d => !d) };
 }
 
-const scenarios: Scenario[] = ['BEAR', 'BASE', 'BULL'];
+
 
 interface AppHeaderProps {
   onMenuToggle?: () => void;
@@ -53,25 +53,9 @@ export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
           v{currentVersion}
         </span>
 
-        <div className="flex items-center bg-secondary rounded-lg p-0.5 border border-border">
-          {scenarios.map((s) => (
-            <button
-              key={s}
-              onClick={() => setScenario(s)}
-              className={`px-2 md:px-3 py-1.5 text-[10px] md:text-xs font-semibold rounded-md transition-all duration-200 ${
-                scenario === s
-                  ? s === 'BULL'
-                    ? 'bg-success text-success-foreground'
-                    : s === 'BEAR'
-                      ? 'bg-destructive text-destructive-foreground'
-                      : 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        <span className="inline-flex items-center px-2 md:px-3 py-1.5 text-[10px] md:text-xs font-semibold rounded-md bg-primary text-primary-foreground">
+          BASE
+        </span>
 
         <div className="hidden sm:block">
           <PeriodFilter />
