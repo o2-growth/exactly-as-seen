@@ -366,7 +366,11 @@ export default function PremissasPage() {
           Clique em qualquer célula <b>amarela</b> de alíquota para editar. Digite valores em
           <b> percentual</b> (ex: <code>0,65</code> para 0,65%). Células com <b>borda laranja</b>
           indicam valor customizado vs padrão. Use <b>↺</b> ao lado da célula para reverter aquele
-          campo. Tudo é salvo automaticamente no navegador.
+          campo. <br/><br/>
+          <b>⚖ Mix Serviço/Produto:</b> Para subcategorias com emissão mista (ex: 50% serviço + 50% e-book/produto),
+          clique na coluna <b>⚖ Mix Serviço</b> e informe o percentual de serviço (0-100%). O sistema calcula
+          automaticamente a base presumida ponderada (Serviço: IRPJ 32%, CSLL 32% | Produto: IRPJ 8%, CSLL 12%).
+          Deixe vazio para usar base presumida manual.
         </section>
 
         {/* FILTROS */}
