@@ -2837,21 +2837,40 @@ export default function Assumptions() {
                                 const cfg = getConfig(k);
 
                                 if (isEditable && rowDef.field) {
-                                  const cellValue = cfg[rowDef.field] as number;
+                                  const cellValue = cfg[rowDef.field] as number | undefined;
+                                  const isMixRow = rowDef.isMix;
+                                  const displayValue = isMixRow ? (cellValue ?? '') : (cellValue ?? 0);
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
                                       {editing ? (
                                         <input
                                           type="number"
-                                          step="0.1"
+                                          step={isMixRow ? '5' : '0.1'}
                                           min="0"
-                                          max="20"
-                                          className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={cellValue}
-                                          onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
+                                          max={isMixRow ? '100' : '100'}
+                                          placeholder={isMixRow ? '—' : '0'}
+                                          className={`w-16 border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary ${isMixRow ? 'bg-accent/50' : 'bg-secondary'}`}
+                                          value={displayValue}
+                                          onChange={e => {
+                                            const v = e.target.value;
+                                            if (isMixRow && v === '') {
+                                              // Clear mix — remove the field
+                                              const current = getConfig(k);
+                                              const { mixServicoPct: _, ...rest } = current as any;
+                                              const rates = { ...(data.subProductTaxRates ?? {}), [k]: rest };
+                                              setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                            } else {
+                                              updateSubProductTax(k, rowDef.field!, Number(v) || 0);
+                                            }
+                                          }}
                                         />
                                       ) : (
-                                        <span className="text-xs tabular-nums">{cellValue.toFixed(2).replace('.', ',')}%</span>
+                                        <span className={`text-xs tabular-nums ${isMixRow && cellValue !== undefined ? 'font-semibold text-primary' : ''}`}>
+                                          {isMixRow
+                                            ? (cellValue !== undefined ? `${cellValue}% serv` : '—')
+                                            : `${(cellValue ?? 0).toFixed(2).replace('.', ',')}%`
+                                          }
+                                        </span>
                                       )}
                                     </td>
                                   );
