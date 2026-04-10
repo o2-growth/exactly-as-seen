@@ -514,7 +514,7 @@ export function explainFaturamentoBase(
     example: (() => {
       const m = findRepresentativeMonth(fatBase);
       const prevClients = m === 0
-        ? (year > 2025 ? Math.round(prevDecRev / (assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase || 1)) : Math.round(monthly[0]))
+        ? (year > 2025 ? Math.round(prevDecRev / ((assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase) || 1)) : Math.round(monthly[0]))
         : Math.round(monthly[m - 1]);
       const prevTicket = m === 0
         ? (assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase)
