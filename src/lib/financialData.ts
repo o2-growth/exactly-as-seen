@@ -212,6 +212,63 @@ export const TAX_PROFILE_KEYS = Object.keys(TAX_PROFILES);
 // Profiles that can be used as slices inside a mix (excludes 'mix' and 'custom')
 export const SLICE_PROFILE_KEYS = TAX_PROFILE_KEYS.filter(k => k !== 'mix' && k !== 'custom');
 
+export const DEFAULT_MIX_TAX_SLICES: TaxSlice[] = [
+  { profileKey: 'servico', pct: 50 },
+  { profileKey: 'ebook', pct: 50 },
+];
+
+function sanitizeSliceProfileKey(profileKey?: string): string {
+  return profileKey && SLICE_PROFILE_KEYS.includes(profileKey) ? profileKey : 'servico';
+}
+
+function sanitizeSlicePct(pct?: number): number {
+  if (!Number.isFinite(pct)) return 0;
+  return Math.max(0, Math.min(100, pct ?? 0));
+}
+
+export function getMixTaxSlices(slices?: TaxSlice[]): TaxSlice[] {
+  const source = slices?.length ? slices : DEFAULT_MIX_TAX_SLICES;
+  return source.map(slice => ({
+    profileKey: sanitizeSliceProfileKey(slice.profileKey),
+    pct: sanitizeSlicePct(slice.pct),
+  }));
+}
+
+export function swapOrUpdateMixSliceProfile(slices: TaxSlice[] | undefined, idx: number, profileKey: string): TaxSlice[] {
+  const currentSlices = getMixTaxSlices(slices);
+  if (!currentSlices[idx]) return currentSlices;
+
+  const safeProfileKey = sanitizeSliceProfileKey(profileKey);
+  const existingIdx = currentSlices.findIndex((slice, sliceIdx) => sliceIdx !== idx && slice.profileKey === safeProfileKey);
+
+  if (existingIdx >= 0) {
+    const reordered = [...currentSlices];
+    [reordered[idx], reordered[existingIdx]] = [reordered[existingIdx], reordered[idx]];
+    return reordered;
+  }
+
+  return currentSlices.map((slice, sliceIdx) => (
+    sliceIdx === idx ? { ...slice, profileKey: safeProfileKey } : slice
+  ));
+}
+
+export function updateMixSlicePct(slices: TaxSlice[] | undefined, idx: number, pct: number): TaxSlice[] {
+  return getMixTaxSlices(slices).map((slice, sliceIdx) => (
+    sliceIdx === idx ? { ...slice, pct: sanitizeSlicePct(pct) } : slice
+  ));
+}
+
+export function addMixTaxSlice(slices?: TaxSlice[]): TaxSlice[] {
+  const currentSlices = getMixTaxSlices(slices);
+  const remaining = Math.max(0, 100 - currentSlices.reduce((sum, slice) => sum + slice.pct, 0));
+  return [...currentSlices, { profileKey: 'servico', pct: remaining }];
+}
+
+export function removeMixTaxSlice(slices: TaxSlice[] | undefined, idx: number): TaxSlice[] {
+  const currentSlices = getMixTaxSlices(slices);
+  return currentSlices.length <= 1 ? currentSlices : currentSlices.filter((_, sliceIdx) => sliceIdx !== idx);
+}
+
 // Constantes de base presumida por tipo de receita (em %)
 export const PRESUMIDO_SERVICO = { irpj: 32, csll: 32 };
 export const PRESUMIDO_PRODUTO = { irpj: 8, csll: 12 };
@@ -236,11 +293,7 @@ export function applyTaxProfile(cfg: SubProductTaxConfig, profileKey: string): S
     return {
       ...cfg,
       perfilTributario: 'mix',
-      // Keep existing slices or default to two slices
-      taxSlices: cfg.taxSlices?.length ? cfg.taxSlices : [
-        { profileKey: 'servico', pct: 50 },
-        { profileKey: 'ebook', pct: 50 },
-      ],
+      taxSlices: getMixTaxSlices(cfg.taxSlices),
       mixServicoPct: undefined,
     };
   }
@@ -260,8 +313,8 @@ export function applyTaxProfile(cfg: SubProductTaxConfig, profileKey: string): S
 
 /** Resolve tax slices for a config. Returns array of slices with resolved profile data. */
 export function resolveSlices(cfg: SubProductTaxConfig): { profile: TaxProfileDef; pct: number }[] {
-  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
-    return cfg.taxSlices.map(s => ({
+  if (cfg.perfilTributario === 'mix') {
+    return getMixTaxSlices(cfg.taxSlices).map(s => ({
       profile: TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico,
       pct: s.pct / 100,
     }));
@@ -283,9 +336,9 @@ export function resolveSlices(cfg: SubProductTaxConfig): { profile: TaxProfileDe
 
 /** Get the effective presumido values for a config, considering profile and mix slices */
 export function getEffectivePresumido(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
-  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
+  if (cfg.perfilTributario === 'mix') {
     let irpj = 0, csll = 0;
-    for (const s of cfg.taxSlices) {
+    for (const s of getMixTaxSlices(cfg.taxSlices)) {
       const p = TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico;
       irpj += p.presumidoIRPJ * (s.pct / 100);
       csll += p.presumidoCSLL * (s.pct / 100);
@@ -304,9 +357,9 @@ export function getEffectivePresumido(cfg: SubProductTaxConfig): { irpj: number;
 
 /** Get effective weighted tax rates for display (PIS, COFINS, ISS, etc.) */
 export function getEffectiveTaxRates(cfg: SubProductTaxConfig): { pis: number; cofins: number; iss: number; icms: number; presumidoIRPJ: number; presumidoCSLL: number } {
-  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
+  if (cfg.perfilTributario === 'mix') {
     let pis = 0, cofins = 0, iss = 0, icms = 0, pIRPJ = 0, pCSLL = 0;
-    for (const s of cfg.taxSlices) {
+    for (const s of getMixTaxSlices(cfg.taxSlices)) {
       const p = TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico;
       const w = s.pct / 100;
       pis += p.pis * w;

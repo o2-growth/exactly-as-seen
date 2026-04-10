@@ -24,7 +24,7 @@ function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: n
 }
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, TaxSlice, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr, computeMixPresumido as computeMixPresumidoFn, TAX_PROFILES, TAX_PROFILE_KEYS, SLICE_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido, getEffectiveTaxRates } from '@/lib/financialData';
+import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, TaxSlice, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr, computeMixPresumido as computeMixPresumidoFn, TAX_PROFILES, TAX_PROFILE_KEYS, SLICE_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido, getEffectiveTaxRates, getMixTaxSlices, swapOrUpdateMixSliceProfile, updateMixSlicePct, addMixTaxSlice, removeMixTaxSlice } from '@/lib/financialData';
 import { TAX_PREMISES, type TaxPremise } from '@/data/taxPremises';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
@@ -2706,9 +2706,10 @@ export default function Assumptions() {
               { label: 'CSLL efetivo (%)', computed: (cfg) => getEffectivePresumido(cfg).csll / 100 * 0.09 * 100 },
               { label: 'TOTAL efetivo (sem AD.IRPJ)', computed: (cfg) => {
                 const eff = getEffectivePresumido(cfg);
+                const effRates = getEffectiveTaxRates(cfg);
                 const irpj = eff.irpj / 100 * 0.15 * 100;
                 const csll = eff.csll / 100 * 0.09 * 100;
-                return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
+                return effRates.pis + effRates.cofins + effRates.iss + cfg.csllRetido + cfg.pisRetido + effRates.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
               }, isTotal: true },
               { label: 'AD.IRPJ (global)', computed: (cfg) => getEffectivePresumido(cfg).irpj / 100 * 0.10 * 100 },
             ];
@@ -2740,14 +2741,12 @@ export default function Assumptions() {
             };
 
             const updateSubProductTax = (key: FinTicketKey, field: keyof SubProductTaxConfig, val: number) => {
-              const current = getConfig(key);
-              const updated = { ...current, [field]: val };
-              const rates = { ...(data.subProductTaxRates ?? {}), [key]: updated };
-              if (editing) {
-                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
-              } else {
-                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates } as AssumptionsType));
-              }
+              setAssumptions(prev => {
+                const current = getSubProductTaxRate(key, prev as AssumptionsType);
+                const updated = { ...current, [field]: val };
+                const rates = { ...(prev.subProductTaxRates ?? {}), [key]: updated };
+                return { ...prev, subProductTaxRates: rates } as AssumptionsType;
+              });
             };
 
             return (
@@ -2822,9 +2821,12 @@ export default function Assumptions() {
                                             value={currentProfile}
                                             onChange={e => {
                                               const profileKey = e.target.value;
-                                              const updated = applyTaxProfile(cfg, profileKey);
-                                              const rates = { ...(data.subProductTaxRates ?? {}), [k]: updated };
-                                              setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                              setAssumptions(prev => {
+                                                const current = getSubProductTaxRate(k, prev as AssumptionsType);
+                                                const updated = applyTaxProfile(current, profileKey);
+                                                const rates = { ...(prev.subProductTaxRates ?? {}), [k]: updated };
+                                                return { ...prev, subProductTaxRates: rates };
+                                              });
                                             }}
                                             className="w-20 border border-border rounded px-1 py-0.5 text-[10px] text-foreground bg-secondary outline-none focus:ring-1 focus:ring-primary"
                                           >
@@ -2835,15 +2837,17 @@ export default function Assumptions() {
                                           </select>
                                           {currentProfile === 'mix' && (
                                             <div className="space-y-1 mt-1">
-                                              {(cfg.taxSlices?.length ? cfg.taxSlices : [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }]).map((sl: TaxSlice, si: number) => (
+                                              {getMixTaxSlices(cfg.taxSlices).map((sl: TaxSlice, si: number) => (
                                                 <div key={si} className="flex items-center gap-1">
                                                   <select
                                                     value={sl.profileKey}
                                                     onChange={e => {
-                                                      const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
-                                                      slices[si] = { ...slices[si], profileKey: e.target.value };
-                                                      const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
-                                                      setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                      setAssumptions(prev => {
+                                                        const current = getSubProductTaxRate(k, prev as AssumptionsType);
+                                                        const slices = swapOrUpdateMixSliceProfile(current.taxSlices, si, e.target.value);
+                                                        const rates = { ...(prev.subProductTaxRates ?? {}), [k]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined } };
+                                                        return { ...prev, subProductTaxRates: rates };
+                                                      });
                                                     }}
                                                     className="w-16 border border-border rounded px-0.5 py-0.5 text-[9px] bg-secondary text-foreground outline-none"
                                                   >
@@ -2855,20 +2859,25 @@ export default function Assumptions() {
                                                     type="number" min="0" max="100" step="5"
                                                     value={sl.pct}
                                                     onChange={e => {
-                                                      const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
-                                                      slices[si] = { ...slices[si], pct: Number(e.target.value) || 0 };
-                                                      const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
-                                                      setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                      setAssumptions(prev => {
+                                                        const current = getSubProductTaxRate(k, prev as AssumptionsType);
+                                                        const slices = updateMixSlicePct(current.taxSlices, si, Number(e.target.value) || 0);
+                                                        const rates = { ...(prev.subProductTaxRates ?? {}), [k]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined } };
+                                                        return { ...prev, subProductTaxRates: rates };
+                                                      });
                                                     }}
                                                     className="w-10 border border-border rounded px-0.5 py-0.5 text-center text-[9px] bg-accent/50 text-foreground outline-none"
                                                   />
                                                   <span className="text-[8px]">%</span>
-                                                  {(cfg.taxSlices?.length ?? 2) > 1 && (
+                                                  {getMixTaxSlices(cfg.taxSlices).length > 1 && (
                                                     <button
                                                       onClick={() => {
-                                                        const slices = [...(cfg.taxSlices || [])].filter((_, i) => i !== si);
-                                                        const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
-                                                        setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                        setAssumptions(prev => {
+                                                          const current = getSubProductTaxRate(k, prev as AssumptionsType);
+                                                          const slices = removeMixTaxSlice(current.taxSlices, si);
+                                                          const rates = { ...(prev.subProductTaxRates ?? {}), [k]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined } };
+                                                          return { ...prev, subProductTaxRates: rates };
+                                                        });
                                                       }}
                                                       className="text-[9px] text-destructive hover:text-destructive/80"
                                                     >✕</button>
@@ -2877,11 +2886,12 @@ export default function Assumptions() {
                                               ))}
                                               <button
                                                 onClick={() => {
-                                                  const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
-                                                  const remaining = Math.max(0, 100 - slices.reduce((s, sl) => s + sl.pct, 0));
-                                                  slices.push({ profileKey: 'servico', pct: remaining });
-                                                  const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
-                                                  setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                  setAssumptions(prev => {
+                                                    const current = getSubProductTaxRate(k, prev as AssumptionsType);
+                                                    const slices = addMixTaxSlice(current.taxSlices);
+                                                    const rates = { ...(prev.subProductTaxRates ?? {}), [k]: { ...current, taxSlices: slices, perfilTributario: 'mix', mixServicoPct: undefined } };
+                                                    return { ...prev, subProductTaxRates: rates };
+                                                  });
                                                 }}
                                                 className="text-[9px] text-primary font-semibold"
                                               >+ Fatia</button>
@@ -2907,8 +2917,12 @@ export default function Assumptions() {
                                 }
 
                                 if (isEditable && rowDef.field) {
-                                  const cellValue = cfg[rowDef.field] as number | undefined;
-                                  const isLocked = cfg.perfilTributario && cfg.perfilTributario !== 'custom' && cfg.perfilTributario !== 'mix';
+                                  const effRates = getEffectiveTaxRates(cfg);
+                                  const isMixDerivedField = cfg.perfilTributario === 'mix' && ['pis', 'cofins', 'iss', 'icms'].includes(rowDef.field);
+                                  const cellValue = isMixDerivedField
+                                    ? effRates[rowDef.field as 'pis' | 'cofins' | 'iss' | 'icms']
+                                    : cfg[rowDef.field] as number | undefined;
+                                  const isLocked = (cfg.perfilTributario && cfg.perfilTributario !== 'custom' && cfg.perfilTributario !== 'mix') || isMixDerivedField;
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
                                       {editing && !isLocked ? (

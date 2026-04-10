@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_ASSUMPTIONS, YEARS, Assumptions, Year, TicketKey,
-  SCENARIO_MULTIPLIERS, DEFAULT_PMR, getFilteredYears, isYearInRange,
+  SCENARIO_MULTIPLIERS, DEFAULT_PMR, getFilteredYears, isYearInRange, getEffectiveTaxRates, swapOrUpdateMixSliceProfile,
 } from '@/lib/financialData';
 
 describe('Financial Data: Constants', () => {
@@ -165,5 +165,53 @@ describe('Financial Data: Period filtering', () => {
     expect(isYearInRange(2025, undefined)).toBe(true);
     expect(isYearInRange(2025, { startYear: 2025, endYear: 2027 })).toBe(true);
     expect(isYearInRange(2028, { startYear: 2025, endYear: 2027 })).toBe(false);
+  });
+});
+
+describe('Financial Data: Mix tax helpers', () => {
+  const baseMixConfig = {
+    pis: 0.65,
+    cofins: 3,
+    iss: 5,
+    csllRetido: 0,
+    pisRetido: 0,
+    icms: 0,
+    irrfRetido: 0,
+    cofinsRetido: 0,
+    presumidoIRPJ: 32,
+    presumidoCSLL: 32,
+    tipoReceita: 'servico',
+    perfilTributario: 'mix',
+  } as const;
+
+  it('keeps effective rates identical when the same mix is reordered', () => {
+    const mixA = {
+      ...baseMixConfig,
+      taxSlices: [
+        { profileKey: 'ebook', pct: 20 },
+        { profileKey: 'servico', pct: 80 },
+      ],
+    };
+    const mixB = {
+      ...baseMixConfig,
+      taxSlices: [
+        { profileKey: 'servico', pct: 80 },
+        { profileKey: 'ebook', pct: 20 },
+      ],
+    };
+
+    expect(getEffectiveTaxRates(mixA)).toEqual(getEffectiveTaxRates(mixB));
+  });
+
+  it('swaps whole slices when selecting a profile that already exists', () => {
+    const reordered = swapOrUpdateMixSliceProfile([
+      { profileKey: 'ebook', pct: 20 },
+      { profileKey: 'servico', pct: 80 },
+    ], 0, 'servico');
+
+    expect(reordered).toEqual([
+      { profileKey: 'servico', pct: 80 },
+      { profileKey: 'ebook', pct: 20 },
+    ]);
   });
 });
