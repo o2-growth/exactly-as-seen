@@ -1,10 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X } from 'lucide-react';
+import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X, Receipt } from 'lucide-react';
 import o2Logo from '@/assets/O2_Inc_Logo.png';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Overview' },
   { to: '/assumptions', icon: SlidersHorizontal, label: 'Assumptions' },
+  { to: '/premissas', icon: Receipt, label: 'Premissas Tributárias' },
   { to: '/pnl', icon: BarChart3, label: 'P&L' },
   { to: '/cashflow', icon: Droplets, label: 'Cash Flow' },
   { to: '/debt', icon: Landmark, label: 'Debt & Finance' },
