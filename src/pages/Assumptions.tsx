@@ -2846,7 +2846,7 @@ export default function Assumptions() {
                 ))}
                 <div className="flex items-start gap-2 mt-3 text-[11px] text-muted-foreground">
                   <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                  <span>Lucro Presumido — base 32% para IRPJ e CSLL (todos os produtos = serviço). Deduções sobre Receita Bruta: PIS 0,65% + COFINS 3% + ISS (SaaS 2,9% | Education 2% | demais 5%). IRPJ efetivo = 32% × 15% = 4,80%. CSLL efetivo = 32% × 9% = 2,88%. AD.IRPJ = 10% sobre base presumida excedente a R$20.000/mês (calculado globalmente). Tributos incidem independente de lucro ou prejuízo.</span>
+                  <span>Lucro Presumido — base presumida editável por subproduto (padrão 32% para serviço). Deduções sobre Receita Bruta: PIS 0,65% + COFINS 3% + ISS (SaaS 2,9% | Education 2% | demais 5%). IRPJ efetivo = base × 15%. CSLL efetivo = base × 9%. AD.IRPJ = 10% sobre base presumida IRPJ excedente a R$20.000/mês (calculado globalmente). Tributos incidem independente de lucro ou prejuízo.</span>
                 </div>
               </div>
             );
