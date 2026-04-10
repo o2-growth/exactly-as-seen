@@ -3262,10 +3262,25 @@ export default function Assumptions() {
                             </td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.saasSubCost * 12)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.setupCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.eduCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.eduCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('education', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.csCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.expansaoCost)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.taxCost)}</td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.expansaoCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('expansao', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
+                            <td className="text-right px-2 py-2 tabular-nums">
+                              <div className="flex items-center justify-end gap-0.5">
+                                {formatCurrency(yi.taxCost)}
+                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('tax', yi.year, data, model)} iconSize={10} />}
+                              </div>
+                            </td>
                             <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.grandTotal)}</td>
                             <td className="text-right px-2 py-2 tabular-nums">
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
