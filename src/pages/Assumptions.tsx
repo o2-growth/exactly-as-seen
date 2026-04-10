@@ -261,19 +261,66 @@ export default function Assumptions() {
   /** Get annual client sum using API data for historical months, engine for projected */
   const getAnnualClientSum = (key: SubProductKey, year: Year): number => {
     const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-    let total = 0;
-    for (let m = 0; m < 12; m++) {
-      const period = toPeriod(year, m);
-      const apiEntry = historicalData[key]?.[period];
-      if (apiEntry && apiEntry.client_count > 0) {
-        total += apiEntry.client_count;
-      } else if (isHistorical(year, m) && apiEntry) {
-        total += 0; // API says 0, trust it
+
+    // Compute "new clients in the year" — same logic for both MRR and non-MRR products.
+    // For historical months: max(0, activeCur - activePrev + churnedCur) using API data.
+    // For projected months: monthlyNewClientOverrides ?? 0.
+    let newInYear = 0;
+    for (let i = 0; i < 12; i++) {
+      const hist = isHistorical(year, i);
+      const hcPeriodCur = toPeriod(year, i);
+      const hcEntryCur = hist ? historicalData[key]?.[hcPeriodCur] : undefined;
+      if (hist) {
+        const activeCur = hcEntryCur ? hcEntryCur.client_count : engineMonthly[i];
+        let activePrev = 0;
+        if (i > 0) {
+          const hcPeriodPrev = toPeriod(year, i - 1);
+          const hcEntryPrev = isHistorical(year, i - 1) ? historicalData[key]?.[hcPeriodPrev] : undefined;
+          activePrev = hcEntryPrev ? hcEntryPrev.client_count : engineMonthly[i - 1];
+        } else if (year > 2025) {
+          const prevYr = (year - 1) as Year;
+          const decPeriodP = toPeriod(prevYr, 11);
+          const decApiP = historicalData[key]?.[decPeriodP];
+          if (decApiP && decApiP.client_count > 0) {
+            activePrev = decApiP.client_count;
+          } else {
+            activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+          }
+        }
+        let churnedCur = 0;
+        if (hcEntryCur) {
+          churnedCur = hcEntryCur.churned_clients ?? 0;
+        } else {
+          churnedCur = Math.round(activePrev * getChurnForMonth(key, data, year, i));
+        }
+        newInYear += Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
       } else {
-        total += Math.round(engineMonthly[m]);
+        const storedNew = data.monthlyNewClientOverrides?.[key]?.[year]?.[i];
+        newInYear += storedNew ?? 0;
       }
     }
-    return Math.round(total);
+
+    // Non-MRR (one-shot): every client is by definition "new", so unique = new in year
+    if (!isProductMrr(key as FinTicketKey)) {
+      return Math.round(newInYear);
+    }
+
+    // MRR: unique clients = carryover from previous year + new in this year
+    // For year === 2025: carryover is 0 (January's client_count is already counted as "new" in the loop above)
+    // For year > 2025: carryover = December of previous year's active clients (API or engine)
+    let activeAtStart = 0;
+    if (year > 2025) {
+      const prevYr = (year - 1) as Year;
+      const decPeriodP = toPeriod(prevYr, 11);
+      const decApiP = historicalData[key]?.[decPeriodP];
+      if (decApiP && decApiP.client_count > 0) {
+        activeAtStart = decApiP.client_count;
+      } else {
+        activeAtStart = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+      }
+    }
+
+    return Math.round(activeAtStart + newInYear);
   };
 
   /** Get annual revenue using API data for historical months, engine for projected */
@@ -2078,8 +2125,10 @@ export default function Assumptions() {
                                         return new Map((prevEntry?.client_names || []).map((c: any) => [c.name, c.value ?? 0]));
                                       };
 
-                                      // ── Historical months: use EXACT individual client values ──
-                                      if (hist && apiEntry && apiEntry.total_revenue > 0 && apiEntry.client_names) {
+                                      // ── Historical months: API is authoritative ──
+                                      // Non-MRR: trust API for any historical month (including total_revenue === 0)
+                                      // MRR: still needs total_revenue > 0 + client_names for per-client decomposition
+                                      if (hist && apiEntry && (isProductNonMrr || (apiEntry.total_revenue > 0 && apiEntry.client_names))) {
                                         const curNames = new Map((apiEntry.client_names || []).map((c: any) => [c.name, c.value ?? 0]));
                                         const prevNames = getPrevClientNamesMap();
 
