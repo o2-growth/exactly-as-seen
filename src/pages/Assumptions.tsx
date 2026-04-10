@@ -2749,9 +2749,7 @@ export default function Assumptions() {
                       <td className="text-right p-2 tabular-nums text-xs font-bold text-emerald-600 bg-primary/5">
                         {formatCurrency(group.items.reduce((sum, row) => {
                           if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
-                          const mc = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                          const tk = data.tickets[row.dataKey as TicketKey] ?? 0;
-                          return sum + mc.reduce((s, v, i) => s + v * (data.monthlyTickets?.[row.dataKey as SubProductKey]?.[selectedYear]?.[i] ?? tk), 0);
+                          return sum + getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
                         }, 0))}
                       </td>
                     </tr>
