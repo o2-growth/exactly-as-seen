@@ -170,9 +170,24 @@ export interface SubProductTaxConfig {
   icms: number;             // 2.06 ICMS — default 0
   irrfRetido: number;       // 2.07 IRRF (retido na fonte) — default 0
   cofinsRetido: number;     // 2.08 COFINS (retido na fonte) — default 0
-  presumidoIRPJ: number;    // Base presumida IRPJ — default 0.32 (serviço)
-  presumidoCSLL: number;    // Base presumida CSLL — default 0.32 (serviço)
+  presumidoIRPJ: number;    // Base presumida IRPJ — default 32 (serviço, em %)
+  presumidoCSLL: number;    // Base presumida CSLL — default 32 (serviço, em %)
   tipoReceita: string;      // 'servico' (default)
+  mixServicoPct?: number;   // Mix: % da receita tributada como serviço (0-100). undefined = sem mix (manual)
+}
+
+// Constantes de base presumida por tipo de receita (em %)
+export const PRESUMIDO_SERVICO = { irpj: 32, csll: 32 };
+export const PRESUMIDO_PRODUTO = { irpj: 8, csll: 12 };
+
+/** Compute blended presumido from mix percentage (serviço vs produto) */
+export function computeMixPresumido(mixServicoPct: number): { irpj: number; csll: number } {
+  const s = mixServicoPct / 100;
+  const p = 1 - s;
+  return {
+    irpj: Math.round((s * PRESUMIDO_SERVICO.irpj + p * PRESUMIDO_PRODUTO.irpj) * 100) / 100,
+    csll: Math.round((s * PRESUMIDO_SERVICO.csll + p * PRESUMIDO_PRODUTO.csll) * 100) / 100,
+  };
 }
 
 /** All TicketKey values grouped by product category */
