@@ -29,8 +29,36 @@ import {
   TaxPremise,
   Categoria,
 } from '@/data/taxPremises';
+import { useFinancialModel } from '@/contexts/FinancialModelContext';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
+
+// Mapping: TAX_PREMISES key → TicketKey (engine)
+const PREMISE_TO_TICKET: Record<string, TicketKey> = {
+  'CaaS/Serviços Especializados': 'caasAssessoria',
+  'CaaS/Enterprise': 'caasEnterprise',
+  'CaaS/Corporate': 'caasCorporate',
+  'CaaS/Parceiros': 'caasParceiros',
+  'CaaS/BPO Financeiro': 'caasSetup',
+  'SaaS/Oxy': 'saasOxy',
+  'SaaS/Oxy + Gênio': 'saasOxyGenio',
+  'SaaS/Setup': 'saasSetup',
+  'SaaS/Parceiros': 'saasParceiros',
+  'SaaS/Oxy + Gênio + Especialista': 'saasOxyGenioEsp',
+  'Education/Dono CFO': 'educationDonoCFO',
+  'Education/Engenheiro de Negócios': 'educationEN',
+  'Education/Financeiro Raiz': 'educationFR',
+  'Education/Finance Sales Program': 'educationFSP',
+  'Expansão/Oxy Hacker - Micro Franqueado': 'baas',
+  'Expansão/Franquia': 'baasFranquia',
+  'Expansão/Master Franquia': 'baasMasterFranquia',
+  'Tax/Assessoria Tributária': 'taxAT',
+  'Tax/Gestão Passivo Tributário': 'taxGPT',
+  'Tax/Recuperação Crédito Tributário': 'taxRCT',
+  'Tax/Reforma Tributária': 'taxRT',
+  'Tax/Diagnóstico Tributário & Compliance': 'taxDTC',
+};
 
 const CATEGORIAS: Categoria[] = ['CaaS', 'SaaS', 'Education', 'Expansão', 'Tax'];
 
