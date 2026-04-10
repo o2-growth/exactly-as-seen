@@ -121,12 +121,13 @@ export function useEditablePremises() {
     // Remove override by deleting the field from the stored config
     const current = assumptions.subProductTaxRates?.[ticketKey];
     if (!current) return;
-    const { [field]: _, ...rest } = current as Record<string, unknown>;
+    const updated = { ...current };
+    delete (updated as any)[field];
     const rates = { ...(assumptions.subProductTaxRates ?? {}) };
-    if (Object.keys(rest).length === 0) {
+    if (Object.keys(updated).length === 0) {
       delete rates[ticketKey];
     } else {
-      rates[ticketKey] = rest as SubProductTaxConfig;
+      rates[ticketKey] = updated;
     }
     setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
   }, [assumptions, setAssumptions]);
