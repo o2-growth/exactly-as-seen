@@ -30,7 +30,7 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido } from '@/lib/financialData';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido, TAX_PROFILES, TAX_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -75,8 +75,8 @@ const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
 // TIPOS DE OVERRIDE
 // ============================================================
 
-type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct';
-type PremiseOverride = Partial<Record<EditableField, number>>;
+type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct' | 'perfilTributario';
+type PremiseOverride = Partial<Record<EditableField, number | string>>;
 type AllOverrides = Record<string, PremiseOverride>;
 
 // ============================================================
