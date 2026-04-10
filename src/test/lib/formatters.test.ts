@@ -6,18 +6,18 @@ import { formatCurrency, formatCurrencyFull, formatPercent, formatNumber } from 
 
 describe('formatCurrency', () => {
   it('formats billions', () => {
-    expect(formatCurrency(1_500_000_000)).toBe('R$ 1.50B');
-    expect(formatCurrency(-2_000_000_000)).toBe('-R$ 2.00B');
+    expect(formatCurrency(1_500_000_000)).toBe('R$ 1.500.000.000');
+    expect(formatCurrency(-2_000_000_000)).toBe('-R$ 2.000.000.000');
   });
 
   it('formats millions', () => {
-    expect(formatCurrency(13_777_000)).toBe('R$ 13.8MM');
-    expect(formatCurrency(-5_500_000)).toBe('-R$ 5.5MM');
+    expect(formatCurrency(13_777_000)).toBe('R$ 13.777.000');
+    expect(formatCurrency(-5_500_000)).toBe('-R$ 5.500.000');
   });
 
   it('formats thousands', () => {
-    expect(formatCurrency(50_000)).toBe('R$ 50.0k');
-    expect(formatCurrency(-1_200)).toBe('-R$ 1.2k');
+    expect(formatCurrency(50_000)).toBe('R$ 50.000');
+    expect(formatCurrency(-1_200)).toBe('-R$ 1.200');
   });
 
   it('formats small values', () => {
