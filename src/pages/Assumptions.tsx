@@ -1246,13 +1246,19 @@ export default function Assumptions() {
                               </div>
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold">
-                              {row.dataKey ? getAnnualClientSum(row.dataKey as SubProductKey, selectedYear).toLocaleString('pt-BR') : '—'}
+                              <div className="flex items-center justify-end gap-1">
+                                {row.dataKey ? getAnnualClientSum(row.dataKey as SubProductKey, selectedYear).toLocaleString('pt-BR') : '—'}
+                                {row.dataKey && <FormulaExplainer explanation={explainClients(row.dataKey as TicketKey, row.label, selectedYear, data)} iconSize={11} />}
+                              </div>
                             </td>
                             <td className="text-right p-3 tabular-nums text-sm bg-primary/5 font-semibold text-emerald-600">
-                              {row.dataKey ? (() => {
-                                const rev = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
-                                return formatCurrency(rev);
-                              })() : '—'}
+                              <div className="flex items-center justify-end gap-1">
+                                {row.dataKey ? (() => {
+                                  const rev = getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
+                                  return formatCurrency(rev);
+                                })() : '—'}
+                                {row.dataKey && <FormulaExplainer explanation={explainRevenue(row.dataKey as TicketKey, row.label, selectedYear, data, model)} iconSize={11} />}
+                              </div>
                             </td>
                           </tr>
 
