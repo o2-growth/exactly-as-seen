@@ -2834,20 +2834,58 @@ export default function Assumptions() {
                                             ))}
                                           </select>
                                           {currentProfile === 'mix' && (
-                                            <input
-                                              type="number"
-                                              min="0" max="100" step="5"
-                                              value={cfg.mixServicoPct ?? 50}
-                                              onChange={e => {
-                                                const v = Number(e.target.value) || 0;
-                                                const mix = computeMixPresumidoFn(v);
-                                                const updated = { ...cfg, mixServicoPct: v, presumidoIRPJ: mix.irpj, presumidoCSLL: mix.csll, perfilTributario: 'mix' };
-                                                const rates = { ...(data.subProductTaxRates ?? {}), [k]: updated };
-                                                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
-                                              }}
-                                              className="w-16 border border-border rounded px-1 py-0.5 text-center text-[10px] bg-accent/50 text-foreground outline-none"
-                                              placeholder="% serv"
-                                            />
+                                            <div className="space-y-1 mt-1">
+                                              {(cfg.taxSlices?.length ? cfg.taxSlices : [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }]).map((sl: TaxSlice, si: number) => (
+                                                <div key={si} className="flex items-center gap-1">
+                                                  <select
+                                                    value={sl.profileKey}
+                                                    onChange={e => {
+                                                      const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
+                                                      slices[si] = { ...slices[si], profileKey: e.target.value };
+                                                      const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
+                                                      setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                    }}
+                                                    className="w-16 border border-border rounded px-0.5 py-0.5 text-[9px] bg-secondary text-foreground outline-none"
+                                                  >
+                                                    {SLICE_PROFILE_KEYS.map(pk => (
+                                                      <option key={pk} value={pk}>{TAX_PROFILES[pk].label}</option>
+                                                    ))}
+                                                  </select>
+                                                  <input
+                                                    type="number" min="0" max="100" step="5"
+                                                    value={sl.pct}
+                                                    onChange={e => {
+                                                      const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
+                                                      slices[si] = { ...slices[si], pct: Number(e.target.value) || 0 };
+                                                      const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
+                                                      setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                    }}
+                                                    className="w-10 border border-border rounded px-0.5 py-0.5 text-center text-[9px] bg-accent/50 text-foreground outline-none"
+                                                  />
+                                                  <span className="text-[8px]">%</span>
+                                                  {(cfg.taxSlices?.length ?? 2) > 1 && (
+                                                    <button
+                                                      onClick={() => {
+                                                        const slices = [...(cfg.taxSlices || [])].filter((_, i) => i !== si);
+                                                        const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
+                                                        setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                      }}
+                                                      className="text-[9px] text-destructive hover:text-destructive/80"
+                                                    >✕</button>
+                                                  )}
+                                                </div>
+                                              ))}
+                                              <button
+                                                onClick={() => {
+                                                  const slices = [...(cfg.taxSlices || [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }])];
+                                                  const remaining = Math.max(0, 100 - slices.reduce((s, sl) => s + sl.pct, 0));
+                                                  slices.push({ profileKey: 'servico', pct: remaining });
+                                                  const rates = { ...(data.subProductTaxRates ?? {}), [k]: { ...cfg, taxSlices: slices, perfilTributario: 'mix' } };
+                                                  setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                                }}
+                                                className="text-[9px] text-primary font-semibold"
+                                              >+ Fatia</button>
+                                            </div>
                                           )}
                                         </div>
                                       ) : (
