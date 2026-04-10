@@ -213,7 +213,7 @@ export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConf
     pis: 0.65, cofins: 3.0,
     iss,
     csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
-    presumidoIRPJ: 0.32, presumidoCSLL: 0.32,
+    presumidoIRPJ: 32, presumidoCSLL: 32,
     tipoReceita: 'servico',
   };
 }
