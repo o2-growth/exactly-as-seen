@@ -454,6 +454,16 @@ export default function PremissasPage() {
                 <tbody>
                   {lista.map((p, i) => {
                     const chave = `${p.categoria}/${p.subcategoria}`;
+                    const ticketKey = PREMISE_TO_TICKET[chave];
+                    const cfg = ticketKey ? getSubProductTaxRate(ticketKey, assumptions) : null;
+                    const hasMix = cfg?.mixServicoPct !== undefined && cfg?.mixServicoPct !== null;
+                    const mixValues = hasMix ? computeMixPresumido(cfg!.mixServicoPct!) : null;
+                    // When mix is active, show computed presumido values instead of raw
+                    const displayPresIRPJ = hasMix ? mixValues!.irpj / 100 : p.presumidoIRPJ;
+                    const displayPresCSLL = hasMix ? mixValues!.csll / 100 : p.presumidoCSLL;
+                    const displayIrpjEfetivo = (hasMix ? mixValues!.irpj : p.presumidoIRPJ * 100) / 100 * 0.15;
+                    const displayCsllEfetivo = (hasMix ? mixValues!.csll : p.presumidoCSLL * 100) / 100 * 0.09;
+                    const displayTotal = p.pis + p.cofins + p.iss + p.icms + displayIrpjEfetivo + displayCsllEfetivo;
                     return (
                       <tr key={chave} style={{
                         background: i % 2 === 0 ? '#FFFFFF' : '#F9F9F9',
@@ -461,6 +471,10 @@ export default function PremissasPage() {
                       }}>
                         <td style={{ ...td, fontWeight: 700 }}>{p.subcategoria}</td>
                         <td style={{ ...td, color: '#787878', fontSize: 10 }}>{p.perfilAplicado}</td>
+                        {/* Mix column */}
+                        <MixCell chave={chave} valor={cfg?.mixServicoPct}
+                          onUpdate={(chave, val) => updateField(chave, 'mixServicoPct', val / 100)}
+                          onClear={(chave) => resetField(chave, 'mixServicoPct')} />
                         <EditableCell chave={chave} field="pis" valor={p.pis}
                           modificado={isFieldOverridden(chave, 'pis')}
                           onUpdate={updateField} onReset={resetField} />
@@ -473,19 +487,19 @@ export default function PremissasPage() {
                         <EditableCell chave={chave} field="icms" valor={p.icms}
                           modificado={isFieldOverridden(chave, 'icms')}
                           onUpdate={updateField} onReset={resetField} />
-                        <EditableCell chave={chave} field="presumidoIRPJ" valor={p.presumidoIRPJ}
-                          modificado={isFieldOverridden(chave, 'presumidoIRPJ')}
-                          onUpdate={updateField} onReset={resetField} digits={0} />
-                        <EditableCell chave={chave} field="presumidoCSLL" valor={p.presumidoCSLL}
-                          modificado={isFieldOverridden(chave, 'presumidoCSLL')}
-                          onUpdate={updateField} onReset={resetField} digits={0} />
-                        <td style={tdNumCalc}>{fmtPct(p.irpjEfetivo)}</td>
-                        <td style={tdNumCalc}>{fmtPct(p.csllEfetivo)}</td>
+                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresIRPJ)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        </td>
+                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresCSLL)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        </td>
+                        <td style={tdNumCalc}>{fmtPct(displayIrpjEfetivo)}</td>
+                        <td style={tdNumCalc}>{fmtPct(displayCsllEfetivo)}</td>
                         <td style={{
                           ...tdNum, background: '#E8FBE8', fontWeight: 800,
                           color: '#2E7D32', fontSize: 12,
                         }}>
-                          {fmtPct(p.totalEfetivo)}
+                          {fmtPct(displayTotal)}
                         </td>
                       </tr>
                     );
