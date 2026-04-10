@@ -591,9 +591,14 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
 
 // ─── LUCRO PRESUMIDO — TAX HELPERS ───
 
-// getBasePresumida now reads from the per-subproduct config (presumidoIRPJ / presumidoCSLL)
-// instead of returning a hardcoded 32%/32%.
+// getBasePresumida reads from the per-subproduct config.
+// If mixServicoPct is set, it computes blended rates from the mix.
+// Otherwise it uses the direct presumidoIRPJ / presumidoCSLL values.
 function getBasePresumida(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
+  if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
+    const mix = computeMixPresumido(cfg.mixServicoPct);
+    return { irpj: mix.irpj / 100, csll: mix.csll / 100 };
+  }
   return { irpj: (cfg.presumidoIRPJ ?? 32) / 100, csll: (cfg.presumidoCSLL ?? 32) / 100 };
 }
 
