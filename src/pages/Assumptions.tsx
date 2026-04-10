@@ -2803,6 +2803,7 @@ export default function Assumptions() {
                         {TAX_ROW_DEFS.map((rowDef) => {
                           const isEditable = !!rowDef.field;
                           const isTotal = !!rowDef.isTotal;
+                          const isProfile = !!rowDef.isProfile;
                           return (
                             <tr key={rowDef.label} className={`border-b border-border/30 ${isTotal ? 'bg-muted/30 font-semibold' : ''}`}>
                               <td className={`py-1.5 px-3 font-medium whitespace-nowrap ${isTotal ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -2811,40 +2812,77 @@ export default function Assumptions() {
                               {cat.keys.map(k => {
                                 const cfg = getConfig(k);
 
-                                if (isEditable && rowDef.field) {
-                                  const cellValue = cfg[rowDef.field] as number | undefined;
-                                  const isMixRow = rowDef.isMix;
-                                  const displayValue = isMixRow ? (cellValue ?? '') : (cellValue ?? 0);
+                                if (isProfile) {
+                                  const currentProfile = cfg.perfilTributario || '';
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
                                       {editing ? (
+                                        <div className="space-y-1">
+                                          <select
+                                            value={currentProfile}
+                                            onChange={e => {
+                                              const profileKey = e.target.value;
+                                              const updated = applyTaxProfile(cfg, profileKey);
+                                              const rates = { ...(data.subProductTaxRates ?? {}), [k]: updated };
+                                              setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                            }}
+                                            className="w-20 border border-border rounded px-1 py-0.5 text-[10px] text-foreground bg-secondary outline-none focus:ring-1 focus:ring-primary"
+                                          >
+                                            <option value="">Padrão</option>
+                                            {TAX_PROFILE_KEYS.map(pk => (
+                                              <option key={pk} value={pk}>{TAX_PROFILES[pk].label}</option>
+                                            ))}
+                                          </select>
+                                          {currentProfile === 'mix' && (
+                                            <input
+                                              type="number"
+                                              min="0" max="100" step="5"
+                                              value={cfg.mixServicoPct ?? 50}
+                                              onChange={e => {
+                                                const v = Number(e.target.value) || 0;
+                                                const mix = computeMixPresumidoFn(v);
+                                                const updated = { ...cfg, mixServicoPct: v, presumidoIRPJ: mix.irpj, presumidoCSLL: mix.csll, perfilTributario: 'mix' };
+                                                const rates = { ...(data.subProductTaxRates ?? {}), [k]: updated };
+                                                setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                              }}
+                                              className="w-16 border border-border rounded px-1 py-0.5 text-center text-[10px] bg-accent/50 text-foreground outline-none"
+                                              placeholder="% serv"
+                                            />
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <span className="text-[10px] tabular-nums text-muted-foreground">
+                                          {currentProfile ? (
+                                            <>
+                                              {TAX_PROFILES[currentProfile]?.label || currentProfile}
+                                              {currentProfile === 'mix' && <span className="ml-1 text-primary font-semibold">{cfg.mixServicoPct ?? 50}%</span>}
+                                            </>
+                                          ) : '—'}
+                                        </span>
+                                      )}
+                                    </td>
+                                  );
+                                }
+
+                                if (isEditable && rowDef.field) {
+                                  const cellValue = cfg[rowDef.field] as number | undefined;
+                                  const isLocked = cfg.perfilTributario && cfg.perfilTributario !== 'custom' && cfg.perfilTributario !== 'mix';
+                                  return (
+                                    <td key={k} className="py-1 px-1 text-center">
+                                      {editing && !isLocked ? (
                                         <input
                                           type="number"
-                                          step={isMixRow ? '5' : '0.1'}
+                                          step="0.1"
                                           min="0"
-                                          max={isMixRow ? '100' : '100'}
-                                          placeholder={isMixRow ? '—' : '0'}
-                                          className={`w-16 border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary ${isMixRow ? 'bg-accent/50' : 'bg-secondary'}`}
-                                          value={displayValue}
-                                          onChange={e => {
-                                            const v = e.target.value;
-                                            if (isMixRow && v === '') {
-                                              // Clear mix — remove the field
-                                              const current = getConfig(k);
-                                              const { mixServicoPct: _, ...rest } = current as any;
-                                              const rates = { ...(data.subProductTaxRates ?? {}), [k]: rest };
-                                              setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
-                                            } else {
-                                              updateSubProductTax(k, rowDef.field!, Number(v) || 0);
-                                            }
-                                          }}
+                                          max="100"
+                                          placeholder="0"
+                                          className="w-16 border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary bg-secondary"
+                                          value={cellValue ?? 0}
+                                          onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
                                         />
                                       ) : (
-                                        <span className={`text-xs tabular-nums ${isMixRow && cellValue !== undefined ? 'font-semibold text-primary' : ''}`}>
-                                          {isMixRow
-                                            ? (cellValue !== undefined ? `${cellValue}% serv` : '—')
-                                            : `${(cellValue ?? 0).toFixed(2).replace('.', ',')}%`
-                                          }
+                                        <span className={`text-xs tabular-nums ${isLocked ? 'text-muted-foreground/60' : ''}`}>
+                                          {`${(cellValue ?? 0).toFixed(2).replace('.', ',')}%`}
                                         </span>
                                       )}
                                     </td>
