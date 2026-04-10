@@ -2893,7 +2893,11 @@ export default function Assumptions() {
                                           {currentProfile ? (
                                             <>
                                               {TAX_PROFILES[currentProfile]?.label || currentProfile}
-                                              {currentProfile === 'mix' && <span className="ml-1 text-primary font-semibold">{cfg.mixServicoPct ?? 50}%</span>}
+                                              {currentProfile === 'mix' && cfg.taxSlices?.length && (
+                                                <span className="ml-1 text-primary font-semibold text-[8px]">
+                                                  {cfg.taxSlices.map(s => `${TAX_PROFILES[s.profileKey]?.label || s.profileKey} ${s.pct}%`).join(' + ')}
+                                                </span>
+                                              )}
                                             </>
                                           ) : '—'}
                                         </span>
