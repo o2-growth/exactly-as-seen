@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS, computeMixPresumido } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS, computeMixPresumido, getEffectivePresumido } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
@@ -591,15 +591,11 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
 
 // ─── LUCRO PRESUMIDO — TAX HELPERS ───
 
-// getBasePresumida reads from the per-subproduct config.
-// If mixServicoPct is set, it computes blended rates from the mix.
-// Otherwise it uses the direct presumidoIRPJ / presumidoCSLL values.
+// getBasePresumida reads from the per-subproduct config using the unified getEffectivePresumido helper.
+// Supports: direct values, tax profiles, and mix percentages.
 function getBasePresumida(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
-  if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
-    const mix = computeMixPresumido(cfg.mixServicoPct);
-    return { irpj: mix.irpj / 100, csll: mix.csll / 100 };
-  }
-  return { irpj: (cfg.presumidoIRPJ ?? 32) / 100, csll: (cfg.presumidoCSLL ?? 32) / 100 };
+  const eff = getEffectivePresumido(cfg);
+  return { irpj: eff.irpj / 100, csll: eff.csll / 100 };
 }
 
 function calcularDeducoesPorSubproduto(

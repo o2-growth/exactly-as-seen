@@ -30,7 +30,7 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido } from '@/lib/financialData';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido, TAX_PROFILES, TAX_PROFILE_KEYS, applyTaxProfile, getEffectivePresumido } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -60,7 +60,7 @@ const PREMISE_TO_TICKET: Record<string, TicketKey> = {
   'Tax/Diagnóstico Tributário & Compliance': 'taxDTC',
 };
 
-const CATEGORIAS: Categoria[] = ['CaaS', 'SaaS', 'Education', 'Expansão', 'Tax'];
+const CATEGORIAS: Categoria[] = ['CaaS', 'SaaS', 'Education', 'Expansão', 'Tax', 'PT'];
 
 const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
   CaaS:      { bg: '#E8FBE8', text: '#2E7D32' },
@@ -68,14 +68,15 @@ const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
   Education: { bg: '#E6F3FF', text: '#1565C0' },
   Expansão:  { bg: '#FFE6E6', text: '#C62828' },
   Tax:       { bg: '#F0E6FF', text: '#6A1B9A' },
+  PT:        { bg: '#FFF3E0', text: '#E65100' },
 };
 
 // ============================================================
 // TIPOS DE OVERRIDE
 // ============================================================
 
-type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct';
-type PremiseOverride = Partial<Record<EditableField, number>>;
+type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct' | 'perfilTributario';
+type PremiseOverride = Partial<Record<EditableField, number | string>>;
 type AllOverrides = Record<string, PremiseOverride>;
 
 // ============================================================
@@ -218,7 +219,7 @@ function fmtBRL(value: number): string {
 // ============================================================
 
 export default function PremissasPage() {
-  const { assumptions } = useFinancialModel();
+  const { assumptions, setAssumptions } = useFinancialModel();
   const {
     overrides,
     updateField,
@@ -367,10 +368,10 @@ export default function PremissasPage() {
           <b> percentual</b> (ex: <code>0,65</code> para 0,65%). Células com <b>borda laranja</b>
           indicam valor customizado vs padrão. Use <b>↺</b> ao lado da célula para reverter aquele
           campo. <br/><br/>
-          <b>⚖ Mix Serviço/Produto:</b> Para subcategorias com emissão mista (ex: 50% serviço + 50% e-book/produto),
-          clique na coluna <b>⚖ Mix Serviço</b> e informe o percentual de serviço (0-100%). O sistema calcula
-          automaticamente a base presumida ponderada (Serviço: IRPJ 32%, CSLL 32% | Produto: IRPJ 8%, CSLL 12%).
-          Deixe vazio para usar base presumida manual.
+          <b>📋 Perfil Tributário:</b> Use o dropdown para selecionar um perfil pré-definido (Serviço, E-book,
+          Livro Físico, Mat. Didático, etc.). Ao selecionar um perfil, as alíquotas PIS/COFINS/ISS/ICMS e bases
+          presumidas são preenchidas automaticamente e ficam travadas. Use <b>Custom</b> para editar manualmente.
+          <b>⚖ Mix Serv/Prod:</b> permite definir % serviço vs produto com base ponderada.
         </section>
 
         {/* FILTROS */}
@@ -447,7 +448,7 @@ export default function PremissasPage() {
                   <tr style={{ background: '#494949', color: '#FFFFFF' }}>
                     <th style={{ ...th, minWidth: 200 }}>Subcategoria</th>
                     <th style={th}>Perfil</th>
-                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF' }}>⚖ Mix Serviço</th>
+                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF', minWidth: 130 }}>📋 Perfil Tributário</th>
                     <th style={thNum}>PIS</th>
                     <th style={thNum}>COFINS</th>
                     <th style={thNum}>ISS</th>
@@ -464,14 +465,18 @@ export default function PremissasPage() {
                     const chave = `${p.categoria}/${p.subcategoria}`;
                     const ticketKey = PREMISE_TO_TICKET[chave];
                     const cfg = ticketKey ? getSubProductTaxRate(ticketKey, assumptions) : null;
-                    const hasMix = cfg?.mixServicoPct !== undefined && cfg?.mixServicoPct !== null;
-                    const mixValues = hasMix ? computeMixPresumido(cfg!.mixServicoPct!) : null;
-                    // When mix is active, show computed presumido values instead of raw
-                    const displayPresIRPJ = hasMix ? mixValues!.irpj / 100 : p.presumidoIRPJ;
-                    const displayPresCSLL = hasMix ? mixValues!.csll / 100 : p.presumidoCSLL;
-                    const displayIrpjEfetivo = (hasMix ? mixValues!.irpj : p.presumidoIRPJ * 100) / 100 * 0.15;
-                    const displayCsllEfetivo = (hasMix ? mixValues!.csll : p.presumidoCSLL * 100) / 100 * 0.09;
-                    const displayTotal = p.pis + p.cofins + p.iss + p.icms + displayIrpjEfetivo + displayCsllEfetivo;
+                    const eff = cfg ? getEffectivePresumido(cfg) : { irpj: p.presumidoIRPJ * 100, csll: p.presumidoCSLL * 100 };
+                    const displayPresIRPJ = eff.irpj / 100;
+                    const displayPresCSLL = eff.csll / 100;
+                    const displayIrpjEfetivo = eff.irpj / 100 * 0.15;
+                    const displayCsllEfetivo = eff.csll / 100 * 0.09;
+                    const currentPis = cfg ? cfg.pis / 100 : p.pis;
+                    const currentCofins = cfg ? cfg.cofins / 100 : p.cofins;
+                    const currentIss = cfg ? cfg.iss / 100 : p.iss;
+                    const currentIcms = cfg ? cfg.icms / 100 : p.icms;
+                    const displayTotal = currentPis + currentCofins + currentIss + currentIcms + displayIrpjEfetivo + displayCsllEfetivo;
+                    const currentProfile = cfg?.perfilTributario || '';
+                    const isProfileLocked = currentProfile && currentProfile !== 'custom' && currentProfile !== 'mix';
                     return (
                       <tr key={chave} style={{
                         background: i % 2 === 0 ? '#FFFFFF' : '#F9F9F9',
@@ -479,27 +484,50 @@ export default function PremissasPage() {
                       }}>
                         <td style={{ ...td, fontWeight: 700 }}>{p.subcategoria}</td>
                         <td style={{ ...td, color: '#787878', fontSize: 10 }}>{p.perfilAplicado}</td>
-                        {/* Mix column */}
-                        <MixCell chave={chave} valor={cfg?.mixServicoPct}
-                          onUpdate={(chave, val) => updateField(chave, 'mixServicoPct', val / 100)}
-                          onClear={(chave) => resetField(chave, 'mixServicoPct')} />
+                        {/* Profile dropdown column */}
+                        <ProfileDropdownCell
+                          chave={chave}
+                          currentProfile={currentProfile}
+                          mixValue={cfg?.mixServicoPct}
+                          onSelectProfile={(chave, profileKey) => {
+                            if (!ticketKey) return;
+                            const current = getSubProductTaxRate(ticketKey, assumptions);
+                            const updated = applyTaxProfile(current, profileKey);
+                            setAssumptions(prev => ({
+                              ...prev,
+                              subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
+                            }));
+                          }}
+                          onUpdateMix={(chave, val) => {
+                            if (!ticketKey) return;
+                            const current = getSubProductTaxRate(ticketKey, assumptions);
+                            const mix = computeMixPresumido(val);
+                            setAssumptions(prev => ({
+                              ...prev,
+                              subProductTaxRates: {
+                                ...(prev.subProductTaxRates ?? {}),
+                                [ticketKey]: { ...current, mixServicoPct: val, presumidoIRPJ: mix.irpj, presumidoCSLL: mix.csll, perfilTributario: 'mix' },
+                              },
+                            }));
+                          }}
+                        />
                         <EditableCell chave={chave} field="pis" valor={p.pis}
                           modificado={isFieldOverridden(chave, 'pis')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="cofins" valor={p.cofins}
                           modificado={isFieldOverridden(chave, 'cofins')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="iss" valor={p.iss}
                           modificado={isFieldOverridden(chave, 'iss')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="icms" valor={p.icms}
                           modificado={isFieldOverridden(chave, 'icms')}
-                          onUpdate={updateField} onReset={resetField} />
-                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresIRPJ)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
+                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresIRPJ)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
-                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresCSLL)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresCSLL)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
                         <td style={tdNumCalc}>{fmtPct(displayIrpjEfetivo)}</td>
                         <td style={tdNumCalc}>{fmtPct(displayCsllEfetivo)}</td>
@@ -578,13 +606,22 @@ interface EditableCellProps {
   onUpdate: (chave: string, field: EditableField, valor: number) => void;
   onReset: (chave: string, field: EditableField) => void;
   digits?: number;
+  locked?: boolean;
 }
 
 function EditableCell({
-  chave, field, valor, modificado, onUpdate, onReset, digits = 2,
+  chave, field, valor, modificado, onUpdate, onReset, digits = 2, locked = false,
 }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
+
+  if (locked) {
+    return (
+      <td style={{ ...tdNum, background: '#F5F5F5', color: '#999' }}>
+        {(valor * 100).toFixed(digits).replace('.', ',')}%
+      </td>
+    );
+  }
 
   const handleStartEdit = () => {
     setInputValue((valor * 100).toFixed(digits).replace('.', ','));
@@ -662,98 +699,80 @@ function EditableCell({
 }
 
 // ============================================================
-// CÉLULA DE MIX (SERVIÇO / PRODUTO)
+// DROPDOWN DE PERFIL TRIBUTÁRIO
 // ============================================================
 
-interface MixCellProps {
+interface ProfileDropdownCellProps {
   chave: string;
-  valor: number | undefined;
-  onUpdate: (chave: string, val: number) => void;
-  onClear: (chave: string) => void;
+  currentProfile: string;
+  mixValue: number | undefined;
+  onSelectProfile: (chave: string, profileKey: string) => void;
+  onUpdateMix: (chave: string, val: number) => void;
 }
 
-function MixCell({ chave, valor, onUpdate, onClear }: MixCellProps) {
-  const [editing, setEditing] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const hasMix = valor !== undefined && valor !== null;
+function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile, onUpdateMix }: ProfileDropdownCellProps) {
+  const [editingMix, setEditingMix] = useState(false);
+  const [mixInput, setMixInput] = useState('');
+  const isMix = currentProfile === 'mix';
+  const profileLabel = currentProfile ? (TAX_PROFILES[currentProfile]?.label || currentProfile) : '—';
 
-  const handleStartEdit = () => {
-    setInputValue(hasMix ? String(valor) : '');
-    setEditing(true);
-  };
-
-  const handleCommit = () => {
-    const v = inputValue.trim();
-    if (v === '' || v === '-') {
-      onClear(chave);
-    } else {
-      const num = parseFloat(v.replace(',', '.'));
-      if (!isNaN(num) && num >= 0 && num <= 100) {
-        onUpdate(chave, num);
-      }
+  const handleMixCommit = () => {
+    const v = parseFloat(mixInput.replace(',', '.'));
+    if (!isNaN(v) && v >= 0 && v <= 100) {
+      onUpdateMix(chave, v);
     }
-    setEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleCommit();
-    if (e.key === 'Escape') setEditing(false);
+    setEditingMix(false);
   };
 
   return (
-    <td
-      style={{
-        ...tdNum,
-        background: hasMix ? '#FFE0B2' : '#FFF9E6',
-        cursor: 'text',
-        border: hasMix ? '2px solid #FF9800' : '1px solid #E0C800',
-        padding: '4px 8px',
-        position: 'relative',
-      }}
-      onClick={!editing ? handleStartEdit : undefined}
-    >
-      {editing ? (
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onBlur={handleCommit}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          placeholder="vazio = sem mix"
-          style={{
-            width: '100%', padding: 2, fontSize: 11, fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 700, border: '2px solid #FF9800', borderRadius: 2,
-            textAlign: 'center', outline: 'none', background: '#FFFFFF', color: '#494949',
-          }}
-        />
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, position: 'relative' }}>
-          {hasMix ? (
-            <>
-              <span style={{ fontWeight: 700, color: '#E65100', fontSize: 11 }}>
-                {valor}% serv
-              </span>
-              <span style={{ fontSize: 9, color: '#787878' }}>
-                / {100 - valor}% prod
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onClear(chave); }}
-                title="Remover mix"
-                style={{
-                  position: 'absolute', right: -6, top: -10, width: 14, height: 14,
-                  borderRadius: '50%', border: '1px solid #C62828', background: '#FFFFFF',
-                  color: '#C62828', fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                  padding: 0, lineHeight: 1, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                ✕
-              </button>
-            </>
+    <td style={{
+      ...tdNum,
+      background: currentProfile ? '#FFF3E0' : '#FFF9E6',
+      border: currentProfile ? '2px solid #FF9800' : '1px solid #E0C800',
+      padding: '4px 4px',
+      minWidth: 130,
+    }}>
+      <select
+        value={currentProfile || ''}
+        onChange={e => onSelectProfile(chave, e.target.value)}
+        style={{
+          width: '100%', fontSize: 10, fontWeight: 700, fontFamily: 'Montserrat, sans-serif',
+          border: '1px solid #CCC', borderRadius: 3, padding: '2px 4px',
+          background: '#FFFFFF', color: '#494949', cursor: 'pointer',
+        }}
+      >
+        <option value="">— Padrão —</option>
+        {TAX_PROFILE_KEYS.map(k => (
+          <option key={k} value={k} title={TAX_PROFILES[k].description}>
+            {TAX_PROFILES[k].label}
+          </option>
+        ))}
+      </select>
+      {isMix && (
+        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+          {editingMix ? (
+            <input
+              type="text"
+              value={mixInput}
+              onChange={e => setMixInput(e.target.value)}
+              onBlur={handleMixCommit}
+              onKeyDown={e => { if (e.key === 'Enter') handleMixCommit(); if (e.key === 'Escape') setEditingMix(false); }}
+              autoFocus
+              placeholder="% serviço"
+              style={{
+                width: 60, fontSize: 10, fontWeight: 700, textAlign: 'center',
+                border: '2px solid #FF9800', borderRadius: 2, padding: '1px 2px',
+                background: '#FFF', color: '#494949', outline: 'none',
+              }}
+            />
           ) : (
-            <span style={{ color: '#AAAAAA', fontSize: 10, fontStyle: 'italic' }}>—</span>
+            <span
+              onClick={() => { setMixInput(String(mixValue ?? 50)); setEditingMix(true); }}
+              style={{ fontSize: 10, fontWeight: 700, color: '#E65100', cursor: 'pointer' }}
+              title="Clique para editar % serviço"
+            >
+              {mixValue ?? 50}% serv / {100 - (mixValue ?? 50)}% prod
+            </span>
           )}
         </div>
       )}

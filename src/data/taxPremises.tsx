@@ -28,7 +28,7 @@
 
 import React, { useState } from 'react';
 
-export type Categoria = 'CaaS' | 'SaaS' | 'Education' | 'Expansão' | 'Tax';
+export type Categoria = 'CaaS' | 'SaaS' | 'Education' | 'Expansão' | 'Tax' | 'PT';
 
 export interface TaxPremise {
   subcategoria: string;
@@ -299,6 +299,37 @@ export const TAX_PREMISES: Record<string, TaxPremise> = {
     baseLegal: 'Lei 9.249/1995 art. 15 §1º III',
     observacao: 'Auditoria tributária e compliance. Serviço técnico recorrente ou pontual.',
     formula: 'Imposto = receita × (PIS 0,65% + COFINS 3% + ISS 5%) + (base IRPJ × 15%) + (base CSLL × 9%)',
+  },
+  // ========== PT — Planejamento Tributário (perfis) ==========
+  'PT/E-book': {
+    subcategoria: 'E-book', categoria: 'PT',
+    perfilAplicado: 'Produto Digital (E-book)',
+    presumidoIRPJ: 0.08, presumidoCSLL: 0.12,
+    pis: 0.0065, cofins: 0.03, iss: 0, icms: 0,
+    ...calc(0.08, 0.12, 0.0065, 0.03, 0),
+    baseLegal: 'Lei 9.249/1995 art. 15; Lei 10.833/2003',
+    observacao: 'E-book: produto digital. Base presumida 8%/12%. PIS e COFINS incidem normalmente.',
+    formula: 'Imposto = receita × (PIS 0,65% + COFINS 3%) + (receita × 8% × 15%) + (receita × 12% × 9%)',
+  },
+  'PT/Mat. Didático': {
+    subcategoria: 'Mat. Didático', categoria: 'PT',
+    perfilAplicado: 'Material Didático (imune)',
+    presumidoIRPJ: 0.08, presumidoCSLL: 0.12,
+    pis: 0, cofins: 0, iss: 0, icms: 0,
+    ...calc(0.08, 0.12, 0, 0, 0),
+    baseLegal: 'CF art. 150 VI-d; Lei 10.753/2003',
+    observacao: 'Material didático: imunidade de PIS, COFINS, ISS e ICMS.',
+    formula: 'Imposto = (receita × 8% × 15%) + (receita × 12% × 9%)',
+  },
+  'PT/Livro Físico': {
+    subcategoria: 'Livro Físico', categoria: 'PT',
+    perfilAplicado: 'Livro Físico (imune)',
+    presumidoIRPJ: 0.08, presumidoCSLL: 0.12,
+    pis: 0, cofins: 0, iss: 0, icms: 0,
+    ...calc(0.08, 0.12, 0, 0, 0),
+    baseLegal: 'CF art. 150 VI-d; Lei 10.753/2003',
+    observacao: 'Livro físico: imunidade tributária sobre livros, jornais e periódicos.',
+    formula: 'Imposto = (receita × 8% × 15%) + (receita × 12% × 9%)',
   },
 };
 
