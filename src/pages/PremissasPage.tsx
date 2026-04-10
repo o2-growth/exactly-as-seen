@@ -30,7 +30,7 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig } from '@/lib/financialData';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -439,6 +439,7 @@ export default function PremissasPage() {
                   <tr style={{ background: '#494949', color: '#FFFFFF' }}>
                     <th style={{ ...th, minWidth: 200 }}>Subcategoria</th>
                     <th style={th}>Perfil</th>
+                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF' }}>⚖ Mix Serviço</th>
                     <th style={thNum}>PIS</th>
                     <th style={thNum}>COFINS</th>
                     <th style={thNum}>ISS</th>
