@@ -18,6 +18,7 @@ import VersionHistory from "./pages/VersionHistory";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PremissasPage from "./pages/PremissasPage";
+import SimuladorTributario from "./pages/SimuladorTributario";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/assumptions" element={<ProtectedRoute><AppLayout><Assumptions /></AppLayout></ProtectedRoute>} />
               <Route path="/clients" element={<Navigate to="/assumptions" replace />} />
               <Route path="/premissas" element={<ProtectedRoute><AppLayout><PremissasPage /></AppLayout></ProtectedRoute>} />
+              <Route path="/simulador-tributario" element={<ProtectedRoute><AppLayout><SimuladorTributario /></AppLayout></ProtectedRoute>} />
               <Route path="/debt" element={<ProtectedRoute><AppLayout><DebtFinance /></AppLayout></ProtectedRoute>} />
               <Route path="/valuation" element={<ProtectedRoute><AppLayout><Valuation /></AppLayout></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><AppLayout><VersionHistory /></AppLayout></ProtectedRoute>} />
