@@ -74,7 +74,7 @@ const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
 // TIPOS DE OVERRIDE
 // ============================================================
 
-type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL';
+type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct';
 type PremiseOverride = Partial<Record<EditableField, number>>;
 type AllOverrides = Record<string, PremiseOverride>;
 
