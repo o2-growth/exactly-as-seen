@@ -161,6 +161,11 @@ export interface BUTaxConfig {
   aliquotaIss: number;
 }
 
+export interface TaxSlice {
+  profileKey: string; // key into TAX_PROFILES (e.g. 'servico', 'ebook', 'livroFisico')
+  pct: number;        // 0–100  (percentage of revenue allocated to this slice)
+}
+
 export interface SubProductTaxConfig {
   pis: number;              // 2.04 PIS — default 0.65
   cofins: number;           // 2.05 COFINS — default 3.0
@@ -174,7 +179,8 @@ export interface SubProductTaxConfig {
   presumidoCSLL: number;    // Base presumida CSLL — default 32 (serviço, em %)
   tipoReceita: string;      // 'servico' (default)
   perfilTributario?: string; // Tax profile key (e.g. 'servico', 'ebook', 'livroFisico', 'mix', 'custom')
-  mixServicoPct?: number;   // Mix: % da receita tributada como serviço (0-100). Only used when perfilTributario='mix'
+  mixServicoPct?: number;   // LEGACY — migrated to taxSlices. Kept for backward compat loading.
+  taxSlices?: TaxSlice[];   // Multi-profile slices. Used when perfilTributario='mix'. Each slice calculated independently.
 }
 
 // ─── TAX PROFILES ───
@@ -197,17 +203,20 @@ export const TAX_PROFILES: Record<string, TaxProfileDef> = {
   ebook:        { label: 'E-book',            presumidoIRPJ: 8,  presumidoCSLL: 12, pis: 0.65, cofins: 3,   iss: 0,   icms: 0, description: 'Produto digital — base 8%/12%, PIS+COFINS, sem ISS' },
   livroFisico:  { label: 'Livro Físico',      presumidoIRPJ: 8,  presumidoCSLL: 12, pis: 0,    cofins: 0,   iss: 0,   icms: 0, description: 'Livro físico — imune PIS/COFINS/ISS (Art. 150 CF)' },
   matDidatico:  { label: 'Mat. Didático',     presumidoIRPJ: 8,  presumidoCSLL: 12, pis: 0,    cofins: 0,   iss: 0,   icms: 0, description: 'Material didático — imune PIS/COFINS/ISS' },
-  mix:          { label: '⚖ Mix Serv/Prod',   presumidoIRPJ: 32, presumidoCSLL: 32, pis: 0.65, cofins: 3,   iss: 5,   icms: 0, description: 'Mix: % serviço / % produto (base ponderada)' },
+  mix:          { label: '⚖ Mix Multi-Perfil', presumidoIRPJ: 32, presumidoCSLL: 32, pis: 0.65, cofins: 3,   iss: 5,   icms: 0, description: 'Mix: múltiplas fatias com perfis independentes' },
   custom:       { label: 'Custom',            presumidoIRPJ: 32, presumidoCSLL: 32, pis: 0.65, cofins: 3,   iss: 5,   icms: 0, description: 'Alíquotas customizadas manualmente' },
 };
 
 export const TAX_PROFILE_KEYS = Object.keys(TAX_PROFILES);
 
+// Profiles that can be used as slices inside a mix (excludes 'mix' and 'custom')
+export const SLICE_PROFILE_KEYS = TAX_PROFILE_KEYS.filter(k => k !== 'mix' && k !== 'custom');
+
 // Constantes de base presumida por tipo de receita (em %)
 export const PRESUMIDO_SERVICO = { irpj: 32, csll: 32 };
 export const PRESUMIDO_PRODUTO = { irpj: 8, csll: 12 };
 
-/** Compute blended presumido from mix percentage (serviço vs produto) */
+/** Compute blended presumido from mix percentage (serviço vs produto) — LEGACY */
 export function computeMixPresumido(mixServicoPct: number): { irpj: number; csll: number } {
   const s = mixServicoPct / 100;
   const p = 1 - s;
@@ -221,14 +230,18 @@ export function computeMixPresumido(mixServicoPct: number): { irpj: number; csll
 export function applyTaxProfile(cfg: SubProductTaxConfig, profileKey: string): SubProductTaxConfig {
   const profile = TAX_PROFILES[profileKey];
   if (!profile || profileKey === 'custom') {
-    return { ...cfg, perfilTributario: profileKey };
+    return { ...cfg, perfilTributario: profileKey, taxSlices: undefined };
   }
   if (profileKey === 'mix') {
     return {
       ...cfg,
       perfilTributario: 'mix',
-      // Keep existing mixServicoPct or default to 50
-      mixServicoPct: cfg.mixServicoPct ?? 50,
+      // Keep existing slices or default to two slices
+      taxSlices: cfg.taxSlices?.length ? cfg.taxSlices : [
+        { profileKey: 'servico', pct: 50 },
+        { profileKey: 'ebook', pct: 50 },
+      ],
+      mixServicoPct: undefined,
     };
   }
   return {
@@ -241,19 +254,79 @@ export function applyTaxProfile(cfg: SubProductTaxConfig, profileKey: string): S
     presumidoIRPJ: profile.presumidoIRPJ,
     presumidoCSLL: profile.presumidoCSLL,
     mixServicoPct: undefined,
+    taxSlices: undefined,
   };
 }
 
-/** Get the effective presumido values for a config, considering profile and mix */
+/** Resolve tax slices for a config. Returns array of slices with resolved profile data. */
+export function resolveSlices(cfg: SubProductTaxConfig): { profile: TaxProfileDef; pct: number }[] {
+  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
+    return cfg.taxSlices.map(s => ({
+      profile: TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico,
+      pct: s.pct / 100,
+    }));
+  }
+  // Single-profile: use the config's own values as a virtual single slice
+  return [{
+    profile: {
+      label: '', description: '',
+      presumidoIRPJ: cfg.presumidoIRPJ ?? 32,
+      presumidoCSLL: cfg.presumidoCSLL ?? 32,
+      pis: cfg.pis,
+      cofins: cfg.cofins,
+      iss: cfg.iss,
+      icms: cfg.icms,
+    },
+    pct: 1,
+  }];
+}
+
+/** Get the effective presumido values for a config, considering profile and mix slices */
 export function getEffectivePresumido(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
+  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
+    let irpj = 0, csll = 0;
+    for (const s of cfg.taxSlices) {
+      const p = TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico;
+      irpj += p.presumidoIRPJ * (s.pct / 100);
+      csll += p.presumidoCSLL * (s.pct / 100);
+    }
+    return { irpj: Math.round(irpj * 100) / 100, csll: Math.round(csll * 100) / 100 };
+  }
+  // Legacy mix support
   if (cfg.perfilTributario === 'mix' && cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
     return computeMixPresumido(cfg.mixServicoPct);
   }
-  // Legacy: mixServicoPct without perfilTributario (backward compat)
   if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null && !cfg.perfilTributario) {
     return computeMixPresumido(cfg.mixServicoPct);
   }
   return { irpj: cfg.presumidoIRPJ ?? 32, csll: cfg.presumidoCSLL ?? 32 };
+}
+
+/** Get effective weighted tax rates for display (PIS, COFINS, ISS, etc.) */
+export function getEffectiveTaxRates(cfg: SubProductTaxConfig): { pis: number; cofins: number; iss: number; icms: number; presumidoIRPJ: number; presumidoCSLL: number } {
+  if (cfg.perfilTributario === 'mix' && cfg.taxSlices?.length) {
+    let pis = 0, cofins = 0, iss = 0, icms = 0, pIRPJ = 0, pCSLL = 0;
+    for (const s of cfg.taxSlices) {
+      const p = TAX_PROFILES[s.profileKey] ?? TAX_PROFILES.servico;
+      const w = s.pct / 100;
+      pis += p.pis * w;
+      cofins += p.cofins * w;
+      iss += p.iss * w;
+      icms += p.icms * w;
+      pIRPJ += p.presumidoIRPJ * w;
+      pCSLL += p.presumidoCSLL * w;
+    }
+    return {
+      pis: Math.round(pis * 1000) / 1000,
+      cofins: Math.round(cofins * 1000) / 1000,
+      iss: Math.round(iss * 1000) / 1000,
+      icms: Math.round(icms * 1000) / 1000,
+      presumidoIRPJ: Math.round(pIRPJ * 100) / 100,
+      presumidoCSLL: Math.round(pCSLL * 100) / 100,
+    };
+  }
+  const eff = getEffectivePresumido(cfg);
+  return { pis: cfg.pis, cofins: cfg.cofins, iss: cfg.iss, icms: cfg.icms, presumidoIRPJ: eff.irpj, presumidoCSLL: eff.csll };
 }
 
 /** All TicketKey values grouped by product category */

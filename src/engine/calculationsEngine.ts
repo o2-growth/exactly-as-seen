@@ -592,7 +592,7 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
 // ─── LUCRO PRESUMIDO — TAX HELPERS ───
 
 // getBasePresumida reads from the per-subproduct config using the unified getEffectivePresumido helper.
-// Supports: direct values, tax profiles, and mix percentages.
+// Supports: direct values, tax profiles, and multi-slice mix.
 function getBasePresumida(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
   const eff = getEffectivePresumido(cfg);
   return { irpj: eff.irpj / 100, csll: eff.csll / 100 };
@@ -608,12 +608,19 @@ function calcularDeducoesPorSubproduto(
     const fat = revenueBySubproduct[key] || 0;
     if (fat <= 0) continue;
     const cfg = getSubProductTaxRate(key, assumptions);
-    deducaoPIS += fat * (cfg.pis / 100);
-    deducaoCOFINS += fat * (cfg.cofins / 100);
-    deducaoISSQN += fat * (cfg.iss / 100);
+
+    // Multi-slice: calculate PIS/COFINS/ISS per slice independently
+    const slices = resolveSlices(cfg);
+    for (const slice of slices) {
+      const sliceRev = fat * slice.pct;
+      deducaoPIS += sliceRev * (slice.profile.pis / 100);
+      deducaoCOFINS += sliceRev * (slice.profile.cofins / 100);
+      deducaoISSQN += sliceRev * (slice.profile.iss / 100);
+      deducaoICMS += sliceRev * (slice.profile.icms / 100);
+    }
+    // Retained taxes are not profile-dependent — use cfg directly
     deducaoCsllRetido += fat * (cfg.csllRetido / 100);
     deducaoPisRetido += fat * (cfg.pisRetido / 100);
-    deducaoICMS += fat * (cfg.icms / 100);
     deducaoIrrfRetido += fat * (cfg.irrfRetido / 100);
     deducaoCofinsRetido += fat * (cfg.cofinsRetido / 100);
   }
@@ -852,26 +859,31 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     // EBT
     const ebt = ebitda + financialResult;
 
-    // Taxes — Lucro Presumido: base presumida × (IRPJ 15% + CSLL 9%) sobre faturamento por subproduto
+    // Taxes — Lucro Presumido: per-slice calculation (IRPJ 15% + CSLL 9%) sobre faturamento por subproduto
     let irpj = 0, csll = 0;
     if (assumptions.taxEnabled !== false) {
       for (const key of ALL_SUBPRODUCT_KEYS) {
         const fat = revBySubprod[key] || 0;
         if (fat <= 0) continue;
         const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
-        const base = getBasePresumida(cfg);
-        irpj += -(fat * base.irpj * 0.15);
-        csll += -(fat * base.csll * 0.09);
+        const slices = resolveSlices(cfg);
+        for (const slice of slices) {
+          const sliceRev = fat * slice.pct;
+          irpj += -(sliceRev * (slice.profile.presumidoIRPJ / 100) * 0.15);
+          csll += -(sliceRev * (slice.profile.presumidoCSLL / 100) * 0.09);
+        }
       }
     }
 
-    // Adicional de IRPJ — accumulate quarterly base presumida IRPJ (weighted by subproduct)
+    // Adicional de IRPJ — accumulate quarterly base presumida IRPJ per slice
     for (const key of ALL_SUBPRODUCT_KEYS) {
       const fat = revBySubprod[key] || 0;
       if (fat <= 0) continue;
       const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
-      const base = getBasePresumida(cfg);
-      quarterBasePresumidaIRPJ += fat * base.irpj;
+      const slices = resolveSlices(cfg);
+      for (const slice of slices) {
+        quarterBasePresumidaIRPJ += fat * slice.pct * (slice.profile.presumidoIRPJ / 100);
+      }
     }
     if (m % 3 === 2) {
       // End of quarter (months 3, 6, 9, 12)
