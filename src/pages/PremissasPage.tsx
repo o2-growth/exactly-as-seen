@@ -368,10 +368,10 @@ export default function PremissasPage() {
           <b> percentual</b> (ex: <code>0,65</code> para 0,65%). Células com <b>borda laranja</b>
           indicam valor customizado vs padrão. Use <b>↺</b> ao lado da célula para reverter aquele
           campo. <br/><br/>
-          <b>⚖ Mix Serviço/Produto:</b> Para subcategorias com emissão mista (ex: 50% serviço + 50% e-book/produto),
-          clique na coluna <b>⚖ Mix Serviço</b> e informe o percentual de serviço (0-100%). O sistema calcula
-          automaticamente a base presumida ponderada (Serviço: IRPJ 32%, CSLL 32% | Produto: IRPJ 8%, CSLL 12%).
-          Deixe vazio para usar base presumida manual.
+          <b>📋 Perfil Tributário:</b> Use o dropdown para selecionar um perfil pré-definido (Serviço, E-book,
+          Livro Físico, Mat. Didático, etc.). Ao selecionar um perfil, as alíquotas PIS/COFINS/ISS/ICMS e bases
+          presumidas são preenchidas automaticamente e ficam travadas. Use <b>Custom</b> para editar manualmente.
+          <b>⚖ Mix Serv/Prod:</b> permite definir % serviço vs produto com base ponderada.
         </section>
 
         {/* FILTROS */}
