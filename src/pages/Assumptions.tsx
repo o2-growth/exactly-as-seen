@@ -2688,10 +2688,8 @@ export default function Assumptions() {
               { id: 'tax', label: 'Tax', keys: TAX_KEYS as FinTicketKey[] },
             ];
             // Each row: { label, field (if editable), computed (if calculated) }
-            // Lucro Presumido: base 32%/32% para todos os produtos (serviço)
+            // Lucro Presumido: base presumida variável por subproduto (lida do config)
             // IRPJ base: 15%, CSLL base: 9%, Adicional IRPJ: 10% (sobre excedente R$20k/mês)
-            const PRES_IRPJ = 0.32;
-            const PRES_CSLL = 0.32;
             const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
               { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
               { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
@@ -2701,14 +2699,16 @@ export default function Assumptions() {
               { label: '2.06  ICMS (%)', field: 'icms' },
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
-              { label: `Pres. IRPJ (${(PRES_IRPJ * 100).toFixed(0)}% × 15%)`, computed: () => PRES_IRPJ * 0.15 * 100 },
-              { label: `Pres. CSLL (${(PRES_CSLL * 100).toFixed(0)}% × 9%)`, computed: () => PRES_CSLL * 0.09 * 100 },
+              { label: 'Base Pres. IRPJ (%)', field: 'presumidoIRPJ' },
+              { label: 'Base Pres. CSLL (%)', field: 'presumidoCSLL' },
+              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.presumidoIRPJ ?? 0.32) * 0.15 * 100 },
+              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.presumidoCSLL ?? 0.32) * 0.09 * 100 },
               { label: 'TOTAL efetivo (sem AD.IRPJ)', computed: (cfg) => {
-                const irpj = PRES_IRPJ * 0.15 * 100;
-                const csll = PRES_CSLL * 0.09 * 100;
+                const irpj = (cfg.presumidoIRPJ ?? 0.32) * 0.15 * 100;
+                const csll = (cfg.presumidoCSLL ?? 0.32) * 0.09 * 100;
                 return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
               }, isTotal: true },
-              { label: 'AD.IRPJ (global, máx 3,20%)', computed: () => PRES_IRPJ * 0.10 * 100 },
+              { label: 'AD.IRPJ (global)', computed: (cfg) => (cfg.presumidoIRPJ ?? 0.32) * 0.10 * 100 },
             ];
 
             const fullLabels: Record<string, string> = {
