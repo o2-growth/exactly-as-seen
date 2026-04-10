@@ -83,62 +83,78 @@ type AllOverrides = Record<string, PremiseOverride>;
 // ============================================================
 
 export function useEditablePremises() {
-  const [overrides, setOverrides] = useState<AllOverrides>({});
+  const { assumptions, setAssumptions } = useFinancialModel();
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setOverrides(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
-    } catch { /* ignore */ }
-  }, [overrides]);
+  // Convert SubProductTaxConfig values to TAX_PREMISES-style overrides
+  // TAX_PREMISES uses decimals (0.0065 for PIS), SubProductTaxConfig uses percentage (0.65 for PIS)
+  // presumidoIRPJ/CSLL: TAX_PREMISES uses 0.32, SubProductTaxConfig uses 32
 
   const updateField = useCallback(
     (chave: string, field: EditableField, valor: number) => {
-      setOverrides((prev) => ({
+      const ticketKey = PREMISE_TO_TICKET[chave];
+      if (!ticketKey) return;
+
+      // Convert from TAX_PREMISES decimal format to SubProductTaxConfig percentage format
+      let engineValue: number;
+      if (field === 'presumidoIRPJ' || field === 'presumidoCSLL') {
+        // TAX_PREMISES stores 0.32, engine config stores 32
+        engineValue = valor * 100;
+      } else {
+        // TAX_PREMISES stores 0.0065, engine config stores 0.65
+        engineValue = valor * 100;
+      }
+
+      const current = getSubProductTaxRate(ticketKey, assumptions);
+      const updated: SubProductTaxConfig = { ...current, [field]: engineValue };
+      setAssumptions(prev => ({
         ...prev,
-        [chave]: { ...prev[chave], [field]: valor },
+        subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
       }));
     },
-    []
+    [assumptions, setAssumptions]
   );
 
   const resetField = useCallback((chave: string, field: EditableField) => {
-    setOverrides((prev) => {
-      const next = { ...prev };
-      if (next[chave]) {
-        const { [field]: _, ...rest } = next[chave];
-        if (Object.keys(rest).length === 0) delete next[chave];
-        else next[chave] = rest;
-      }
-      return next;
-    });
-  }, []);
+    const ticketKey = PREMISE_TO_TICKET[chave];
+    if (!ticketKey) return;
 
-  const resetAll = useCallback(() => setOverrides({}), []);
+    // Remove override by deleting the field from the stored config
+    const current = assumptions.subProductTaxRates?.[ticketKey];
+    if (!current) return;
+    const { [field]: _, ...rest } = current as Record<string, unknown>;
+    const rates = { ...(assumptions.subProductTaxRates ?? {}) };
+    if (Object.keys(rest).length === 0) {
+      delete rates[ticketKey];
+    } else {
+      rates[ticketKey] = rest as SubProductTaxConfig;
+    }
+    setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+  }, [assumptions, setAssumptions]);
+
+  const resetAll = useCallback(() => {
+    setAssumptions(prev => {
+      const { subProductTaxRates: _, ...rest } = prev;
+      return rest as typeof prev;
+    });
+  }, [setAssumptions]);
 
   const getMerged = useCallback(
     (chave: string): TaxPremise | null => {
       const base = TAX_PREMISES[chave];
       if (!base) return null;
-      const ov = overrides[chave];
-      if (!ov || Object.keys(ov).length === 0) return base;
+      const ticketKey = PREMISE_TO_TICKET[chave];
+      if (!ticketKey) return base;
 
+      const cfg = getSubProductTaxRate(ticketKey, assumptions);
+      // Convert engine config back to TAX_PREMISES decimal format
       const merged: TaxPremise = {
         ...base,
-        pis: ov.pis ?? base.pis,
-        cofins: ov.cofins ?? base.cofins,
-        iss: ov.iss ?? base.iss,
-        icms: ov.icms ?? base.icms,
-        presumidoIRPJ: ov.presumidoIRPJ ?? base.presumidoIRPJ,
-        presumidoCSLL: ov.presumidoCSLL ?? base.presumidoCSLL,
+        pis: cfg.pis / 100,           // 0.65 → 0.0065
+        cofins: cfg.cofins / 100,     // 3.0 → 0.03
+        iss: cfg.iss / 100,           // 5.0 → 0.05
+        icms: cfg.icms / 100,         // 0 → 0
+        presumidoIRPJ: cfg.presumidoIRPJ / 100,  // 32 → 0.32
+        presumidoCSLL: cfg.presumidoCSLL / 100,   // 32 → 0.32
         irpjEfetivo: 0, csllEfetivo: 0, totalEfetivo: 0,
       };
       merged.irpjEfetivo = merged.presumidoIRPJ * TAX_CONSTANTS.IRPJ_BASE;
@@ -148,22 +164,26 @@ export function useEditablePremises() {
         merged.irpjEfetivo + merged.csllEfetivo;
       return merged;
     },
-    [overrides]
+    [assumptions]
   );
 
   const isFieldOverridden = useCallback(
-    (chave: string, field: EditableField): boolean =>
-      overrides[chave]?.[field] !== undefined,
-    [overrides]
+    (chave: string, field: EditableField): boolean => {
+      const ticketKey = PREMISE_TO_TICKET[chave];
+      if (!ticketKey) return false;
+      return assumptions.subProductTaxRates?.[ticketKey]?.[field as keyof SubProductTaxConfig] !== undefined;
+    },
+    [assumptions]
   );
 
-  const totalOverrides = useMemo(
-    () => Object.values(overrides).reduce((s, ov) => s + Object.keys(ov).length, 0),
-    [overrides]
-  );
+  const totalOverrides = useMemo(() => {
+    const rates = assumptions.subProductTaxRates;
+    if (!rates) return 0;
+    return Object.values(rates).reduce((s, cfg) => s + Object.keys(cfg).length, 0);
+  }, [assumptions.subProductTaxRates]);
 
   return {
-    overrides,
+    overrides: assumptions.subProductTaxRates ?? {},
     updateField,
     resetField,
     resetAll,
