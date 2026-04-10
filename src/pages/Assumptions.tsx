@@ -2690,7 +2690,7 @@ export default function Assumptions() {
             // Each row: { label, field (if editable), computed (if calculated) }
             // Lucro Presumido: base presumida variável por subproduto (lida do config)
             // IRPJ base: 15%, CSLL base: 9%, Adicional IRPJ: 10% (sobre excedente R$20k/mês)
-            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
+            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean; isMix?: boolean }[] = [
               { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
               { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
               { label: '2.03  ISS (%)', field: 'iss' },
@@ -2699,16 +2699,43 @@ export default function Assumptions() {
               { label: '2.06  ICMS (%)', field: 'icms' },
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
-              { label: 'Base Pres. IRPJ (%)', field: 'presumidoIRPJ' },
-              { label: 'Base Pres. CSLL (%)', field: 'presumidoCSLL' },
-              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.presumidoIRPJ ?? 32) / 100 * 0.15 * 100 },
-              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.presumidoCSLL ?? 32) / 100 * 0.09 * 100 },
+              { label: '⚖ Mix Serviço (%)', field: 'mixServicoPct', isMix: true },
+              { label: 'Base Pres. IRPJ (%)', computed: (cfg) => {
+                if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
+                  return computeMixPresumidoFn(cfg.mixServicoPct).irpj;
+                }
+                return cfg.presumidoIRPJ ?? 32;
+              }},
+              { label: 'Base Pres. CSLL (%)', computed: (cfg) => {
+                if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
+                  return computeMixPresumidoFn(cfg.mixServicoPct).csll;
+                }
+                return cfg.presumidoCSLL ?? 32;
+              }},
+              { label: 'IRPJ efetivo (%)', computed: (cfg) => {
+                const base = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                return base / 100 * 0.15 * 100;
+              }},
+              { label: 'CSLL efetivo (%)', computed: (cfg) => {
+                const base = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).csll : (cfg.presumidoCSLL ?? 32);
+                return base / 100 * 0.09 * 100;
+              }},
               { label: 'TOTAL efetivo (sem AD.IRPJ)', computed: (cfg) => {
-                const irpj = (cfg.presumidoIRPJ ?? 32) / 100 * 0.15 * 100;
-                const csll = (cfg.presumidoCSLL ?? 32) / 100 * 0.09 * 100;
+                const baseIrpj = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                const baseCsll = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).csll : (cfg.presumidoCSLL ?? 32);
+                const irpj = baseIrpj / 100 * 0.15 * 100;
+                const csll = baseCsll / 100 * 0.09 * 100;
                 return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
               }, isTotal: true },
-              { label: 'AD.IRPJ (global)', computed: (cfg) => (cfg.presumidoIRPJ ?? 32) / 100 * 0.10 * 100 },
+              { label: 'AD.IRPJ (global)', computed: (cfg) => {
+                const baseIrpj = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                return baseIrpj / 100 * 0.10 * 100;
+              }},
             ];
 
             const fullLabels: Record<string, string> = {
