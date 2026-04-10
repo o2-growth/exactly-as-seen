@@ -47,6 +47,51 @@ export type Database = {
         }
         Relationships: []
       }
+      historical_clients: {
+        Row: {
+          assumption_key: string
+          avg_ticket: number
+          category: string
+          churn_rate: number
+          churned_clients: number
+          client_count: number
+          client_names: Json | null
+          created_at: string
+          id: string
+          is_mrr: boolean
+          period: string
+          total_revenue: number
+        }
+        Insert: {
+          assumption_key: string
+          avg_ticket?: number
+          category: string
+          churn_rate?: number
+          churned_clients?: number
+          client_count?: number
+          client_names?: Json | null
+          created_at?: string
+          id?: string
+          is_mrr?: boolean
+          period: string
+          total_revenue?: number
+        }
+        Update: {
+          assumption_key?: string
+          avg_ticket?: number
+          category?: string
+          churn_rate?: number
+          churned_clients?: number
+          client_count?: number
+          client_names?: Json | null
+          created_at?: string
+          id?: string
+          is_mrr?: boolean
+          period?: string
+          total_revenue?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

@@ -385,7 +385,7 @@ export default function Assumptions() {
           if (y < year) yearMap[y] = oldVal;
         }
       } else {
-        yearMap = { ...current };
+        yearMap = { ...(current as Record<number, number>) };
       }
       // Set from this year forward
       for (const y of [2025, 2026, 2027, 2028, 2029, 2030]) {
@@ -529,7 +529,8 @@ export default function Assumptions() {
     queueMicrotask(() => setAssumptions(prev => ({ ...prev, [field]: value })));
   }, [setAssumptions]);
 
-  const setRowApplyPctPersist = (valOrFn: Record<string, number> | ((prev: Record<string, number>) => Record<string, number>)) => {
+  type RowApplyPctValue = Record<string, number | Record<number, number>>;
+  const setRowApplyPctPersist = (valOrFn: RowApplyPctValue | ((prev: RowApplyPctValue) => RowApplyPctValue)) => {
     setRowApplyPct(prev => {
       const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
       persistGrowthField('rowApplyPct', next);
