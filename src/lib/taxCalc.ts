@@ -19,7 +19,6 @@ import {
   TAX_PROFILES,
   TaxSlice,
   SubProductTaxConfig,
-  resolveSlices,
   getMixTaxSlices,
 } from './financialData';
 
@@ -112,11 +111,15 @@ export function normalizeComposition(composition: TaxSlice[]): TaxSlice[] {
  * Handles single profiles, mix profiles, and custom profiles.
  */
 export function compositionFromConfig(cfg: SubProductTaxConfig): TaxSlice[] {
-  const slices = resolveSlices(cfg);
-  return slices.map(s => ({
-    profileKey: s.profileKey ?? 'servico',
-    pct: s.pct, // already 0..1 from resolveSlices
-  }));
+  if (cfg.perfilTributario === 'mix') {
+    const slices = getMixTaxSlices(cfg.taxSlices);
+    const total = slices.reduce((s, sl) => s + sl.pct, 0) || 100;
+    return slices.map(s => ({ profileKey: s.profileKey, pct: s.pct / total }));
+  }
+  const profileKey = cfg.perfilTributario && cfg.perfilTributario !== 'custom'
+    ? cfg.perfilTributario
+    : 'servico';
+  return [{ profileKey, pct: 1 }];
 }
 
 // ─── Main Calculation ───
