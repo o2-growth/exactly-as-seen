@@ -24,7 +24,7 @@ function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: n
 }
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr } from '@/lib/financialData';
+import { YEARS, Year, Assumptions as AssumptionsType, DEFAULT_ASSUMPTIONS, HEADCOUNT, SUB_PRODUCT_LABELS, SubProductClients, BUTaxConfig, TicketKey as FinTicketKey, SubProductTaxConfig, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, getDefaultSubProductTaxConfig, CosConfig, DEFAULT_COS_CONFIG, isProductMrr, computeMixPresumido as computeMixPresumidoFn } from '@/lib/financialData';
 import { TAX_PREMISES, type TaxPremise } from '@/data/taxPremises';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
@@ -2690,7 +2690,7 @@ export default function Assumptions() {
             // Each row: { label, field (if editable), computed (if calculated) }
             // Lucro Presumido: base presumida variável por subproduto (lida do config)
             // IRPJ base: 15%, CSLL base: 9%, Adicional IRPJ: 10% (sobre excedente R$20k/mês)
-            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean }[] = [
+            const TAX_ROW_DEFS: { label: string; field?: keyof SubProductTaxConfig; computed?: (cfg: SubProductTaxConfig) => number; isTotal?: boolean; isMix?: boolean }[] = [
               { label: '2.01  CSLL (retido na fonte) (%)', field: 'csllRetido' },
               { label: '2.02  PIS (retido na fonte) (%)', field: 'pisRetido' },
               { label: '2.03  ISS (%)', field: 'iss' },
@@ -2699,16 +2699,43 @@ export default function Assumptions() {
               { label: '2.06  ICMS (%)', field: 'icms' },
               { label: '2.07  IRRF (retido na fonte) (%)', field: 'irrfRetido' },
               { label: '2.08  COFINS (retido na fonte) (%)', field: 'cofinsRetido' },
-              { label: 'Base Pres. IRPJ (%)', field: 'presumidoIRPJ' },
-              { label: 'Base Pres. CSLL (%)', field: 'presumidoCSLL' },
-              { label: 'IRPJ efetivo (%)', computed: (cfg) => (cfg.presumidoIRPJ ?? 32) / 100 * 0.15 * 100 },
-              { label: 'CSLL efetivo (%)', computed: (cfg) => (cfg.presumidoCSLL ?? 32) / 100 * 0.09 * 100 },
+              { label: '⚖ Mix Serviço (%)', field: 'mixServicoPct', isMix: true },
+              { label: 'Base Pres. IRPJ (%)', computed: (cfg) => {
+                if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
+                  return computeMixPresumidoFn(cfg.mixServicoPct).irpj;
+                }
+                return cfg.presumidoIRPJ ?? 32;
+              }},
+              { label: 'Base Pres. CSLL (%)', computed: (cfg) => {
+                if (cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null) {
+                  return computeMixPresumidoFn(cfg.mixServicoPct).csll;
+                }
+                return cfg.presumidoCSLL ?? 32;
+              }},
+              { label: 'IRPJ efetivo (%)', computed: (cfg) => {
+                const base = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                return base / 100 * 0.15 * 100;
+              }},
+              { label: 'CSLL efetivo (%)', computed: (cfg) => {
+                const base = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).csll : (cfg.presumidoCSLL ?? 32);
+                return base / 100 * 0.09 * 100;
+              }},
               { label: 'TOTAL efetivo (sem AD.IRPJ)', computed: (cfg) => {
-                const irpj = (cfg.presumidoIRPJ ?? 32) / 100 * 0.15 * 100;
-                const csll = (cfg.presumidoCSLL ?? 32) / 100 * 0.09 * 100;
+                const baseIrpj = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                const baseCsll = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).csll : (cfg.presumidoCSLL ?? 32);
+                const irpj = baseIrpj / 100 * 0.15 * 100;
+                const csll = baseCsll / 100 * 0.09 * 100;
                 return cfg.pis + cfg.cofins + cfg.iss + cfg.csllRetido + cfg.pisRetido + cfg.icms + cfg.irrfRetido + cfg.cofinsRetido + irpj + csll;
               }, isTotal: true },
-              { label: 'AD.IRPJ (global)', computed: (cfg) => (cfg.presumidoIRPJ ?? 32) / 100 * 0.10 * 100 },
+              { label: 'AD.IRPJ (global)', computed: (cfg) => {
+                const baseIrpj = cfg.mixServicoPct !== undefined && cfg.mixServicoPct !== null
+                  ? computeMixPresumidoFn(cfg.mixServicoPct).irpj : (cfg.presumidoIRPJ ?? 32);
+                return baseIrpj / 100 * 0.10 * 100;
+              }},
             ];
 
             const fullLabels: Record<string, string> = {
@@ -2810,21 +2837,40 @@ export default function Assumptions() {
                                 const cfg = getConfig(k);
 
                                 if (isEditable && rowDef.field) {
-                                  const cellValue = cfg[rowDef.field] as number;
+                                  const cellValue = cfg[rowDef.field] as number | undefined;
+                                  const isMixRow = rowDef.isMix;
+                                  const displayValue = isMixRow ? (cellValue ?? '') : (cellValue ?? 0);
                                   return (
                                     <td key={k} className="py-1 px-1 text-center">
                                       {editing ? (
                                         <input
                                           type="number"
-                                          step="0.1"
+                                          step={isMixRow ? '5' : '0.1'}
                                           min="0"
-                                          max="20"
-                                          className="w-16 bg-secondary border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                                          value={cellValue}
-                                          onChange={e => updateSubProductTax(k, rowDef.field!, Number(e.target.value) || 0)}
+                                          max={isMixRow ? '100' : '100'}
+                                          placeholder={isMixRow ? '—' : '0'}
+                                          className={`w-16 border border-border rounded px-1.5 py-0.5 text-center text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary ${isMixRow ? 'bg-accent/50' : 'bg-secondary'}`}
+                                          value={displayValue}
+                                          onChange={e => {
+                                            const v = e.target.value;
+                                            if (isMixRow && v === '') {
+                                              // Clear mix — remove the field
+                                              const current = getConfig(k);
+                                              const { mixServicoPct: _, ...rest } = current as any;
+                                              const rates = { ...(data.subProductTaxRates ?? {}), [k]: rest };
+                                              setAssumptions(prev => ({ ...prev, subProductTaxRates: rates }));
+                                            } else {
+                                              updateSubProductTax(k, rowDef.field!, Number(v) || 0);
+                                            }
+                                          }}
                                         />
                                       ) : (
-                                        <span className="text-xs tabular-nums">{cellValue.toFixed(2).replace('.', ',')}%</span>
+                                        <span className={`text-xs tabular-nums ${isMixRow && cellValue !== undefined ? 'font-semibold text-primary' : ''}`}>
+                                          {isMixRow
+                                            ? (cellValue !== undefined ? `${cellValue}% serv` : '—')
+                                            : `${(cellValue ?? 0).toFixed(2).replace('.', ',')}%`
+                                          }
+                                        </span>
                                       )}
                                     </td>
                                   );

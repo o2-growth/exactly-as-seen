@@ -30,7 +30,7 @@ import {
   Categoria,
 } from '@/data/taxPremises';
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig } from '@/lib/financialData';
+import { getSubProductTaxRate, type TicketKey, type SubProductTaxConfig, computeMixPresumido } from '@/lib/financialData';
 
 const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
@@ -74,7 +74,7 @@ const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
 // TIPOS DE OVERRIDE
 // ============================================================
 
-type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL';
+type EditableField = 'pis' | 'cofins' | 'iss' | 'icms' | 'presumidoIRPJ' | 'presumidoCSLL' | 'mixServicoPct';
 type PremiseOverride = Partial<Record<EditableField, number>>;
 type AllOverrides = Record<string, PremiseOverride>;
 
@@ -98,6 +98,9 @@ export function useEditablePremises() {
       let engineValue: number;
       if (field === 'presumidoIRPJ' || field === 'presumidoCSLL') {
         // TAX_PREMISES stores 0.32, engine config stores 32
+        engineValue = valor * 100;
+      } else if (field === 'mixServicoPct') {
+        // mixServicoPct: TAX_PREMISES passes 0-1 range, engine stores 0-100
         engineValue = valor * 100;
       } else {
         // TAX_PREMISES stores 0.0065, engine config stores 0.65
@@ -215,6 +218,7 @@ function fmtBRL(value: number): string {
 // ============================================================
 
 export default function PremissasPage() {
+  const { assumptions } = useFinancialModel();
   const {
     overrides,
     updateField,
@@ -362,7 +366,11 @@ export default function PremissasPage() {
           Clique em qualquer célula <b>amarela</b> de alíquota para editar. Digite valores em
           <b> percentual</b> (ex: <code>0,65</code> para 0,65%). Células com <b>borda laranja</b>
           indicam valor customizado vs padrão. Use <b>↺</b> ao lado da célula para reverter aquele
-          campo. Tudo é salvo automaticamente no navegador.
+          campo. <br/><br/>
+          <b>⚖ Mix Serviço/Produto:</b> Para subcategorias com emissão mista (ex: 50% serviço + 50% e-book/produto),
+          clique na coluna <b>⚖ Mix Serviço</b> e informe o percentual de serviço (0-100%). O sistema calcula
+          automaticamente a base presumida ponderada (Serviço: IRPJ 32%, CSLL 32% | Produto: IRPJ 8%, CSLL 12%).
+          Deixe vazio para usar base presumida manual.
         </section>
 
         {/* FILTROS */}
@@ -439,6 +447,7 @@ export default function PremissasPage() {
                   <tr style={{ background: '#494949', color: '#FFFFFF' }}>
                     <th style={{ ...th, minWidth: 200 }}>Subcategoria</th>
                     <th style={th}>Perfil</th>
+                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF' }}>⚖ Mix Serviço</th>
                     <th style={thNum}>PIS</th>
                     <th style={thNum}>COFINS</th>
                     <th style={thNum}>ISS</th>
@@ -453,6 +462,16 @@ export default function PremissasPage() {
                 <tbody>
                   {lista.map((p, i) => {
                     const chave = `${p.categoria}/${p.subcategoria}`;
+                    const ticketKey = PREMISE_TO_TICKET[chave];
+                    const cfg = ticketKey ? getSubProductTaxRate(ticketKey, assumptions) : null;
+                    const hasMix = cfg?.mixServicoPct !== undefined && cfg?.mixServicoPct !== null;
+                    const mixValues = hasMix ? computeMixPresumido(cfg!.mixServicoPct!) : null;
+                    // When mix is active, show computed presumido values instead of raw
+                    const displayPresIRPJ = hasMix ? mixValues!.irpj / 100 : p.presumidoIRPJ;
+                    const displayPresCSLL = hasMix ? mixValues!.csll / 100 : p.presumidoCSLL;
+                    const displayIrpjEfetivo = (hasMix ? mixValues!.irpj : p.presumidoIRPJ * 100) / 100 * 0.15;
+                    const displayCsllEfetivo = (hasMix ? mixValues!.csll : p.presumidoCSLL * 100) / 100 * 0.09;
+                    const displayTotal = p.pis + p.cofins + p.iss + p.icms + displayIrpjEfetivo + displayCsllEfetivo;
                     return (
                       <tr key={chave} style={{
                         background: i % 2 === 0 ? '#FFFFFF' : '#F9F9F9',
@@ -460,6 +479,10 @@ export default function PremissasPage() {
                       }}>
                         <td style={{ ...td, fontWeight: 700 }}>{p.subcategoria}</td>
                         <td style={{ ...td, color: '#787878', fontSize: 10 }}>{p.perfilAplicado}</td>
+                        {/* Mix column */}
+                        <MixCell chave={chave} valor={cfg?.mixServicoPct}
+                          onUpdate={(chave, val) => updateField(chave, 'mixServicoPct', val / 100)}
+                          onClear={(chave) => resetField(chave, 'mixServicoPct')} />
                         <EditableCell chave={chave} field="pis" valor={p.pis}
                           modificado={isFieldOverridden(chave, 'pis')}
                           onUpdate={updateField} onReset={resetField} />
@@ -472,19 +495,19 @@ export default function PremissasPage() {
                         <EditableCell chave={chave} field="icms" valor={p.icms}
                           modificado={isFieldOverridden(chave, 'icms')}
                           onUpdate={updateField} onReset={resetField} />
-                        <EditableCell chave={chave} field="presumidoIRPJ" valor={p.presumidoIRPJ}
-                          modificado={isFieldOverridden(chave, 'presumidoIRPJ')}
-                          onUpdate={updateField} onReset={resetField} digits={0} />
-                        <EditableCell chave={chave} field="presumidoCSLL" valor={p.presumidoCSLL}
-                          modificado={isFieldOverridden(chave, 'presumidoCSLL')}
-                          onUpdate={updateField} onReset={resetField} digits={0} />
-                        <td style={tdNumCalc}>{fmtPct(p.irpjEfetivo)}</td>
-                        <td style={tdNumCalc}>{fmtPct(p.csllEfetivo)}</td>
+                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresIRPJ)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        </td>
+                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresCSLL)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        </td>
+                        <td style={tdNumCalc}>{fmtPct(displayIrpjEfetivo)}</td>
+                        <td style={tdNumCalc}>{fmtPct(displayCsllEfetivo)}</td>
                         <td style={{
                           ...tdNum, background: '#E8FBE8', fontWeight: 800,
                           color: '#2E7D32', fontSize: 12,
                         }}>
-                          {fmtPct(p.totalEfetivo)}
+                          {fmtPct(displayTotal)}
                         </td>
                       </tr>
                     );
@@ -631,6 +654,106 @@ function EditableCell({
             >
               ↺
             </button>
+          )}
+        </div>
+      )}
+    </td>
+  );
+}
+
+// ============================================================
+// CÉLULA DE MIX (SERVIÇO / PRODUTO)
+// ============================================================
+
+interface MixCellProps {
+  chave: string;
+  valor: number | undefined;
+  onUpdate: (chave: string, val: number) => void;
+  onClear: (chave: string) => void;
+}
+
+function MixCell({ chave, valor, onUpdate, onClear }: MixCellProps) {
+  const [editing, setEditing] = useState(false);
+  const [inputValue, setInputValue] = useState('');
+  const hasMix = valor !== undefined && valor !== null;
+
+  const handleStartEdit = () => {
+    setInputValue(hasMix ? String(valor) : '');
+    setEditing(true);
+  };
+
+  const handleCommit = () => {
+    const v = inputValue.trim();
+    if (v === '' || v === '-') {
+      onClear(chave);
+    } else {
+      const num = parseFloat(v.replace(',', '.'));
+      if (!isNaN(num) && num >= 0 && num <= 100) {
+        onUpdate(chave, num);
+      }
+    }
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleCommit();
+    if (e.key === 'Escape') setEditing(false);
+  };
+
+  return (
+    <td
+      style={{
+        ...tdNum,
+        background: hasMix ? '#FFE0B2' : '#FFF9E6',
+        cursor: 'text',
+        border: hasMix ? '2px solid #FF9800' : '1px solid #E0C800',
+        padding: '4px 8px',
+        position: 'relative',
+      }}
+      onClick={!editing ? handleStartEdit : undefined}
+    >
+      {editing ? (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={handleCommit}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          placeholder="vazio = sem mix"
+          style={{
+            width: '100%', padding: 2, fontSize: 11, fontFamily: 'Montserrat, sans-serif',
+            fontWeight: 700, border: '2px solid #FF9800', borderRadius: 2,
+            textAlign: 'center', outline: 'none', background: '#FFFFFF', color: '#494949',
+          }}
+        />
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, position: 'relative' }}>
+          {hasMix ? (
+            <>
+              <span style={{ fontWeight: 700, color: '#E65100', fontSize: 11 }}>
+                {valor}% serv
+              </span>
+              <span style={{ fontSize: 9, color: '#787878' }}>
+                / {100 - valor}% prod
+              </span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onClear(chave); }}
+                title="Remover mix"
+                style={{
+                  position: 'absolute', right: -6, top: -10, width: 14, height: 14,
+                  borderRadius: '50%', border: '1px solid #C62828', background: '#FFFFFF',
+                  color: '#C62828', fontSize: 9, fontWeight: 700, cursor: 'pointer',
+                  padding: 0, lineHeight: 1, display: 'flex',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <span style={{ color: '#AAAAAA', fontSize: 10, fontStyle: 'italic' }}>—</span>
           )}
         </div>
       )}
