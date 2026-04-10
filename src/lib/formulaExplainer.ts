@@ -9,8 +9,14 @@ import {
   CosConfig, DEFAULT_COS_CONFIG,
 } from '@/lib/financialData';
 import { formatCurrency, formatCurrencyFull, formatPercent } from '@/lib/formatters';
-import { getMonthlyClients } from '@/lib/monthlyData';
+import { getMonthlyClients, MONTHS } from '@/lib/monthlyData';
 import { FullModelOutput } from '@/engine/calculationsEngine';
+
+/** Find first month index with value > 0; fallback to 0 */
+function findRepresentativeMonth(monthly: number[]): number {
+  const idx = monthly.findIndex(v => v > 0);
+  return idx >= 0 ? idx : 0;
+}
 
 export interface FormulaStep {
   label: string;
@@ -364,7 +370,16 @@ export function explainChurn(
       { label: 'Taxa anual efetiva', value: `${annualRate.toFixed(1)}%`, source: 'Churns / Média ativos' },
     ],
     result: Math.round(totalChurned).toLocaleString('pt-BR'),
-    example: `Ex: ${Math.round(monthly[0])} ativos × ${rateJan.toFixed(2)}% = ${(monthly[0] * rateJan / 100).toFixed(1)} churns (Jan/${year})`,
+    example: (() => {
+      const m = findRepresentativeMonth(monthly);
+      const prevActive = m === 0
+        ? (year > 2025
+          ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides)[11]
+          : monthly[0])
+        : monthly[m - 1];
+      const rateM = isArray ? (churnRates as number[])[m] : rateJan;
+      return `Ex: ${Math.round(prevActive)} ativos × ${rateM.toFixed(2)}% = ${(prevActive * rateM / 100).toFixed(1)} churns (${MONTHS[m]}/${year})`;
+    })(),
   };
 }
 
@@ -410,7 +425,12 @@ export function explainNovosClientes(
       { label: 'Total novos no ano', value: Math.round(totalNew).toLocaleString('pt-BR'), source: 'Σ 12 meses' },
     ],
     result: Math.round(totalNew).toLocaleString('pt-BR'),
-    example: `Ex: ${Math.round(monthly[0])} (Jan) − ${Math.round(prevDec)} (Dez/${year - 1}) = ${Math.round(janNew)} novos (Jan/${year})`,
+    example: (() => {
+      const m = findRepresentativeMonth(monthly);
+      const prev = m === 0 ? prevDec : monthly[m - 1];
+      const nv = newOverrides?.[m] ?? Math.max(0, monthly[m] - prev);
+      return `Ex: ${Math.round(monthly[m])} (${MONTHS[m]}) − ${Math.round(prev)} (${m === 0 ? `Dez/${year - 1}` : MONTHS[m - 1]}) = ${Math.round(nv)} novos (${MONTHS[m]}/${year})`;
+    })(),
   };
 }
 
@@ -442,7 +462,12 @@ export function explainClientesAtivos(
       { label: 'Crescimento anual', value: `${growth.toFixed(1)}%`, source: 'Dez/Dez anterior' },
     ],
     result: dec.toLocaleString('pt-BR'),
-    example: `Ex: ${prevDec} (Dez/${year - 1}) + novos − churn = ${jan} (Jan/${year}), crescimento ${growth.toFixed(1)}% a.a.`,
+    example: (() => {
+      const m = findRepresentativeMonth(monthly);
+      const prev = m === 0 ? prevDec : Math.round(monthly[m - 1]);
+      const cur = Math.round(monthly[m]);
+      return `Ex: ${prev} (${m === 0 ? `Dez/${year - 1}` : MONTHS[m - 1]}) + novos − churn = ${cur} (${MONTHS[m]}/${year})`;
+    })(),
   };
 }
 
@@ -486,7 +511,16 @@ export function explainFaturamentoBase(
       { label: 'Total ano', value: formatCurrencyFull(Math.round(total)), source: 'Σ 12 meses' },
     ],
     result: formatCurrencyFull(Math.round(total)),
-    example: `Ex: ${Math.round(year > 2025 ? prevDecRev > 0 ? monthly[0] : 0 : monthly[0])} clientes (Dez/${year - 1}) × ${formatCurrencyFull(Math.round(assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase))} = ${formatCurrencyFull(Math.round(fatBase[0]))} (Jan)`,
+    example: (() => {
+      const m = findRepresentativeMonth(fatBase);
+      const prevClients = m === 0
+        ? (year > 2025 ? Math.round(prevDecRev / ((assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase) || 1)) : Math.round(monthly[0]))
+        : Math.round(monthly[m - 1]);
+      const prevTicket = m === 0
+        ? (assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase)
+        : (assumptions.monthlyTickets?.[key]?.[year]?.[m - 1] ?? ticketBase);
+      return `Ex: ${prevClients} clientes × ${formatCurrencyFull(Math.round(prevTicket))} = ${formatCurrencyFull(Math.round(fatBase[m]))} (${MONTHS[m]})`;
+    })(),
   };
 }
 
@@ -526,9 +560,11 @@ export function explainIncremento(
     ],
     result: formatCurrencyFull(Math.round(total)),
     example: (() => {
-      const newJan = Math.max(0, monthly[0] - prevDec);
-      const ticketJan = assumptions.monthlyTickets?.[key]?.[year]?.[0] ?? ticketBase;
-      return `Ex: ${Math.round(newJan)} novos × ${formatCurrencyFull(Math.round(ticketJan))} = ${formatCurrencyFull(Math.round(incremento[0]))} (Jan)`;
+      const m = findRepresentativeMonth(incremento);
+      const prevClients = m === 0 ? prevDec : monthly[m - 1];
+      const newM = Math.max(0, monthly[m] - prevClients);
+      const ticketM = assumptions.monthlyTickets?.[key]?.[year]?.[m] ?? ticketBase;
+      return `Ex: ${Math.round(newM)} novos × ${formatCurrencyFull(Math.round(ticketM))} = ${formatCurrencyFull(Math.round(incremento[m]))} (${MONTHS[m]})`;
     })(),
   };
 }
@@ -571,10 +607,12 @@ export function explainRevenueChurn(
     ],
     result: formatCurrencyFull(Math.round(totalRevChurn)),
     example: (() => {
-      const rate0 = isArray ? (churnRates as number[])[0] : rateFlat;
-      const churned0 = prevDec * (rate0 / 100);
-      const ticket0 = assumptions.monthlyTickets?.[key]?.[year]?.[0] ?? ticketBase;
-      return `Ex: ${prevDec.toFixed(0)} × ${rate0.toFixed(2)}% = ${churned0.toFixed(1)} churns × ${formatCurrencyFull(Math.round(ticket0))} = ${formatCurrencyFull(Math.round(churned0 * ticket0))} (Jan)`;
+      const m = findRepresentativeMonth(monthly);
+      const prevClients = m === 0 ? prevDec : monthly[m - 1];
+      const rateM = isArray ? (churnRates as number[])[m] : rateFlat;
+      const churnedM = prevClients * (rateM / 100);
+      const ticketM = assumptions.monthlyTickets?.[key]?.[year]?.[m] ?? ticketBase;
+      return `Ex: ${prevClients.toFixed(0)} × ${rateM.toFixed(2)}% = ${churnedM.toFixed(1)} churns × ${formatCurrencyFull(Math.round(ticketM))} = ${formatCurrencyFull(Math.round(churnedM * ticketM))} (${MONTHS[m]})`;
     })(),
   };
 }
