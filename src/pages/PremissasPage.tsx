@@ -99,6 +99,9 @@ export function useEditablePremises() {
       if (field === 'presumidoIRPJ' || field === 'presumidoCSLL') {
         // TAX_PREMISES stores 0.32, engine config stores 32
         engineValue = valor * 100;
+      } else if (field === 'mixServicoPct') {
+        // mixServicoPct: TAX_PREMISES passes 0-1 range, engine stores 0-100
+        engineValue = valor * 100;
       } else {
         // TAX_PREMISES stores 0.0065, engine config stores 0.65
         engineValue = valor * 100;
