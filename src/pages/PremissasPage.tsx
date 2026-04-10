@@ -448,7 +448,7 @@ export default function PremissasPage() {
                   <tr style={{ background: '#494949', color: '#FFFFFF' }}>
                     <th style={{ ...th, minWidth: 200 }}>Subcategoria</th>
                     <th style={th}>Perfil</th>
-                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF' }}>⚖ Mix Serviço</th>
+                    <th style={{ ...thNum, background: '#FF9800', color: '#FFFFFF', minWidth: 130 }}>📋 Perfil Tributário</th>
                     <th style={thNum}>PIS</th>
                     <th style={thNum}>COFINS</th>
                     <th style={thNum}>ISS</th>
@@ -465,14 +465,18 @@ export default function PremissasPage() {
                     const chave = `${p.categoria}/${p.subcategoria}`;
                     const ticketKey = PREMISE_TO_TICKET[chave];
                     const cfg = ticketKey ? getSubProductTaxRate(ticketKey, assumptions) : null;
-                    const hasMix = cfg?.mixServicoPct !== undefined && cfg?.mixServicoPct !== null;
-                    const mixValues = hasMix ? computeMixPresumido(cfg!.mixServicoPct!) : null;
-                    // When mix is active, show computed presumido values instead of raw
-                    const displayPresIRPJ = hasMix ? mixValues!.irpj / 100 : p.presumidoIRPJ;
-                    const displayPresCSLL = hasMix ? mixValues!.csll / 100 : p.presumidoCSLL;
-                    const displayIrpjEfetivo = (hasMix ? mixValues!.irpj : p.presumidoIRPJ * 100) / 100 * 0.15;
-                    const displayCsllEfetivo = (hasMix ? mixValues!.csll : p.presumidoCSLL * 100) / 100 * 0.09;
-                    const displayTotal = p.pis + p.cofins + p.iss + p.icms + displayIrpjEfetivo + displayCsllEfetivo;
+                    const eff = cfg ? getEffectivePresumido(cfg) : { irpj: p.presumidoIRPJ * 100, csll: p.presumidoCSLL * 100 };
+                    const displayPresIRPJ = eff.irpj / 100;
+                    const displayPresCSLL = eff.csll / 100;
+                    const displayIrpjEfetivo = eff.irpj / 100 * 0.15;
+                    const displayCsllEfetivo = eff.csll / 100 * 0.09;
+                    const currentPis = cfg ? cfg.pis / 100 : p.pis;
+                    const currentCofins = cfg ? cfg.cofins / 100 : p.cofins;
+                    const currentIss = cfg ? cfg.iss / 100 : p.iss;
+                    const currentIcms = cfg ? cfg.icms / 100 : p.icms;
+                    const displayTotal = currentPis + currentCofins + currentIss + currentIcms + displayIrpjEfetivo + displayCsllEfetivo;
+                    const currentProfile = cfg?.perfilTributario || '';
+                    const isProfileLocked = currentProfile && currentProfile !== 'custom' && currentProfile !== 'mix';
                     return (
                       <tr key={chave} style={{
                         background: i % 2 === 0 ? '#FFFFFF' : '#F9F9F9',
@@ -480,27 +484,50 @@ export default function PremissasPage() {
                       }}>
                         <td style={{ ...td, fontWeight: 700 }}>{p.subcategoria}</td>
                         <td style={{ ...td, color: '#787878', fontSize: 10 }}>{p.perfilAplicado}</td>
-                        {/* Mix column */}
-                        <MixCell chave={chave} valor={cfg?.mixServicoPct}
-                          onUpdate={(chave, val) => updateField(chave, 'mixServicoPct', val / 100)}
-                          onClear={(chave) => resetField(chave, 'mixServicoPct')} />
+                        {/* Profile dropdown column */}
+                        <ProfileDropdownCell
+                          chave={chave}
+                          currentProfile={currentProfile}
+                          mixValue={cfg?.mixServicoPct}
+                          onSelectProfile={(chave, profileKey) => {
+                            if (!ticketKey) return;
+                            const current = getSubProductTaxRate(ticketKey, assumptions);
+                            const updated = applyTaxProfile(current, profileKey);
+                            setAssumptions(prev => ({
+                              ...prev,
+                              subProductTaxRates: { ...(prev.subProductTaxRates ?? {}), [ticketKey]: updated },
+                            }));
+                          }}
+                          onUpdateMix={(chave, val) => {
+                            if (!ticketKey) return;
+                            const current = getSubProductTaxRate(ticketKey, assumptions);
+                            const mix = computeMixPresumido(val);
+                            setAssumptions(prev => ({
+                              ...prev,
+                              subProductTaxRates: {
+                                ...(prev.subProductTaxRates ?? {}),
+                                [ticketKey]: { ...current, mixServicoPct: val, presumidoIRPJ: mix.irpj, presumidoCSLL: mix.csll, perfilTributario: 'mix' },
+                              },
+                            }));
+                          }}
+                        />
                         <EditableCell chave={chave} field="pis" valor={p.pis}
                           modificado={isFieldOverridden(chave, 'pis')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="cofins" valor={p.cofins}
                           modificado={isFieldOverridden(chave, 'cofins')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="iss" valor={p.iss}
                           modificado={isFieldOverridden(chave, 'iss')}
-                          onUpdate={updateField} onReset={resetField} />
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
                         <EditableCell chave={chave} field="icms" valor={p.icms}
                           modificado={isFieldOverridden(chave, 'icms')}
-                          onUpdate={updateField} onReset={resetField} />
-                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresIRPJ)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                          onUpdate={updateField} onReset={resetField} locked={!!isProfileLocked} />
+                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresIRPJ)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
-                        <td style={{ ...tdNum, fontWeight: hasMix ? 700 : 400, color: hasMix ? '#FF6F00' : '#494949' }}>
-                          {fmtPct(displayPresCSLL)} {hasMix && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
+                        <td style={{ ...tdNum, fontWeight: currentProfile === 'mix' ? 700 : 400, color: currentProfile === 'mix' ? '#FF6F00' : '#494949' }}>
+                          {fmtPct(displayPresCSLL)} {currentProfile === 'mix' && <span style={{ fontSize: 8, color: '#FF6F00' }}>mix</span>}
                         </td>
                         <td style={tdNumCalc}>{fmtPct(displayIrpjEfetivo)}</td>
                         <td style={tdNumCalc}>{fmtPct(displayCsllEfetivo)}</td>
