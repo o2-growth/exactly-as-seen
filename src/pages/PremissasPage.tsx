@@ -727,29 +727,35 @@ function EditableCell({
 }
 
 // ============================================================
-// DROPDOWN DE PERFIL TRIBUTÁRIO
+// DROPDOWN DE PERFIL TRIBUTÁRIO + SLICE EDITOR
 // ============================================================
 
 interface ProfileDropdownCellProps {
   chave: string;
   currentProfile: string;
-  mixValue: number | undefined;
+  slices: TaxSlice[] | undefined;
   onSelectProfile: (chave: string, profileKey: string) => void;
-  onUpdateMix: (chave: string, val: number) => void;
+  onUpdateSlices: (chave: string, slices: TaxSlice[]) => void;
 }
 
-function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile, onUpdateMix }: ProfileDropdownCellProps) {
-  const [editingMix, setEditingMix] = useState(false);
-  const [mixInput, setMixInput] = useState('');
+function ProfileDropdownCell({ chave, currentProfile, slices, onSelectProfile, onUpdateSlices }: ProfileDropdownCellProps) {
   const isMix = currentProfile === 'mix';
   const profileLabel = currentProfile ? (TAX_PROFILES[currentProfile]?.label || currentProfile) : '—';
+  const currentSlices = slices?.length ? slices : [{ profileKey: 'servico', pct: 50 }, { profileKey: 'ebook', pct: 50 }];
+  const sliceSum = currentSlices.reduce((s, sl) => s + sl.pct, 0);
+  const isValid = Math.abs(sliceSum - 100) < 0.01;
 
-  const handleMixCommit = () => {
-    const v = parseFloat(mixInput.replace(',', '.'));
-    if (!isNaN(v) && v >= 0 && v <= 100) {
-      onUpdateMix(chave, v);
-    }
-    setEditingMix(false);
+  const updateSlice = (idx: number, field: 'profileKey' | 'pct', val: string | number) => {
+    const updated = currentSlices.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    onUpdateSlices(chave, updated);
+  };
+  const addSlice = () => {
+    const remaining = Math.max(0, 100 - sliceSum);
+    onUpdateSlices(chave, [...currentSlices, { profileKey: 'servico', pct: remaining }]);
+  };
+  const removeSlice = (idx: number) => {
+    if (currentSlices.length <= 1) return;
+    onUpdateSlices(chave, currentSlices.filter((_, i) => i !== idx));
   };
 
   return (
@@ -759,6 +765,7 @@ function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile,
       border: currentProfile ? '2px solid #FF9800' : '1px solid #E0C800',
       padding: '4px 4px',
       minWidth: 130,
+      verticalAlign: 'top',
     }}>
       <select
         value={currentProfile || ''}
@@ -777,31 +784,47 @@ function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile,
         ))}
       </select>
       {isMix && (
-        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          {editingMix ? (
-            <input
-              type="text"
-              value={mixInput}
-              onChange={e => setMixInput(e.target.value)}
-              onBlur={handleMixCommit}
-              onKeyDown={e => { if (e.key === 'Enter') handleMixCommit(); if (e.key === 'Escape') setEditingMix(false); }}
-              autoFocus
-              placeholder="% serviço"
-              style={{
-                width: 60, fontSize: 10, fontWeight: 700, textAlign: 'center',
-                border: '2px solid #FF9800', borderRadius: 2, padding: '1px 2px',
-                background: '#FFF', color: '#494949', outline: 'none',
-              }}
-            />
-          ) : (
-            <span
-              onClick={() => { setMixInput(String(mixValue ?? 50)); setEditingMix(true); }}
-              style={{ fontSize: 10, fontWeight: 700, color: '#E65100', cursor: 'pointer' }}
-              title="Clique para editar % serviço"
-            >
-              {mixValue ?? 50}% serv / {100 - (mixValue ?? 50)}% prod
+        <div style={{ marginTop: 4, background: '#FFF8E1', border: '1px solid #FFE082', borderRadius: 4, padding: 4 }}>
+          {currentSlices.map((sl, si) => (
+            <div key={si} style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 3 }}>
+              <select
+                value={sl.profileKey}
+                onChange={e => updateSlice(si, 'profileKey', e.target.value)}
+                style={{ flex: 1, fontSize: 9, border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
+              >
+                {SLICE_PROFILE_KEYS.map(k => (
+                  <option key={k} value={k}>{TAX_PROFILES[k].label}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                min="0" max="100" step="5"
+                value={sl.pct}
+                onChange={e => updateSlice(si, 'pct', Number(e.target.value) || 0)}
+                style={{ width: 40, fontSize: 9, textAlign: 'center', border: '1px solid #CCC', borderRadius: 2, padding: '1px 2px' }}
+              />
+              <span style={{ fontSize: 8 }}>%</span>
+              {currentSlices.length > 1 && (
+                <button
+                  onClick={() => removeSlice(si)}
+                  style={{ fontSize: 10, color: '#C62828', cursor: 'pointer', border: 'none', background: 'none', padding: 0, fontWeight: 700 }}
+                  title="Remover fatia"
+                >✕</button>
+              )}
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+            <button
+              onClick={addSlice}
+              style={{ fontSize: 9, color: '#1565C0', cursor: 'pointer', border: 'none', background: 'none', padding: 0, fontWeight: 700 }}
+            >+ Fatia</button>
+            <span style={{
+              fontSize: 9, fontWeight: 700,
+              color: isValid ? '#2E7D32' : '#C62828',
+            }}>
+              Σ {sliceSum}%{!isValid && ' ⚠'}
             </span>
-          )}
+          </div>
         </div>
       )}
     </td>
