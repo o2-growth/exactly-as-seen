@@ -1,21 +1,34 @@
 
 
-## Corrigir valor de receita na barra de título dos subprodutos
+## Corrigir totais de receita por BU (Total SaaS, Total Education, etc.)
 
 ### Problema
-A barra de título de cada subproduto (coluna de receita, ex: "R$ 2.544.610") usa a função `getAnnualRevenue()` que calcula `clientes × ticket` de forma simplificada. Porém, o "Total ano" dentro da seção expandida usa a lógica detalhada `faturamentoTotal = Base + Incremento - Churn`, que é o valor correto. Os dois divergem.
+Os subtotais de receita por categoria (linhas "Total SaaS", "Total Education", etc.) usam a fórmula simplificada `clientes × ticket` (linhas 2750-2754), enquanto os valores individuais na barra de título de cada subproduto já usam `getAnnualRevenue()` com a lógica correta de `Base + Incremento - Churn`. Isso causa divergência entre a soma visual das linhas e o total exibido.
 
 ### Solução
-Refatorar `getAnnualRevenue()` (linhas 348-365) para usar a mesma lógica de `faturamentoTotal` que já existe na seção expandida. Isso significa:
+Substituir o cálculo inline nas linhas 2750-2754 por uma soma de `getAnnualRevenue()` para cada subproduto do grupo — a mesma função já usada nas barras de título individuais.
 
-1. Para meses históricos com dados da API: usar `apiEntry.total_revenue`
-2. Para meses projetados de produtos MRR: calcular `Base + Incremento - Churn` acumulando mês a mês
-3. Para meses projetados de produtos não-MRR: calcular `novosClientes × ticket`
+### Alteração
 
-A lógica já existe no bloco expandido (linhas ~2130-2296). Ela será extraída para dentro de `getAnnualRevenue()` para que ambos os locais usem o mesmo cálculo.
+**`src/pages/Assumptions.tsx`** — linhas 2749-2755
 
-### Arquivo alterado
-| Arquivo | Ação |
-|---------|------|
-| `src/pages/Assumptions.tsx` | Editar `getAnnualRevenue()` para replicar a lógica de `faturamentoTotal` |
+Antes:
+```tsx
+{formatCurrency(group.items.reduce((sum, row) => {
+  if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
+  const mc = getMonthlyClients(...);
+  const tk = data.tickets[...] ?? 0;
+  return sum + mc.reduce((s, v, i) => s + v * (...), 0);
+}, 0))}
+```
+
+Depois:
+```tsx
+{formatCurrency(group.items.reduce((sum, row) => {
+  if (!row.dataKey || excludedFromTotal[row.dataKey]) return sum;
+  return sum + getAnnualRevenue(row.dataKey as SubProductKey, selectedYear);
+}, 0))}
+```
+
+Isso garante que o total da BU seja exatamente a soma dos valores mostrados em cada linha individual.
 
