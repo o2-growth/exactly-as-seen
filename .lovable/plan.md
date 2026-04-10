@@ -1,40 +1,46 @@
 
 
-## Plano: Adicionar ícones ℹ️ nas seções detalhadas de cada subproduto
+## Adicionar Exemplo Numérico ao Explicador de Fórmulas
 
-O explicador de fórmulas foi adicionado apenas nos KPI cards e na tabela resumo, mas falta nas seções expandidas dentro de cada subproduto. Este plano adiciona os ícones em **todas** as seções detalhadas.
+### Objetivo
+Incluir uma seção "Exemplo" em cada popover do Formula Explainer, mostrando a conta com os números reais substituídos na fórmula.
 
-### Novas funções em `src/lib/formulaExplainer.ts`
+### Alterações
 
-Criar funções auxiliares que faltam:
+#### 1. `src/lib/formulaExplainer.ts` — Adicionar campo `example` ao `FormulaExplanation`
 
-- **`explainTicket(key, year, assumptions)`** — Ticket base + crescimento aplicado, mostrando ticket base flat, crescimento % a.m., ticket Jan vs Dez, e média ponderada
-- **`explainChurn(key, year, assumptions)`** — Churn base flat + crescimento, taxa mensal, total de churns no ano, % anual resultante
-- **`explainFaturamentoBase(key, year, assumptions)`** — Base = faturamento total do mês anterior (MRR), mostrando Dez do ano anterior como ponto de partida
-- **`explainIncremento(key, year, assumptions)`** — Novos clientes × ticket do mês, total anual de incremento
-- **`explainRevenueChurn(key, year, assumptions)`** — Clientes perdidos × ticket anterior, total anual de revenue churn e % sobre receita
-- **`explainNovosClientes(key, year, assumptions)`** — Base flat + crescimento %, total novos no ano
-- **`explainClientesAtivos(key, year, assumptions)`** — Fórmula Ativos(m) = Ativos(m-1) + Novos - Churn, com base Dez anterior, Jan e Dez do ano
+- Adicionar `example?: string` à interface `FormulaExplanation`
+- Em cada função (`explainRevenue`, `explainClients`, `explainTicket`, `explainChurn`, `explainTaxEffective`, `explainCOS`, `explainKPI`, `explainNovosClientes`, `explainClientesAtivos`, `explainFaturamentoBase`, `explainIncremento`, `explainRevenueChurn`), gerar uma string de exemplo com os números reais:
+  - `explainRevenue`: `"Ex: 21 clientes × R$ 25.000 = R$ 525.000/mês → R$ 6.300.000/ano"`
+  - `explainClients`: `"Ex: 18 (Dez/2024) + 5 novos − 2 churn = 21 (Jan/2025)"`
+  - `explainTicket`: `"Ex: R$ 25.000 × (1 + 0,5%)^12 = R$ 26.534 (Dez)"`
+  - `explainChurn`: `"Ex: 21 ativos × 2,00% = 0,42 churns (Jan)"`
+  - `explainTaxEffective`: `"Ex: 0,65% + 3,00% + 5,00% + (32% × 15%) + (32% × 9%) = 16,33%"`
+  - `explainCOS`: `"Ex: ceil(21/7) = 3 PFDs × R$ 8.000 × 12 = R$ 288.000"`
+  - `explainKPI`: cada KPI com seus números somados
+  - `explainFaturamentoBase`: `"Ex: 18 clientes × R$ 25.000 = R$ 450.000 (Jan)"`
+  - `explainIncremento`: `"Ex: 3 novos × R$ 25.000 = R$ 75.000 (Jan)"`
+  - `explainRevenueChurn`: `"Ex: 0,42 churns × R$ 25.000 = R$ 10.500 (Jan)"`
+  - `explainNovosClientes`: `"Ex: 21 (Jan) − 18 (Dez anterior) + 0 churn = 3 novos"`
+  - `explainClientesAtivos`: `"Ex: 18 (Dez/2024) + 3 novos − 0 churn = 21 (Jan/2025)"`
 
-### Integração em `src/pages/Assumptions.tsx`
+Cada example usará os valores reais já calculados dentro da função (jan, dec, prevDec, ticketBase, rates etc.), montando uma string legível.
 
-Adicionar `<FormulaExplainer>` ao lado do título de cada seção expandida:
+#### 2. `src/components/assumptions/FormulaExplainer.tsx` — Renderizar o exemplo
 
-| Seção | Linha aprox. | Onde colocar |
-|-------|-------------|--------------|
-| **Clientes Ativos — {year}** | ~1323 | Ao lado do título `<p>` |
-| **Novos Clientes — {year}** | ~1351 | Ao lado do título `<p>` |
-| **Logo Churn — {year}** | ~1556 | Ao lado do título `<p>` |
-| **Ticket (R$/mês) — {year}** | ~1901 | Ao lado do título `<p>` |
-| **Faturamento Base — {year}** | ~2206 | Ao lado do título `<p>` |
-| **Incremento — {year}** | ~2228 | Ao lado do título `<p>` |
-| **Revenue Churn — {year}** | Após Incremento | Ao lado do título `<p>` |
+- Após a seção de steps e antes do resultado, adicionar um bloco condicional:
+```text
+{explanation.example && (
+  <div className="bg-muted/50 rounded px-2 py-1.5">
+    <span className="text-[10px] font-semibold text-muted-foreground">EXEMPLO</span>
+    <p className="text-[11px] font-mono text-foreground mt-0.5">{explanation.example}</p>
+  </div>
+)}
+```
 
-Cada ícone chamará a função correspondente do `formulaExplainer.ts` passando `prodKey`, `selectedYear`, e `data` (assumptions).
-
-### Detalhes técnicos
-
-- As novas funções seguem o mesmo padrão das existentes: recebem `key, label, year, assumptions` e retornam `FormulaExplanation`
-- O componente `FormulaExplainer` já existe e será reutilizado com `iconSize={11}`
-- Nenhum arquivo novo — apenas edições em `formulaExplainer.ts` e `Assumptions.tsx`
+### Resumo
+| Arquivo | Ação |
+|---------|------|
+| `src/lib/formulaExplainer.ts` | Editar — adicionar campo `example` com cálculo numérico real em todas as 12 funções |
+| `src/components/assumptions/FormulaExplainer.tsx` | Editar — renderizar bloco "EXEMPLO" no popover |
 
