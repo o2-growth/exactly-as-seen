@@ -699,98 +699,80 @@ function EditableCell({
 }
 
 // ============================================================
-// CÉLULA DE MIX (SERVIÇO / PRODUTO)
+// DROPDOWN DE PERFIL TRIBUTÁRIO
 // ============================================================
 
-interface MixCellProps {
+interface ProfileDropdownCellProps {
   chave: string;
-  valor: number | undefined;
-  onUpdate: (chave: string, val: number) => void;
-  onClear: (chave: string) => void;
+  currentProfile: string;
+  mixValue: number | undefined;
+  onSelectProfile: (chave: string, profileKey: string) => void;
+  onUpdateMix: (chave: string, val: number) => void;
 }
 
-function MixCell({ chave, valor, onUpdate, onClear }: MixCellProps) {
-  const [editing, setEditing] = useState(false);
-  const [inputValue, setInputValue] = useState('');
-  const hasMix = valor !== undefined && valor !== null;
+function ProfileDropdownCell({ chave, currentProfile, mixValue, onSelectProfile, onUpdateMix }: ProfileDropdownCellProps) {
+  const [editingMix, setEditingMix] = useState(false);
+  const [mixInput, setMixInput] = useState('');
+  const isMix = currentProfile === 'mix';
+  const profileLabel = currentProfile ? (TAX_PROFILES[currentProfile]?.label || currentProfile) : '—';
 
-  const handleStartEdit = () => {
-    setInputValue(hasMix ? String(valor) : '');
-    setEditing(true);
-  };
-
-  const handleCommit = () => {
-    const v = inputValue.trim();
-    if (v === '' || v === '-') {
-      onClear(chave);
-    } else {
-      const num = parseFloat(v.replace(',', '.'));
-      if (!isNaN(num) && num >= 0 && num <= 100) {
-        onUpdate(chave, num);
-      }
+  const handleMixCommit = () => {
+    const v = parseFloat(mixInput.replace(',', '.'));
+    if (!isNaN(v) && v >= 0 && v <= 100) {
+      onUpdateMix(chave, v);
     }
-    setEditing(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') handleCommit();
-    if (e.key === 'Escape') setEditing(false);
+    setEditingMix(false);
   };
 
   return (
-    <td
-      style={{
-        ...tdNum,
-        background: hasMix ? '#FFE0B2' : '#FFF9E6',
-        cursor: 'text',
-        border: hasMix ? '2px solid #FF9800' : '1px solid #E0C800',
-        padding: '4px 8px',
-        position: 'relative',
-      }}
-      onClick={!editing ? handleStartEdit : undefined}
-    >
-      {editing ? (
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onBlur={handleCommit}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          placeholder="vazio = sem mix"
-          style={{
-            width: '100%', padding: 2, fontSize: 11, fontFamily: 'Montserrat, sans-serif',
-            fontWeight: 700, border: '2px solid #FF9800', borderRadius: 2,
-            textAlign: 'center', outline: 'none', background: '#FFFFFF', color: '#494949',
-          }}
-        />
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, position: 'relative' }}>
-          {hasMix ? (
-            <>
-              <span style={{ fontWeight: 700, color: '#E65100', fontSize: 11 }}>
-                {valor}% serv
-              </span>
-              <span style={{ fontSize: 9, color: '#787878' }}>
-                / {100 - valor}% prod
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onClear(chave); }}
-                title="Remover mix"
-                style={{
-                  position: 'absolute', right: -6, top: -10, width: 14, height: 14,
-                  borderRadius: '50%', border: '1px solid #C62828', background: '#FFFFFF',
-                  color: '#C62828', fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                  padding: 0, lineHeight: 1, display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                ✕
-              </button>
-            </>
+    <td style={{
+      ...tdNum,
+      background: currentProfile ? '#FFF3E0' : '#FFF9E6',
+      border: currentProfile ? '2px solid #FF9800' : '1px solid #E0C800',
+      padding: '4px 4px',
+      minWidth: 130,
+    }}>
+      <select
+        value={currentProfile || ''}
+        onChange={e => onSelectProfile(chave, e.target.value)}
+        style={{
+          width: '100%', fontSize: 10, fontWeight: 700, fontFamily: 'Montserrat, sans-serif',
+          border: '1px solid #CCC', borderRadius: 3, padding: '2px 4px',
+          background: '#FFFFFF', color: '#494949', cursor: 'pointer',
+        }}
+      >
+        <option value="">— Padrão —</option>
+        {TAX_PROFILE_KEYS.map(k => (
+          <option key={k} value={k} title={TAX_PROFILES[k].description}>
+            {TAX_PROFILES[k].label}
+          </option>
+        ))}
+      </select>
+      {isMix && (
+        <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+          {editingMix ? (
+            <input
+              type="text"
+              value={mixInput}
+              onChange={e => setMixInput(e.target.value)}
+              onBlur={handleMixCommit}
+              onKeyDown={e => { if (e.key === 'Enter') handleMixCommit(); if (e.key === 'Escape') setEditingMix(false); }}
+              autoFocus
+              placeholder="% serviço"
+              style={{
+                width: 60, fontSize: 10, fontWeight: 700, textAlign: 'center',
+                border: '2px solid #FF9800', borderRadius: 2, padding: '1px 2px',
+                background: '#FFF', color: '#494949', outline: 'none',
+              }}
+            />
           ) : (
-            <span style={{ color: '#AAAAAA', fontSize: 10, fontStyle: 'italic' }}>—</span>
+            <span
+              onClick={() => { setMixInput(String(mixValue ?? 50)); setEditingMix(true); }}
+              style={{ fontSize: 10, fontWeight: 700, color: '#E65100', cursor: 'pointer' }}
+              title="Clique para editar % serviço"
+            >
+              {mixValue ?? 50}% serv / {100 - (mixValue ?? 50)}% prod
+            </span>
           )}
         </div>
       )}
