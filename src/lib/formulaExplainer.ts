@@ -9,8 +9,14 @@ import {
   CosConfig, DEFAULT_COS_CONFIG,
 } from '@/lib/financialData';
 import { formatCurrency, formatCurrencyFull, formatPercent } from '@/lib/formatters';
-import { getMonthlyClients } from '@/lib/monthlyData';
+import { getMonthlyClients, MONTHS } from '@/lib/monthlyData';
 import { FullModelOutput } from '@/engine/calculationsEngine';
+
+/** Find first month index with value > 0; fallback to 0 */
+function findRepresentativeMonth(monthly: number[]): number {
+  const idx = monthly.findIndex(v => v > 0);
+  return idx >= 0 ? idx : 0;
+}
 
 export interface FormulaStep {
   label: string;
