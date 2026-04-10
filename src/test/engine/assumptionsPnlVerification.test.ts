@@ -182,8 +182,8 @@ describe('Assumptions → P&L: Tax rates affect deductions', () => {
     const base = getModel();
     const highTax = getModel({
       subProductTaxRates: {
-        caasAssessoria: { pis: 0.65, cofins: 3.0, iss: 10.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, tipoReceita: 'servico' },
-        caasEnterprise: { pis: 0.65, cofins: 3.0, iss: 10.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, tipoReceita: 'servico' },
+        caasAssessoria: { pis: 0.65, cofins: 3.0, iss: 10.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, presumidoIRPJ: 32, presumidoCSLL: 32, tipoReceita: 'servico' },
+        caasEnterprise: { pis: 0.65, cofins: 3.0, iss: 10.0, csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0, presumidoIRPJ: 32, presumidoCSLL: 32, tipoReceita: 'servico' },
       },
     });
 

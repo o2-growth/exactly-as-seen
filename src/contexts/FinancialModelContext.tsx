@@ -117,6 +117,19 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           }
         }
 
+        // Migration: convert old decimal presumido values (0.32) to percentage (32)
+        if (fixed.subProductTaxRates) {
+          for (const [key, cfg] of Object.entries(fixed.subProductTaxRates)) {
+            const c = cfg as any;
+            if (c.presumidoIRPJ !== undefined && c.presumidoIRPJ < 1) {
+              c.presumidoIRPJ = c.presumidoIRPJ * 100;
+            }
+            if (c.presumidoCSLL !== undefined && c.presumidoCSLL < 1) {
+              c.presumidoCSLL = c.presumidoCSLL * 100;
+            }
+          }
+        }
+
         // Ensure cacPerProduct has all keys
         if (fixed.cacPerProduct) {
           fixed.cacPerProduct = {

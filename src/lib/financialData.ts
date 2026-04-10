@@ -170,6 +170,8 @@ export interface SubProductTaxConfig {
   icms: number;             // 2.06 ICMS — default 0
   irrfRetido: number;       // 2.07 IRRF (retido na fonte) — default 0
   cofinsRetido: number;     // 2.08 COFINS (retido na fonte) — default 0
+  presumidoIRPJ: number;    // Base presumida IRPJ — default 0.32 (serviço)
+  presumidoCSLL: number;    // Base presumida CSLL — default 0.32 (serviço)
   tipoReceita: string;      // 'servico' (default)
 }
 
@@ -211,6 +213,7 @@ export function getDefaultSubProductTaxConfig(key: TicketKey): SubProductTaxConf
     pis: 0.65, cofins: 3.0,
     iss,
     csllRetido: 0, pisRetido: 0, icms: 0, irrfRetido: 0, cofinsRetido: 0,
+    presumidoIRPJ: 32, presumidoCSLL: 32,
     tipoReceita: 'servico',
   };
 }
