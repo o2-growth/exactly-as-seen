@@ -242,9 +242,7 @@ export default function Valuation() {
   const focalEbitda = resolveAnnualMetric('EBITDA', focalYear, projections.ebitda[focalYear]);
   const baseVal2025Ebitda = focalEbitda * ebitdaMultiple;
   const scenarioCards = (baseVal: number) => [
-    { label: 'Bear', value: baseVal * SCENARIO_MULTIPLIERS.BEAR, color: 'text-destructive' },
-    { label: 'Base', value: baseVal * SCENARIO_MULTIPLIERS.BASE, color: 'text-foreground' },
-    { label: 'Bull', value: baseVal * SCENARIO_MULTIPLIERS.BULL, color: 'text-accent' },
+    { label: 'Base', value: baseVal, color: 'text-foreground' },
   ];
 
   // Dilution
@@ -257,9 +255,7 @@ export default function Valuation() {
   const trajectoryData = (valuations: { year: Year; valuation: number }[]) =>
     valuations.map(v => ({
       year: v.year,
-      Bear: Math.round(v.valuation * SCENARIO_MULTIPLIERS.BEAR),
       Base: Math.round(v.valuation),
-      Bull: Math.round(v.valuation * SCENARIO_MULTIPLIERS.BULL),
     }));
 
   return (
@@ -415,14 +411,9 @@ export default function Valuation() {
               <span className="text-xs text-muted-foreground">x</span>
             </div>
 
-            {/* Scenario cards */}
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              {scenarioCards(baseVal2025Ebitda).map(c => (
-                <div key={c.label} className="kpi-card text-center">
-                  <p className="text-[10px] text-muted-foreground mb-1">{c.label}</p>
-                  <p className={`text-lg font-bold ${c.color}`}>{formatCurrency(c.value * 1000)}</p>
-                </div>
-              ))}
+            <div className="kpi-card text-center mb-4">
+              <p className="text-[10px] text-muted-foreground mb-1">Base</p>
+              <p className="text-lg font-bold text-foreground">{formatCurrency(baseVal2025Ebitda * 1000)}</p>
             </div>
 
             {totalShares > 0 && (
@@ -458,9 +449,7 @@ export default function Valuation() {
                 <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
                 <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={(v: number) => `R$${(v / 1_000_000).toFixed(0)}MM`} />
                 <Tooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => formatCurrency(v * 1000)} />
-                <Line type="monotone" dataKey="Bear" stroke="hsl(0 84% 60%)" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="Base" stroke="hsl(217 91% 60%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Bull" stroke="hsl(160 84% 39%)" strokeWidth={2} dot={false} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -473,13 +462,9 @@ export default function Valuation() {
               <span className="text-xs text-muted-foreground">x</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              {scenarioCards(arrValuations[0]?.valuation || 0).map(c => (
-                <div key={c.label} className="kpi-card text-center">
-                  <p className="text-[10px] text-muted-foreground mb-1">{c.label}</p>
-                  <p className={`text-lg font-bold ${c.color}`}>{formatCurrency(c.value * 1000)}</p>
-                </div>
-              ))}
+            <div className="kpi-card text-center mb-4">
+              <p className="text-[10px] text-muted-foreground mb-1">Base</p>
+              <p className="text-lg font-bold text-foreground">{formatCurrency((arrValuations[0]?.valuation || 0) * 1000)}</p>
             </div>
 
             {totalShares > 0 && arrValuations[0] && (
@@ -517,9 +502,7 @@ export default function Valuation() {
                 <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
                 <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={(v: number) => `R$${(v / 1_000_000).toFixed(0)}MM`} />
                 <Tooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => formatCurrency(v * 1000)} />
-                <Line type="monotone" dataKey="Bear" stroke="hsl(0 84% 60%)" strokeWidth={2} dot={false} />
                 <Line type="monotone" dataKey="Base" stroke="hsl(217 91% 60%)" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="Bull" stroke="hsl(160 84% 39%)" strokeWidth={2} dot={false} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
               </LineChart>
             </ResponsiveContainer>
