@@ -219,7 +219,7 @@ function fmtBRL(value: number): string {
 // ============================================================
 
 export default function PremissasPage() {
-  const { assumptions } = useFinancialModel();
+  const { assumptions, setAssumptions } = useFinancialModel();
   const {
     overrides,
     updateField,
@@ -606,13 +606,22 @@ interface EditableCellProps {
   onUpdate: (chave: string, field: EditableField, valor: number) => void;
   onReset: (chave: string, field: EditableField) => void;
   digits?: number;
+  locked?: boolean;
 }
 
 function EditableCell({
-  chave, field, valor, modificado, onUpdate, onReset, digits = 2,
+  chave, field, valor, modificado, onUpdate, onReset, digits = 2, locked = false,
 }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
+
+  if (locked) {
+    return (
+      <td style={{ ...tdNum, background: '#F5F5F5', color: '#999' }}>
+        {(valor * 100).toFixed(digits).replace('.', ',')}%
+      </td>
+    );
+  }
 
   const handleStartEdit = () => {
     setInputValue((valor * 100).toFixed(digits).replace('.', ','));
