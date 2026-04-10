@@ -19,7 +19,6 @@ import {
   TAX_PROFILES,
   TaxSlice,
   SubProductTaxConfig,
-  resolveSlices,
   getMixTaxSlices,
 } from './financialData';
 
