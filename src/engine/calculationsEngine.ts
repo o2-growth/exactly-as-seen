@@ -591,9 +591,10 @@ function calcMonthlyCapex(month: number, year: number, saasCogsMonthly: number):
 
 // ─── LUCRO PRESUMIDO — TAX HELPERS ───
 
-function getBasePresumida(_tipoReceita: string): { irpj: number; csll: number } {
-  // Lucro Presumido: todos os produtos O2 são prestação de serviço → base 32%/32%
-  return { irpj: 0.32, csll: 0.32 };
+// getBasePresumida now reads from the per-subproduct config (presumidoIRPJ / presumidoCSLL)
+// instead of returning a hardcoded 32%/32%.
+function getBasePresumida(cfg: SubProductTaxConfig): { irpj: number; csll: number } {
+  return { irpj: cfg.presumidoIRPJ ?? 0.32, csll: cfg.presumidoCSLL ?? 0.32 };
 }
 
 function calcularDeducoesPorSubproduto(
