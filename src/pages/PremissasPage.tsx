@@ -60,7 +60,7 @@ const PREMISE_TO_TICKET: Record<string, TicketKey> = {
   'Tax/Diagnóstico Tributário & Compliance': 'taxDTC',
 };
 
-const CATEGORIAS: Categoria[] = ['CaaS', 'SaaS', 'Education', 'Expansão', 'Tax'];
+const CATEGORIAS: Categoria[] = ['CaaS', 'SaaS', 'Education', 'Expansão', 'Tax', 'PT'];
 
 const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
   CaaS:      { bg: '#E8FBE8', text: '#2E7D32' },
@@ -68,6 +68,7 @@ const CAT_COLORS: Record<Categoria, { bg: string; text: string }> = {
   Education: { bg: '#E6F3FF', text: '#1565C0' },
   Expansão:  { bg: '#FFE6E6', text: '#C62828' },
   Tax:       { bg: '#F0E6FF', text: '#6A1B9A' },
+  PT:        { bg: '#FFF3E0', text: '#E65100' },
 };
 
 // ============================================================
