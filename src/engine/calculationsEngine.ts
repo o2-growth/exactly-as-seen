@@ -858,7 +858,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
         const fat = revBySubprod[key] || 0;
         if (fat <= 0) continue;
         const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
-        const base = getBasePresumida(cfg.tipoReceita);
+        const base = getBasePresumida(cfg);
         irpj += -(fat * base.irpj * 0.15);
         csll += -(fat * base.csll * 0.09);
       }
@@ -869,7 +869,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
       const fat = revBySubprod[key] || 0;
       if (fat <= 0) continue;
       const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
-      const base = getBasePresumida(cfg.tipoReceita);
+      const base = getBasePresumida(cfg);
       quarterBasePresumidaIRPJ += fat * base.irpj;
     }
     if (m % 3 === 2) {
