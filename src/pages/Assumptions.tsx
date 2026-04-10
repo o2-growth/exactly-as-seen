@@ -472,10 +472,7 @@ export default function Assumptions() {
   const [expandedProducts, setExpandedProducts] = useState<Record<string, boolean>>({});
   const [showTotalFilter, setShowTotalFilter] = useState(false);
   // Products excluded from totals — default: Setup keys
-  const [excludedFromTotal, setExcludedFromTotal] = useState<Record<string, boolean>>(() => ({
-    caasSetup: true,
-    saasSetup: true,
-  }));
+  const [excludedFromTotal, setExcludedFromTotal] = useState<Record<string, boolean>>(() => ({}));
   const [hcViewMode, setHcViewMode] = useState<'people' | 'cost'>('people');
 
   const [actualData, setActualData] = useState<Record<string, Record<number, number>>>(() => {
