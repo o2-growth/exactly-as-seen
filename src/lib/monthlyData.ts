@@ -129,21 +129,6 @@ export function getMonthlyClients(
   ticketPrices?: Partial<Record<SubProductKey, number>>,
   monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
 ): number[] {
-  // Setup = sum of absolute client counts from 5 source products
-  if (key === 'saasSetup') {
-    const sources: SubProductKey[] = [
-      'caasEnterprise', 'caasCorporate',
-      'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp',
-    ];
-    return Array.from({ length: 12 }, (_, m) => {
-      let total = 0;
-      for (const src of sources) {
-        const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
-        total += Math.round(srcMonthly[m]);
-      }
-      return total;
-    });
-  }
   // Determine the ticket price for this sub-product
   const STATIC_TICKET_FALLBACK: Record<SubProductKey, number> = {
     caasAssessoria:   25000,
@@ -180,6 +165,36 @@ export function getMonthlyClients(
       return (ov !== null && ov !== undefined) ? ov : v;
     });
   };
+
+  // saasSetup special handling:
+  // - For HISTORICAL months: read real Oxy data from historicalRevenueItems
+  //   (via getHistoricalClients). The real setup revenue reflects actual closed
+  //   deals, not a derived "sum of 5 MRR products".
+  // - For PROJECTED months: use the business rule formula "sum of new clients
+  //   from 5 MRR products × setup ticket" as the forecast model.
+  // - Fallback (when historical data is missing for a month): the 5-source formula.
+  if (key === 'saasSetup') {
+    const sources: SubProductKey[] = [
+      'caasEnterprise', 'caasCorporate',
+      'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp',
+    ];
+    // Compute the 5-source sum (used for projected months and as fallback)
+    const sumFallback = Array.from({ length: 12 }, (_, m) => {
+      let total = 0;
+      for (const src of sources) {
+        const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
+        total += Math.round(srcMonthly[m]);
+      }
+      return total;
+    });
+
+    // For historical periods (2025 all + 2026 Q1), read real data from Oxy
+    const hist = getHistoricalClients(key, year, ticket);
+    // hist[m] is null for months NOT in HISTORICAL_PERIODS.
+    // For those months, use the 5-source fallback (projected logic).
+    const result = hist.map((histVal, m) => histVal !== null ? histVal : sumFallback[m]);
+    return applyOverrides(result);
+  }
 
   if (year === 2025) {
     // Use real historical data from Oxy (via historicalRevenueItems),
