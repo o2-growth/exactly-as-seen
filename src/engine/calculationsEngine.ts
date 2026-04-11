@@ -1431,7 +1431,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const saas2026     = mixedYear(historicalRevenue, 'SaaS',     2026, d => d.saasRevenue);
   const edu2026      = mixedYear(historicalRevenue, 'Education', 2026, d => d.educationRevenue);
   const expansao2026 = mixedYear(historicalRevenue, 'Expansão', 2026, d => d.baasRevenue);
-  const tax2026      = getHistoricalAnnual(historicalRevenue, 'Tax', 2026) ?? 0;
+  const tax2026      = mixedYear(historicalRevenue, 'Tax', 2026, d => d.taxRevenue);
   const grossRev2026 = mixedYear(historicalMetrics, 'RECEITA BRUTA',    2026, d => d.grossRevenue);
   const netRev2026   = mixedYear(historicalMetrics, 'RECEITA LÍQUIDA',  2026, d => d.netRevenue);
   const grossProfit2026 = mixedYear(historicalMetrics, 'LUCRO BRUTO',   2026, d => d.grossProfit);
