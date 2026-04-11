@@ -1498,58 +1498,11 @@ export default function Assumptions() {
                                         const hist = isHistorical(selectedYear, i);
                                         const hcPeriod = toPeriod(selectedYear, i);
                                         const hcEntry = hist ? historicalData[prodKey]?.[hcPeriod] : undefined;
-                                        let displayClients: number = hcEntry ? hcEntry.client_count : monthly[i];
-                                        if (isProductNonMrr) {
-                                          // For non-MRR products, active clients of the month = new clients of the month.
-                                          // Use the same inline logic as the "Novos Clientes" display below.
-                                          let newClientsDisplay = 0;
-                                          if (hist) {
-                                            const activeCur = hcEntry ? hcEntry.client_count : monthly[i];
-                                            let activePrev = 0;
-                                            if (i > 0) {
-                                              const hcPeriodPrev = toPeriod(selectedYear, i - 1);
-                                              const hcEntryPrev = isHistorical(selectedYear, i - 1) ? historicalData[prodKey]?.[hcPeriodPrev] : undefined;
-                                              activePrev = hcEntryPrev ? hcEntryPrev.client_count : monthly[i - 1];
-                                            } else if (selectedYear > 2025) {
-                                              const prevYr = (selectedYear - 1) as Year;
-                                              const decPeriodPrev = toPeriod(prevYr, 11);
-                                              const decApiPrev = historicalData[prodKey]?.[decPeriodPrev];
-                                              if (decApiPrev && decApiPrev.client_count > 0) {
-                                                activePrev = decApiPrev.client_count;
-                                              } else {
-                                                const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                                activePrev = Math.round(prevYrMonthly[11]);
-                                              }
-                                            }
-                                            let churnedCur = 0;
-                                            if (hcEntry) {
-                                              churnedCur = hcEntry.churned_clients ?? 0;
-                                            } else {
-                                              const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                              churnedCur = Math.round(activePrev * churnRate);
-                                            }
-                                            newClientsDisplay = Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
-                                          } else {
-                                            const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
-                                            if (storedNew !== null && storedNew !== undefined) {
-                                              newClientsDisplay = storedNew;
-                                            } else {
-                                              const activeCur = monthly[i];
-                                              let activePrev = 0;
-                                              if (i > 0) {
-                                                activePrev = monthly[i - 1];
-                                              } else if (selectedYear > 2025) {
-                                                const prevYr = (selectedYear - 1) as Year;
-                                                const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
-                                                activePrev = Math.round(prevYrMonthly[11]);
-                                              }
-                                              const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
-                                              const churnedCur = Math.round(activePrev * churnRate);
-                                              newClientsDisplay = Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
-                                            }
-                                          }
-                                          displayClients = newClientsDisplay;
-                                        }
+                                        // For both MRR and non-MRR: read from Supabase if available, else engine-derived monthly[].
+                                        // The old non-MRR branch that used a delta formula is removed — for non-MRR
+                                        // (one-shot products), each month's active count = that month's new clients,
+                                        // so the direct read already gives the correct value.
+                                        const displayClients: number = hcEntry ? hcEntry.client_count : monthly[i];
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
