@@ -22,7 +22,11 @@ describe('Assumptions → P&L: Ticket changes affect revenue', () => {
     });
 
     for (const y of YEARS) {
-      if (y === 2025) continue; // 2025 uses clientsBase2025, not assumptions
+      // Skip 2025 (fully historical) and 2026 (mixed: Jan-Mar historical, Apr-Dec projected).
+      // After the fix to read real Oxy data, historical months compute clients as
+      // revenue/ticket, so doubling the ticket halves the clients and leaves revenue
+      // unchanged. Only fully projected years (2027+) scale linearly with ticket.
+      if (y <= 2026) continue;
       const baseRev = base.years[y].revenueDetail.caasEnterprise;
       const dblRev = doubled.years[y].revenueDetail.caasEnterprise;
       if (baseRev > 0) {

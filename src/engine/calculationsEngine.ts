@@ -6,6 +6,7 @@
 
 import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS, computeMixPresumido, getEffectivePresumido, resolveSlices } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
+import { getMonthlyClients as getMonthlyClientsFromData } from '@/lib/monthlyData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
   cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
@@ -109,12 +110,16 @@ export interface FullModelOutput {
 }
 
 // ─── HELPER: Get monthly clients for a product ───
-
-function getDecClients2025(bu: string, product: string): number {
-  const buData = (clientsBase2025 as any)[bu];
-  if (!buData || !buData[product]) return 0;
-  return buData[product][11] || 0;
-}
+//
+// Single source of truth: delegates to getMonthlyClients from monthlyData.ts.
+// That function handles:
+//   - monthlyClientOverrides (user edits)
+//   - historical data from Oxy (via historicalRevenueItems, for 2025 and 2026 Q1)
+//   - geometric interpolation from last real month to user's annual target
+//   - special case for saasSetup (sum of new clients from 5 MRR products)
+//
+// This replaces the previous parallel logic that read from clientsBase2025 seed
+// for 2025 and did linear interpolation for 2026+, which diverged from the display.
 
 function getMonthlyClientCount(bu: string, product: string, month: number, year: number, assumptions: Assumptions): number {
   // month is 0-indexed (0=Jan, 11=Dec)
@@ -127,36 +132,16 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
     'tax.rt': 'taxRT', 'tax.dtc': 'taxDTC',
   };
   const subKey = keyMap[`${bu}.${product}`];
-
-  // Check for monthly client overrides first
-  if (subKey) {
-    const override = assumptions.monthlyClientOverrides?.[subKey as TicketKey]?.[year as Year];
-    if (override && override[month] !== null && override[month] !== undefined) {
-      return override[month]!;
-    }
-  }
-
-  if (year === 2025) {
-    const arr = (clientsBase2025 as any)[bu]?.[product];
-    return arr ? arr[month] : 0;
-  }
-
-  // For years > 2025: interpolate from previous year-end to current year-end
   if (!subKey) return 0;
 
-  const prevYear = (year - 1) as Year;
-  let startClients: number;
-  if (prevYear === 2025) {
-    startClients = getDecClients2025(bu, product);
-  } else if (YEARS.includes(prevYear)) {
-    startClients = (assumptions.subProductClients as any)[subKey]?.[prevYear] ?? 0;
-  } else {
-    startClients = 0;
-  }
-
-  const endClients = (assumptions.subProductClients as any)[subKey]?.[year] ?? 0;
-  // Linear interpolation within the year
-  return startClients + (endClients - startClients) * ((month + 1) / 12);
+  const monthly = getMonthlyClientsFromData(
+    subKey as any,
+    year as Year,
+    assumptions.subProductClients,
+    assumptions.tickets,
+    assumptions.monthlyClientOverrides,
+  );
+  return monthly[month] ?? 0;
 }
 
 // ─── TICKET HELPER (Item 1: monthly ticket overrides) ───
@@ -646,7 +631,7 @@ function calcularDeducoesPorBU(
 
 // ─── COMPUTE FULL YEAR ───
 
-function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): AnnualOutput {
+function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, prevYearGrossRev: number = 0): AnnualOutput {
   const sMult = scenarioMultipliers[scenario.toLowerCase() as keyof typeof scenarioMultipliers] ?? scenarioMultipliers.base;
 
   const monthly: MonthlyPnL[] = [];
@@ -992,10 +977,12 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
     : 0;
   // annualGrossRevenue is in R$ thousands — no /1000 needed
   const endingReceivables = annualGrossRevenue * (weightedPmr / 365); // in R$ thousands
-  // For prior year revenue, expectedOutputs.grossRevenue is also in R$ thousands
-  const prevYear = (year - 1) as Year;
-  const prevYearRev = YEARS.includes(prevYear) ? expectedOutputs.grossRevenue[prevYear] ?? 0 : 0;
-  const beginningReceivables = prevYearRev * (weightedPmr / 365); // in R$ thousands
+  // prevYearGrossRev is passed from computeFullModel:
+  //   - For the first iteration (2025), it's 0 (no prior year exists)
+  //   - For subsequent years, it's the previous year's engine-computed grossRevenue
+  //     (which now reads from real Oxy data via getMonthlyClients after the fix)
+  // Previously this read expectedOutputs.grossRevenue[prevYear] — a hardcoded Lovable chute.
+  const beginningReceivables = prevYearGrossRev * (weightedPmr / 365); // in R$ thousands
   const receivablesChange = -(endingReceivables - beginningReceivables); // negative = cash used, positive = cash released
 
   return {
@@ -1042,8 +1029,13 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario): 
 export function computeFullModel(assumptions: Assumptions, scenario: Scenario): FullModelOutput {
   const years = {} as Record<Year, AnnualOutput>;
 
+  // Track previous year's computed grossRevenue to pass to the next iteration.
+  // Used by receivables calculation (prevYearGrossRev) to eliminate the dependency
+  // on expectedOutputs.grossRevenue (hardcoded Lovable chute).
+  let prevYearGrossRev = 0;
   for (const y of YEARS) {
-    years[y] = computeYear(y, assumptions, scenario);
+    years[y] = computeYear(y, assumptions, scenario, prevYearGrossRev);
+    prevYearGrossRev = years[y].grossRevenue;
   }
 
   // Validate against expected outputs (base scenario only)

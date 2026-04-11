@@ -19,15 +19,37 @@ export type Month = typeof MONTHS[number];
 type SubProductKey = keyof SubProductClients;
 
 // Map from SubProductKey to historical revenue item location (group, item_name)
+// Complete mapping for all 21 sub-products to their entries in historicalRevenueItems.
+// Products that didn't exist in 2025 (e.g. Oxy standalone) will have all-zero values in
+// historicalRevenueItems but are still mapped for correctness.
 const HISTORICAL_REVENUE_MAP: Partial<Record<SubProductKey, { group: string; item: string }>> = {
-  caasAssessoria:   { group: 'CaaS', item: 'Serviços Especializados' },
-  caasEnterprise:   { group: 'CaaS', item: 'Enterprise' },
-  caasCorporate:    { group: 'CaaS', item: 'Corporate' },
-  caasSetup:        { group: 'CaaS', item: 'BPO Financeiro' },
-  saasOxy:          { group: 'SaaS', item: 'Oxy' },
-  saasOxyGenio:     { group: 'SaaS', item: 'Oxy + Gênio' },
-  educationDonoCFO: { group: 'Education', item: 'Dono CFO' },
-  // baas: no historical data yet
+  // CaaS
+  caasAssessoria:     { group: 'CaaS', item: 'Serviços Especializados' },
+  caasEnterprise:     { group: 'CaaS', item: 'Enterprise' },
+  caasCorporate:      { group: 'CaaS', item: 'Corporate' },
+  caasSetup:          { group: 'CaaS', item: 'BPO Financeiro' },
+  caasParceiros:      { group: 'CaaS', item: 'Parceiros' },
+  // SaaS
+  saasOxy:            { group: 'SaaS', item: 'Oxy' },
+  saasOxyGenio:       { group: 'SaaS', item: 'Oxy + Gênio' },
+  saasOxyGenioEsp:    { group: 'SaaS', item: 'Oxy + Gênio + Especialista' },
+  saasSetup:          { group: 'SaaS', item: 'Setup' },
+  saasParceiros:      { group: 'SaaS', item: 'Parceiros' },
+  // Education
+  educationDonoCFO:   { group: 'Education', item: 'Dono CFO' },
+  educationEN:        { group: 'Education', item: 'Engenheiro de Negócios' },
+  educationFR:        { group: 'Education', item: 'Financeiro Raiz' },
+  educationFSP:       { group: 'Education', item: 'Finance Sales Program' },
+  // Expansão (labeled as 'baas*' in SubProductKey, maps to 'Expansão' in historicalRevenueItems)
+  baas:               { group: 'Expansão', item: 'Oxy Hacker - Micro Franqueado' },
+  baasFranquia:       { group: 'Expansão', item: 'Franquia' },
+  baasMasterFranquia: { group: 'Expansão', item: 'Master Franquia' },
+  // Tax
+  taxAT:              { group: 'Tax', item: 'AT - Assessoria Tributária' },
+  taxGPT:             { group: 'Tax', item: 'GPT - Gestão passivo tributário' },
+  taxRCT:             { group: 'Tax', item: 'RCT - Recuperação Crédito tributário' },
+  taxRT:              { group: 'Tax', item: 'RT - Reforma tributária' },
+  taxDTC:             { group: 'Tax', item: 'Diagnóstico Tributário & Compliance Tributário' },
 };
 
 /**
