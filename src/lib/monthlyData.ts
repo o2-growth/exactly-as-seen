@@ -160,8 +160,14 @@ export function getMonthlyClients(
   };
 
   if (year === 2025) {
-    // Use actual client base data for 2025 — never derive from ticket
-    return applyOverrides([...SUB_PRODUCT_2025_DATA[key]]);
+    // Use real historical data from Oxy (via historicalRevenueItems),
+    // not the hardcoded clientsBase2025 seed.
+    // Each month's client count = revenue_from_oxy / ticket_price.
+    // Products that didn't exist in 2025 (like Oxy standalone) will show 0,
+    // which matches reality. Legacy SUB_PRODUCT_2025_DATA is kept for
+    // reference but no longer used as source of truth.
+    const hist = getHistoricalClients(key, 2025, ticket);
+    return applyOverrides(hist.map(v => v ?? 0));
   }
 
   if (year === 2026) {
