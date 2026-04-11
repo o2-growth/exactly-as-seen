@@ -1431,7 +1431,15 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const saas2026     = mixedYear(historicalRevenue, 'SaaS',     2026, d => d.saasRevenue);
   const edu2026      = mixedYear(historicalRevenue, 'Education', 2026, d => d.educationRevenue);
   const expansao2026 = mixedYear(historicalRevenue, 'Expansão', 2026, d => d.baasRevenue);
-  const tax2026      = mixedYear(historicalRevenue, 'Tax', 2026, d => d.taxRevenue);
+  // WORKAROUND: Tax uses getHistoricalAnnual (historical-only) instead of mixedYear
+  // (which would include engine projection) because calcMonthlyRevenue at lines 203-208
+  // treats ALL Tax sub-products as MRR (clientesAtivos × ticket), but 4 of 5
+  // (taxGPT, taxRCT, taxRT, taxDTC) are non-MRR one-shot projects. Including the engine
+  // projection for Apr-Dec 2026 here would inflate Tax revenue by ~1.5x vs reality.
+  // Until the engine is refactored to distinguish MRR vs non-MRR revenue calculation,
+  // Tax Apr-Dec 2026 is left at zero in the tree (effectively: show only historical Q1).
+  // See docs/engine-nonmrr-bug.md for full analysis.
+  const tax2026      = getHistoricalAnnual(historicalRevenue, 'Tax', 2026) ?? 0;
   const grossRev2026 = mixedYear(historicalMetrics, 'RECEITA BRUTA',    2026, d => d.grossRevenue);
   const netRev2026   = mixedYear(historicalMetrics, 'RECEITA LÍQUIDA',  2026, d => d.netRevenue);
   const grossProfit2026 = mixedYear(historicalMetrics, 'LUCRO BRUTO',   2026, d => d.grossProfit);
