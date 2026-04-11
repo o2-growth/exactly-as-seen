@@ -793,13 +793,16 @@ export default function Assumptions() {
       manualFlags[monthIdx] = true;
 
       // Recalculate subsequent non-manual NEW client months using growth %
+      // Keep prevVal as FLOAT across iterations so compounding works even
+      // with small base values (e.g. 2 * 1.10 = 2.2 → rounded display 2,
+      // but internal accumulator keeps 2.2 → 2.42 → 2.66 ...).
       let prevVal = newCount;
       for (let j = monthIdx + 1; j < 12; j++) {
         if (manualFlags[j] && newArr[j] !== null && newArr[j] !== undefined) {
           prevVal = newArr[j]!;
         } else {
-          prevVal = Math.max(0, Math.round(prevVal * (1 + rate)));
-          newArr[j] = prevVal;
+          prevVal = Math.max(0, prevVal * (1 + rate));
+          newArr[j] = Math.round(prevVal);
         }
       }
 
@@ -821,10 +824,11 @@ export default function Assumptions() {
       for (const fy of futureYears) {
         const futureRate = getGrowthPct(key, fy) / 100;
         const futureNewArr: (number | null)[] = Array(12).fill(null);
+        // Float accumulator: preserves compounding precision across iterations
         let prevNew = lastDecNew;
         for (let m = 0; m < 12; m++) {
-          prevNew = Math.max(0, Math.round(prevNew * (1 + futureRate)));
-          futureNewArr[m] = prevNew;
+          prevNew = Math.max(0, prevNew * (1 + futureRate));
+          futureNewArr[m] = Math.round(prevNew);
         }
         const futureActiveArr = computeActiveFromNew(key, fy, futureNewArr, lastDecActive, prev);
         const futureDec = futureActiveArr[11] ?? Math.round(lastDecActive);
@@ -895,8 +899,9 @@ export default function Assumptions() {
               newClientsArr[m] = existingNew[m]!;
               prevNew = existingNew[m]!;
             } else {
-              prevNew = Math.max(0, Math.round(prevNew * (1 + arr[m])));
-              newClientsArr[m] = prevNew;
+              // Float accumulator: preserves compounding even with small bases
+              prevNew = Math.max(0, prevNew * (1 + arr[m]));
+              newClientsArr[m] = Math.round(prevNew);
             }
           }
           if (!newClientsAccum[k]) newClientsAccum[k] = {};
@@ -1009,8 +1014,9 @@ export default function Assumptions() {
             prevNew = existingNew[m]!;
             foundBase = true;
           } else {
-            prevNew = Math.max(0, Math.round(prevNew * (1 + arr[m])));
-            newClientsArr[m] = prevNew;
+            // Float accumulator: preserves compounding precision
+            prevNew = Math.max(0, prevNew * (1 + arr[m]));
+            newClientsArr[m] = Math.round(prevNew);
           }
         }
         allNewOverrides[y] = newClientsArr;
