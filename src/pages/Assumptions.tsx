@@ -1603,8 +1603,28 @@ export default function Assumptions() {
 
                                         // For historical months, compute new clients from API data
                                         // For projected months, read from monthlyNewClientOverrides or compute from active diff
+                                        //
+                                        // IMPORTANT: for non-MRR (one-shot) products, each month is a DIFFERENT
+                                        // set of clients (projects that closed that month). There's no accumulation,
+                                        // so "novos clientes" = "clientes ativos" = this month's count directly.
+                                        // The delta-based formula (activeCur - activePrev + churn) is ONLY correct
+                                        // for MRR where clients carry over month-to-month.
+                                        const isProductNonMrrNC = !isProductMrr(prodKey as FinTicketKey);
                                         let newClientsDisplay = 0;
-                                        if (hist) {
+                                        if (isProductNonMrrNC) {
+                                          // Non-MRR: new clients = this month's real count (all are "new" by definition)
+                                          if (hist) {
+                                            newClientsDisplay = hcEntryCur ? hcEntryCur.client_count : monthly[i];
+                                          } else {
+                                            const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
+                                            if (storedNew !== null && storedNew !== undefined) {
+                                              newClientsDisplay = storedNew;
+                                            } else {
+                                              newClientsDisplay = Math.round(monthly[i]);
+                                            }
+                                          }
+                                        } else if (hist) {
+                                          // MRR historical: use delta formula
                                           const activeCur = hcEntryCur ? hcEntryCur.client_count : monthly[i];
                                           let activePrev = 0;
                                           if (i > 0) {
@@ -1631,7 +1651,7 @@ export default function Assumptions() {
                                           }
                                           newClientsDisplay = Math.max(0, Math.round(activeCur) - Math.round(activePrev) + churnedCur);
                                         } else {
-                                          // Projected: read from stored new client overrides
+                                          // MRR projected: read from stored new client overrides or compute from diff
                                           const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
                                           if (storedNew !== null && storedNew !== undefined) {
                                             newClientsDisplay = storedNew;
