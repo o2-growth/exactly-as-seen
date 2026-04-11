@@ -1745,14 +1745,41 @@ export default function Assumptions() {
                                       const hcChurnEntry = hist ? historicalData[prodKey]?.[period] : undefined;
                                       const storedArr = data.monthlyChurnRates?.[prodKey as TicketKey]?.[selectedYear];
                                       const hasManualChurn = hist && storedArr && Array.isArray(storedArr) && storedArr[i] !== undefined;
-                                      const churnRate = data.churnNotApplicable?.[prodKey] ? 0
-                                        : hcChurnEntry
-                                          ? hcChurnEntry.churn_rate / 100 / 12
-                                          : (hasManualChurn
-                                            ? storedArr[i] / 100 / 12
-                                            : (hist
-                                              ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
-                                              : getChurnForMonth(prodKey, data, selectedYear, i)));
+
+                                      // Compute prevClients and curClients from monthly[] (engine).
+                                      // Used both for the delta fallback (when Supabase data absent)
+                                      // AND for consistent logoChurn computation.
+                                      const prevClientsForChurn = i === 0
+                                        ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                        : monthly[i - 1];
+                                      const curClientsForChurn = monthly[i];
+
+                                      // Determine monthly churn rate (decimal, e.g. 0.05 = 5%)
+                                      // Priority:
+                                      // 1. Supabase real churn_rate (stored as MONTHLY percent by populate script)
+                                      // 2. Manual override (stored as ANNUAL percent by user)
+                                      // 3. Delta from monthly[] (when Supabase absent but we have engine data)
+                                      // 4. Premise fallback
+                                      let churnRate: number;
+                                      if (data.churnNotApplicable?.[prodKey]) {
+                                        churnRate = 0;
+                                      } else if (hcChurnEntry && (hcChurnEntry.churn_rate ?? 0) > 0) {
+                                        // Supabase stores monthly % → divide by 100 for decimal (NOT /12)
+                                        churnRate = hcChurnEntry.churn_rate / 100;
+                                      } else if (hasManualChurn) {
+                                        // Manual override stored as ANNUAL % → divide by 100 and by 12
+                                        churnRate = storedArr[i] / 100 / 12;
+                                      } else if (hist && prevClientsForChurn > 0 && curClientsForChurn < prevClientsForChurn) {
+                                        // Delta fallback: when we have engine-derived counts but no Supabase churn,
+                                        // compute monthly churn rate from the net drop.
+                                        const netChurn = prevClientsForChurn - curClientsForChurn;
+                                        churnRate = netChurn / prevClientsForChurn;
+                                      } else {
+                                        // Final fallback: premise
+                                        churnRate = hist
+                                          ? getChurnMonthly(prodKey, { ...data, monthlyChurnRates: undefined } as any, selectedYear)
+                                          : getChurnForMonth(prodKey, data, selectedYear, i);
+                                      }
                                       churnPctMonthlyArrLC.push(Math.round(churnRate * 100 * 100) / 100);
 
                                       if (data.churnNotApplicable?.[prodKey]) {
@@ -1771,17 +1798,22 @@ export default function Assumptions() {
                                       const curEntry = historicalData[prodKey]?.[period];
                                       const prevEntry = historicalData[prodKey]?.[prevPeriodLC];
 
+                                      // Logo churn count priority:
+                                      // 1. Set-diff from client_names (most accurate)
+                                      // 2. Supabase churned_clients field (if > 0)
+                                      // 3. Net delta from monthly[] (when Supabase absent)
+                                      // 4. prevClients * churnRate (premise)
                                       if (hist && curEntry?.client_names && prevEntry?.client_names) {
                                         const curNameSet = new Set(curEntry.client_names.map(c => c.name));
                                         const churned = prevEntry.client_names.filter(c => !curNameSet.has(c.name));
                                         logoChurnMonthlyLC.push(churned.length);
-                                      } else if (hist && curEntry) {
+                                      } else if (hist && curEntry && (curEntry.churned_clients ?? 0) > 0) {
                                         logoChurnMonthlyLC.push(curEntry.churned_clients ?? 0);
+                                      } else if (hist && prevClientsForChurn > 0 && curClientsForChurn < prevClientsForChurn) {
+                                        // Delta fallback: net drop in engine-derived client count
+                                        logoChurnMonthlyLC.push(prevClientsForChurn - curClientsForChurn);
                                       } else {
-                                        const prevClients = i === 0
-                                          ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
-                                          : monthly[i - 1];
-                                        const logoChurn = Math.round(prevClients * churnRate);
+                                        const logoChurn = Math.round(prevClientsForChurn * churnRate);
                                         logoChurnMonthlyLC.push(logoChurn);
                                       }
                                     }
