@@ -1463,7 +1463,13 @@ export default function Assumptions() {
                                         const engineMonthlyYr = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
                                         const decPeriod = toPeriod(y, 11);
                                         const decApi = historicalData[prodKey]?.[decPeriod];
-                                        const decClients = (decApi && decApi.client_count > 0) ? decApi.client_count : Math.round(engineMonthlyYr[11]);
+                                        // API e soberana para meses historicos: respeita 0 do Oxy
+                                        // em vez de cair no engine seed hardcoded (modelData.ts).
+                                        // Para meses projetados (Dec de anos >= 2026, dependendo do
+                                        // isHistorical), continua usando engine.
+                                        const decClients = (decApi && isHistorical(y, 11))
+                                          ? decApi.client_count
+                                          : Math.round(engineMonthlyYr[11]);
                                         return (
                                           <div key={y} className={`text-center p-2 rounded ${y === selectedYear ? 'bg-primary/10 border border-primary/30' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium mb-1">{y}</p>
