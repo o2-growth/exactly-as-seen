@@ -9,7 +9,7 @@ import { PnlNode } from '@/lib/pnlData';
 import { getMonthlyClients as getMonthlyClientsFromData } from '@/lib/monthlyData';
 import {
   clientsBase2025, avgTicket, churnAnnual,
-  cogsMonthly2025, commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
+  commissionRate, cacPerClient, marketingHeadcount, sgaMonthly2025,
   commercialExpenses2025, revenueTaxes, debtSchedule,
   scenarioMultipliers, benefitsMonthly2025, basePayroll2025, headcountRatios,
   salaryRanges, expectedOutputs, namedEmployees2025,
@@ -244,37 +244,6 @@ function calcTotalClients(month: number, year: number, assumptions: Assumptions)
 }
 
 // ─── COGS ───
-
-function calcMonthlyCOGS(month: number, year: number, revenueScale: number, baasClients: number) {
-  if (year === 2025) {
-    return {
-      caas: cogsMonthly2025.caas[month] / 1000,
-      customerService: cogsMonthly2025.customerService[month] / 1000,
-      saas: cogsMonthly2025.saas[month] / 1000,
-      education: cogsMonthly2025.education[month] / 1000,
-      baas: cogsMonthly2025.baas[month] / 1000,
-    };
-  }
-  // For later years, scale COGS with revenue growth
-  const yearMult = revenueScale;
-  const base = {
-    caas: (cogsMonthly2025.caas.reduce((s, v) => s + v, 0) / 12) / 1000,
-    customerService: (cogsMonthly2025.customerService.reduce((s, v) => s + v, 0) / 12) / 1000,
-    saas: (cogsMonthly2025.saas.reduce((s, v) => s + v, 0) / 12) / 1000,
-    education: 0,
-  };
-  // BaaS COGS: ~R$25 per BaaS client/month (processing, compliance, banking fees)
-  // Starts from 2025
-  const baasCogs = year >= 2025 ? -(baasClients * 25) / 1000 : 0;
-
-  return {
-    caas: base.caas * yearMult,
-    customerService: base.customerService * yearMult,
-    saas: base.saas * yearMult,
-    education: base.education * yearMult,
-    baas: baasCogs,
-  };
-}
 
 // ─── COS FROM CONFIG (3.1–3.6) ───
 
