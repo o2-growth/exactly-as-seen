@@ -3,7 +3,7 @@
  * Provides month-by-month client counts and headcount projections.
  */
 
-import { Year, SubProductClients } from '@/lib/financialData';
+import { Year, SubProductClients, isProductMrr, TicketKey } from '@/lib/financialData';
 import { clientsBase2025, headcountRatios, namedEmployees2025, salaryRanges } from '@/data/modelData';
 import { historicalRevenueItems, HISTORICAL_PERIODS } from '@/data/historicalData';
 
@@ -230,7 +230,7 @@ export function getMonthlyClients(
     const prevDec = lastHistIdx >= 0 ? (hist[lastHistIdx] ?? 0) : SUB_PRODUCT_2025_DATA[key][11];
     const currentDec = subProductClients[key][year];
 
-    const result = hist.map((histVal, i) => {
+    const accumulated = hist.map((histVal, i) => {
       if (histVal !== null) return histVal;
       // Projected month — geometric from prevDec
       const monthNum = i + 1; // 1-based
@@ -247,27 +247,48 @@ export function getMonthlyClients(
       }
       return Math.round(val * 100) / 100;
     });
-    return applyOverrides(result);
+
+    // For non-MRR (one-shot) products: convert accumulated → per-month deltas.
+    // Each month should show only the NEW clients for that month, not the cumulative count.
+    // Historical months (from Oxy) already represent per-month counts, so only convert projected months.
+    if (!isProductMrr(key as TicketKey)) {
+      const result = accumulated.map((val, i) => {
+        if (hist[i] !== null) return val; // historical: keep as-is (already per-month from Oxy)
+        const prev = i > 0 ? accumulated[i - 1] : prevDec;
+        return Math.max(0, Math.round(val) - Math.round(prev));
+      });
+      return applyOverrides(result);
+    }
+    return applyOverrides(accumulated);
   }
 
   // For 2027+: geometric interpolation from Dec of previous year to Dec target of current year
   const prevYear = (year - 1) as Year;
-  const prevDec = subProductClients[key][prevYear];
-  const currentDec = subProductClients[key][year];
+  const prevDec2027 = subProductClients[key][prevYear];
+  const currentDec2027 = subProductClients[key][year];
 
-  const months: number[] = [];
+  const accumulated2027: number[] = [];
   for (let i = 1; i <= 12; i++) {
     let val: number;
-    if (prevDec > 0 && currentDec > 0) {
-      val = prevDec * Math.pow(currentDec / prevDec, i / 12);
-    } else if (prevDec === 0 && currentDec > 0) {
-      val = currentDec * (i / 12);
+    if (prevDec2027 > 0 && currentDec2027 > 0) {
+      val = prevDec2027 * Math.pow(currentDec2027 / prevDec2027, i / 12);
+    } else if (prevDec2027 === 0 && currentDec2027 > 0) {
+      val = currentDec2027 * (i / 12);
     } else {
       val = 0;
     }
-    months.push(Math.round(val * 100) / 100);
+    accumulated2027.push(Math.round(val * 100) / 100);
   }
-  return applyOverrides(months);
+
+  // For non-MRR: convert accumulated → per-month deltas
+  if (!isProductMrr(key as TicketKey)) {
+    const result = accumulated2027.map((val, i) => {
+      const prev = i > 0 ? accumulated2027[i - 1] : prevDec2027;
+      return Math.max(0, Math.round(val) - Math.round(prev));
+    });
+    return applyOverrides(result);
+  }
+  return applyOverrides(accumulated2027);
 }
 
 // ─── Monthly headcount computation ───
