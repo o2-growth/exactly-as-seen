@@ -8,6 +8,8 @@ import {
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
 import { computeProductAnnualRevenue } from '@/lib/revenueCalc';
+import { calculateTaxForRevenue, sumTaxResults, compositionFromConfig } from '@/lib/taxCalc';
+import { getSubProductTaxRate } from '@/lib/financialData';
 import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodResolution';
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
@@ -261,6 +263,31 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           total += buTotal;
         }
         node1.annual[y] = total / 1000;
+      }
+    }
+
+    // Patch tax nodes (TAX, 10.01, 10.02, 10.03) — recompute IRPJ/CSLL/Adicional
+    // on the SAME per-product revenue used above, ensuring P&L tax matches revenue.
+    const taxNode = tree.find(n => n.code === 'TAX');
+    if (taxNode) {
+      for (const y of YEARS) {
+        // Compute per-product tax using the shared taxCalc.ts
+        const productTaxResults = ALL_SUBPRODUCT_KEYS.map(key => {
+          const revenue = computeProductAnnualRevenue(key, y, assumptions, historicalData);
+          const cfg = getSubProductTaxRate(key as TicketKey, assumptions);
+          const composition = compositionFromConfig(cfg);
+          return calculateTaxForRevenue(revenue, composition);
+        });
+        const aggregated = sumTaxResults(productTaxResults);
+
+        // Override tax node values (in R$ thousands, negative = expense)
+        taxNode.annual[y] = -(aggregated.irpj + aggregated.adicionalIrpj + aggregated.csll) / 1000;
+        const irpjNode = taxNode.children?.find(c => c.code === '10.01');
+        const adicNode = taxNode.children?.find(c => c.code === '10.03');
+        const csllNode = taxNode.children?.find(c => c.code === '10.02');
+        if (irpjNode) irpjNode.annual[y] = -aggregated.irpj / 1000;
+        if (adicNode) adicNode.annual[y] = -aggregated.adicionalIrpj / 1000;
+        if (csllNode) csllNode.annual[y] = -aggregated.csll / 1000;
       }
     }
 
