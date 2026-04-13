@@ -247,10 +247,10 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           const buTotal = bu.keys.reduce((sum, key) =>
             sum + computeProductAnnualRevenue(key, y, assumptions, historicalData), 0);
           const buNode = node1.children?.find(c => c.code === bu.code);
-          if (buNode) buNode.annual[y] = Math.round(buTotal / 1000);
+          if (buNode) buNode.annual[y] = buTotal / 1000;
           total += buTotal;
         }
-        node1.annual[y] = Math.round(total / 1000);
+        node1.annual[y] = total / 1000;
       }
     }
 
