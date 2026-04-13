@@ -2388,12 +2388,20 @@ export default function Assumptions() {
                                       } else {
                                         // ── Projected / fallback months ──
 
+                                        // Compute prevClients (needed by MRR Revenue Churn below)
+                                        let prevClients = 0;
+                                        if (i > 0) {
+                                          prevClients = monthly[i - 1];
+                                        } else if (prevDecApi) {
+                                          prevClients = prevDecApi.client_count;
+                                        } else if (prevYrMonthly) {
+                                          prevClients = Math.round(prevYrMonthly[11]);
+                                        }
+
                                         // Compute newClients — different logic for MRR vs non-MRR.
                                         let newClients = 0;
                                         if (isProductNonMrr) {
                                           // Non-MRR (one-shot): all clients in this month are "new" by definition.
-                                          // monthly[i] already contains the correct count (real from Oxy for historical,
-                                          // or delta-of-5-MRR for Setup projected).
                                           const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
                                           newClients = (storedNew !== null && storedNew !== undefined)
                                             ? storedNew
@@ -2401,14 +2409,6 @@ export default function Assumptions() {
                                         } else {
                                           // MRR: compute delta (new entries = activeCur - activePrev + churned)
                                           const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
-                                          let prevClients = 0;
-                                          if (i > 0) {
-                                            prevClients = monthly[i - 1];
-                                          } else if (prevDecApi) {
-                                            prevClients = prevDecApi.client_count;
-                                          } else if (prevYrMonthly) {
-                                            prevClients = Math.round(prevYrMonthly[11]);
-                                          }
                                           if (storedNew !== null && storedNew !== undefined) {
                                             newClients = storedNew;
                                           } else {
