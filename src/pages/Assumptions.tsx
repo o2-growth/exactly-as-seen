@@ -3729,7 +3729,9 @@ export default function Assumptions() {
                         </tr>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 text-destructive">(-) COS Total</td>
-                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(yi.grandTotal)}</td>)}
+                          {activeYears.map(y => (
+                            <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].cogs)}</td>
+                          ))}
                         </tr>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 font-medium">Clientes Totais</td>
@@ -3745,17 +3747,16 @@ export default function Assumptions() {
                         </tr>
                         <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
                           <td className="px-2 py-2">Lucro Bruto</td>
-                          {activeYears.map((y, i) => {
-                            const gp = model.years[y].netRevenue - yearImpact[i].grandTotal / 1000;
+                          {activeYears.map(y => {
+                            const gp = model.years[y].grossProfit;
                             return <td key={y} className={`text-right px-2 py-2 tabular-nums ${gp < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{formatCurrency(gp)}</td>;
                           })}
                         </tr>
                         <tr className="bg-primary/5 font-bold">
                           <td className="px-2 py-2">Margem Bruta %</td>
-                          {activeYears.map((y, i) => {
+                          {activeYears.map(y => {
                             const nr = model.years[y].netRevenue;
-                            const gp = nr - yearImpact[i].grandTotal / 1000;
-                            const margin = nr > 0 ? (gp / nr * 100) : 0;
+                            const margin = model.years[y].grossMarginPct;
                             return (
                               <td key={y} className="text-right px-2 py-2 tabular-nums">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
