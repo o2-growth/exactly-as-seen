@@ -178,12 +178,24 @@ export function getMonthlyClients(
       'caasEnterprise', 'caasCorporate',
       'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp',
     ];
-    // Compute the 5-source sum (used for projected months and as fallback)
+    // Compute the 5-source NEW CLIENTS sum (used for projected months and as fallback).
+    // Setup is a one-time fee per new MRR client, so we count the month-over-month
+    // INCREASE (delta) in active clients, not the accumulated total.
     const sumFallback = Array.from({ length: 12 }, (_, m) => {
       let total = 0;
       for (const src of sources) {
         const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
-        total += Math.round(srcMonthly[m]);
+        const curActive = Math.round(srcMonthly[m]);
+        let prevActive = 0;
+        if (m > 0) {
+          prevActive = Math.round(srcMonthly[m - 1]);
+        } else if (year > 2025) {
+          // Cross-year boundary: get Dec of previous year
+          const prevYrMonthly = getMonthlyClients(src, (year - 1) as Year, subProductClients, ticketPrices, monthlyClientOverrides);
+          prevActive = Math.round(prevYrMonthly[11]);
+        }
+        // Only count positive delta (new entries). Churn doesn't generate negative setups.
+        total += Math.max(0, curActive - prevActive);
       }
       return total;
     });

@@ -168,14 +168,24 @@ function calcMonthlyRevenue(month: number, year: number, assumptions: Assumption
   const saasOxy     = getMonthlyClientCount('saas', 'oxy', month, year, assumptions) * getTicketForMonth('saasOxy', month, year, assumptions);
   const saasOxyGenio= getMonthlyClientCount('saas', 'oxyGenio', month, year, assumptions) * getTicketForMonth('saasOxyGenio', month, year, assumptions);
   const saasOxyGenioEsp = getMonthlyClientCount('saas', 'oxyGenioEsp', month, year, assumptions) * getTicketForMonth('saasOxyGenioEsp', month, year, assumptions);
-  // SaaS setup: sum of absolute client counts from 5 products
+  // SaaS setup: sum of NEW (delta) clients from 5 MRR products — not accumulated actives.
+  // Setup is a one-time fee charged when a client ENTERS, not every month they're active.
+  // So we compute the month-over-month increase in active clients for each MRR source.
   const setupSources: [string, string][] = [
     ['caas', 'enterprise'], ['caas', 'corporate'],
     ['saas', 'oxy'], ['saas', 'oxyGenio'], ['saas', 'oxyGenioEsp'],
   ];
   let setupNewClients = 0;
   for (const [bu, prod] of setupSources) {
-    setupNewClients += getMonthlyClientCount(bu, prod, month, year, assumptions);
+    const curActive = getMonthlyClientCount(bu, prod, month, year, assumptions);
+    let prevActive = 0;
+    if (month > 0) {
+      prevActive = getMonthlyClientCount(bu, prod, month - 1, year, assumptions);
+    } else if (year > 2025) {
+      prevActive = getMonthlyClientCount(bu, prod, 11, year - 1, assumptions);
+    }
+    // Only count positive delta (new entries). If active dropped (churn > new), 0 new setups.
+    setupNewClients += Math.max(0, curActive - prevActive);
   }
   const saasSetup = setupNewClients * getTicketForMonth('saasSetup', month, year, assumptions);
   const saasTotal = saasOxy + saasOxyGenio + saasOxyGenioEsp + saasSetup;
