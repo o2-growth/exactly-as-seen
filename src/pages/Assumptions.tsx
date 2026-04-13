@@ -251,7 +251,7 @@ function findNodeInTree(code: string, nodes: PnlNode[]): PnlNode | undefined {
 }
 
 export default function Assumptions() {
-  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow } = useFinancialModel();
+  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow, dataReady } = useFinancialModel();
   const { saveVersion } = useVersionHistory();
   const { data: historicalData, loading: historicalLoading } = useHistoricalClients();
 
@@ -1215,6 +1215,14 @@ export default function Assumptions() {
 
   // Monthly headcount rows for selected year
   const monthlyHCRows = getMonthlyHeadcount(selectedYear, data.subProductClients, data.tickets);
+
+  if (!dataReady || historicalLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground">
+        Carregando...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

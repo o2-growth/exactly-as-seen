@@ -35,6 +35,7 @@ interface FinancialModelContextType {
   setDateRange: (r: DateRange | undefined) => void;
   resetAssumptions: () => void;
   saveNow: (a: Assumptions) => void;
+  dataReady: boolean;
 }
 
 const FinancialModelContext = createContext<FinancialModelContextType | null>(null);
@@ -51,6 +52,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const { saveAssumptions, loadSnapshots } = useAssumptionsPersistence();
   const loadStarted = useRef(false);
   const hasLoaded = useRef(false);
+  const [assumptionsLoaded, setAssumptionsLoaded] = useState(false);
 
   useEffect(() => {
     if (loadStarted.current) return;
@@ -185,6 +187,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       }
       // Mark as loaded AFTER state is set — prevents debounce from saving defaults
       hasLoaded.current = true;
+      setAssumptionsLoaded(true);
     });
   }, [loadSnapshots]);
 
@@ -217,7 +220,8 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   }, []);
 
   // Historical data from Supabase (real Oxy values)
-  const { data: historicalData } = useHistoricalClients();
+  const { data: historicalData, loading: historicalLoading } = useHistoricalClients();
+  const dataReady = assumptionsLoaded && !historicalLoading;
 
   // Compute full model from engine
   const model = useMemo(
@@ -310,7 +314,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   return (
     <FinancialModelContext.Provider value={{
       assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
-      dateRange, filteredYears, focalYear, rangeDataSource,
+      dateRange, filteredYears, focalYear, rangeDataSource, dataReady,
       setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions, saveNow,
     }}>
       {children}
