@@ -72,6 +72,9 @@ export interface Assumptions {
   churnBaas: number;
   pmrConfig: PmrConfig;
   sgaPercent: number;
+  marketingPercent: number;   // % of gross revenue for Despesas de Marketing
+  commercialPercent: number;  // % of gross revenue for Despesas Comerciais
+  pessoalPercent: number;     // % of gross revenue for Despesas com Pessoal
   headcountGrowth: number;
   headcountSalaries: Record<string, number>;
   sgaGrowthRate: number;
@@ -636,7 +639,10 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   churnSaas: 5,
   churnBaas: 0,
   pmrConfig: { caas: 30, saas: 15, education: 30, baas: 0 },
-  sgaPercent: 15,
+  sgaPercent: 10.4,
+  marketingPercent: 15.5,
+  commercialPercent: 2.3,
+  pessoalPercent: 7.2,
   headcountGrowth: 10,
   headcountSalaries: {
     'CFOs': 8500,

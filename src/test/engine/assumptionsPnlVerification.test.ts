@@ -81,13 +81,11 @@ describe('Assumptions → P&L: Client count changes affect revenue', () => {
 
 // ─── 3. SG&A Growth Rate: Changing it should affect SG&A costs ───
 
-describe('Assumptions → P&L: SG&A growth rate affects costs', () => {
-  it('higher sgaGrowthRate increases SG&A for future years', () => {
-    const base = getModel({ sgaGrowthRate: 10 });
-    const high = getModel({ sgaGrowthRate: 30 });
+describe('Assumptions → P&L: SG&A percentage affects costs', () => {
+  it('higher sgaPercent increases SG&A (Despesas Administrativas)', () => {
+    const base = getModel({ sgaPercent: 10.4 });
+    const high = getModel({ sgaPercent: 20 });
 
-    // 2025 should be the same (yearMult = 1.0^0 = 1)
-    // 2026+ should diverge
     for (const y of [2027, 2028, 2029, 2030] as Year[]) {
       const baseSGA = Math.abs(base.years[y].sga);
       const highSGA = Math.abs(high.years[y].sga);
@@ -95,23 +93,21 @@ describe('Assumptions → P&L: SG&A growth rate affects costs', () => {
     }
   });
 
-  it('sgaGrowthRate = 0 grows less than sgaGrowthRate = 20', () => {
-    const flat = getModel({ sgaGrowthRate: 0 });
-    const high = getModel({ sgaGrowthRate: 20 });
-    // SG&A still grows with 0% due to bad debt (2% revenue) and headcount-scaled items
-    // but it should grow LESS than with 20% growth rate
+  it('sgaPercent = 5 costs less than sgaPercent = 20', () => {
+    const low = getModel({ sgaPercent: 5 });
+    const high = getModel({ sgaPercent: 20 });
     for (const y of [2028, 2029, 2030] as Year[]) {
-      expect(Math.abs(flat.years[y].sga)).toBeLessThan(Math.abs(high.years[y].sga));
+      expect(Math.abs(low.years[y].sga)).toBeLessThan(Math.abs(high.years[y].sga));
     }
   });
 });
 
 // ─── 4. Headcount Growth: Changing it should affect headcount costs ───
 
-describe('Assumptions → P&L: Headcount growth rate affects costs', () => {
-  it('higher headcountGrowth increases headcount costs', () => {
-    const base = getModel({ headcountGrowth: 10 });
-    const high = getModel({ headcountGrowth: 30 });
+describe('Assumptions → P&L: Pessoal percentage affects costs', () => {
+  it('higher pessoalPercent increases headcount (Despesas com Pessoal)', () => {
+    const base = getModel({ pessoalPercent: 7.2 });
+    const high = getModel({ pessoalPercent: 20 });
 
     for (const y of [2027, 2028, 2029, 2030] as Year[]) {
       const baseHC = Math.abs(base.years[y].headcount);
@@ -123,41 +119,31 @@ describe('Assumptions → P&L: Headcount growth rate affects costs', () => {
 
 // ─── 5. Headcount Ratios: Changing them should affect hiring ───
 
-describe('Assumptions → P&L: Headcount ratios affect costs (legacy mode only)', () => {
-  it('more clients per CFO means fewer CFOs → lower costs (when squadConfig is removed)', () => {
-    // headcountRatios only used in LEGACY mode (no squadConfig)
-    const base = getModel({
-      squadConfig: undefined,
-      headcountRatios: { ...DEFAULT_ASSUMPTIONS.headcountRatios, clientsPerCFO: 15 },
-    });
-    const fewer = getModel({
-      squadConfig: undefined,
-      headcountRatios: { ...DEFAULT_ASSUMPTIONS.headcountRatios, clientsPerCFO: 50 },
-    });
+describe('Assumptions → P&L: Headcount ratios (legacy — now percentage-based)', () => {
+  it('headcount is now driven by pessoalPercent, not ratios', () => {
+    // With the simplified model, headcountRatios no longer affect Despesas com Pessoal.
+    // Changing pessoalPercent changes headcount costs.
+    const low = getModel({ pessoalPercent: 5 });
+    const high = getModel({ pessoalPercent: 15 });
 
     for (const y of [2028, 2029, 2030] as Year[]) {
-      const baseCost = Math.abs(base.years[y].headcount);
-      const fewerCost = Math.abs(fewer.years[y].headcount);
-      expect(fewerCost).toBeLessThan(baseCost);
+      expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(Math.abs(low.years[y].headcount));
     }
   });
 });
 
 // ─── 6. Salary Ranges: Changing them should affect costs ───
 
-describe('Assumptions → P&L: Salary ranges affect costs (legacy mode only)', () => {
-  it('doubling CFO salary increases headcount costs (when squadConfig is removed)', () => {
-    // salaryRanges only used in LEGACY mode (no squadConfig)
-    const base = getModel({ squadConfig: undefined });
-    const expensive = getModel({
-      squadConfig: undefined,
-      salaryRanges: { ...DEFAULT_ASSUMPTIONS.salaryRanges, CFO: 30000 },
-    });
+describe('Assumptions → P&L: Salary ranges (legacy — now percentage-based)', () => {
+  it('headcount is now driven by pessoalPercent, salaries no longer affect it', () => {
+    // With the simplified model, salaryRanges no longer affect Despesas com Pessoal.
+    const base = getModel({ pessoalPercent: 7.2 });
+    const high = getModel({ pessoalPercent: 14.4 });
 
     for (const y of [2028, 2029, 2030] as Year[]) {
       const baseCost = Math.abs(base.years[y].headcount);
-      const expCost = Math.abs(expensive.years[y].headcount);
-      expect(expCost).toBeGreaterThan(baseCost);
+      const highCost = Math.abs(high.years[y].headcount);
+      expect(highCost).toBeGreaterThan(baseCost);
     }
   });
 });
@@ -202,14 +188,14 @@ describe('Assumptions → P&L: Tax rates affect deductions', () => {
 // ─── 9. Marketing: PR and Events should affect marketing costs ───
 
 describe('Assumptions → P&L: Marketing costs', () => {
-  it('adding marketingPR increases marketing expense', () => {
-    const base = getModel({ marketingPR: 0, marketingEvents: 0 });
-    const withPR = getModel({ marketingPR: 50000, marketingEvents: 0 });
+  it('higher marketingPercent increases marketing expense', () => {
+    const base = getModel({ marketingPercent: 15.5 });
+    const high = getModel({ marketingPercent: 25 });
 
     for (const y of YEARS) {
       const baseMkt = Math.abs(base.years[y].marketing);
-      const prMkt = Math.abs(withPR.years[y].marketing);
-      expect(prMkt).toBeGreaterThan(baseMkt);
+      const highMkt = Math.abs(high.years[y].marketing);
+      expect(highMkt).toBeGreaterThan(baseMkt);
     }
   });
 });

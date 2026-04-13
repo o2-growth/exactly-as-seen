@@ -3950,45 +3950,58 @@ export default function Assumptions() {
             </div>
           </div>
 
-          {/* Comissão e SG&A */}
+          {/* Despesas Fixas (% da Receita Bruta) */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Receipt className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Comissão e SG&A</h3>
+              <h3 className="text-sm font-semibold">Despesas Fixas (% da Receita Bruta)</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Comissão de Vendas</p>
-                <p className="text-sm font-semibold">{(commissionRate.caas * 100).toFixed(0)}% da receita bruta</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">SG&A % of Revenue</p>
-                <div className="text-sm font-semibold">
+                <p className="text-xs text-muted-foreground">Despesas de Marketing</p>
+                <div className="text-sm font-semibold flex items-center gap-1">
                   {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaPercent} onChange={e => setAssumptions(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaPercent}%</span>}
+                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.marketingPercent ?? 15.5} onChange={e => setAssumptions(p => ({ ...p, marketingPercent: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.marketingPercent ?? 15.5}</span>}
+                  <span className="text-xs text-muted-foreground">%</span>
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">SG&A Annual Growth %</p>
-                <div className="text-sm font-semibold">
+                <p className="text-xs text-muted-foreground">Despesas Comerciais</p>
+                <div className="text-sm font-semibold flex items-center gap-1">
                   {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaGrowthRate} onChange={e => setAssumptions(p => ({ ...p, sgaGrowthRate: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaGrowthRate}%</span>}
+                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.commercialPercent ?? 2.3} onChange={e => setAssumptions(p => ({ ...p, commercialPercent: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.commercialPercent ?? 2.3}</span>}
+                  <span className="text-xs text-muted-foreground">%</span>
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Headcount Cost Growth/yr</p>
-                <div className="text-sm font-semibold">
+                <p className="text-xs text-muted-foreground">Despesas com Pessoal</p>
+                <div className="text-sm font-semibold flex items-center gap-1">
                   {editing ? (
-                    <input type="number" className="w-full bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.headcountGrowth} onChange={e => setAssumptions(p => ({ ...p, headcountGrowth: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.headcountGrowth}%</span>}
+                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.pessoalPercent ?? 7.2} onChange={e => setAssumptions(p => ({ ...p, pessoalPercent: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.pessoalPercent ?? 7.2}</span>}
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Despesas Administrativas</p>
+                <div className="text-sm font-semibold flex items-center gap-1">
+                  {editing ? (
+                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+                      value={data.sgaPercent ?? 10.4} onChange={e => setAssumptions(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
+                  ) : <span>{data.sgaPercent ?? 10.4}</span>}
+                  <span className="text-xs text-muted-foreground">%</span>
                 </div>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-3">
+              Total: {((data.marketingPercent ?? 15.5) + (data.commercialPercent ?? 2.3) + (data.pessoalPercent ?? 7.2) + (data.sgaPercent ?? 10.4)).toFixed(1)}% da Receita Bruta
+              (Padrao baseado no realizado 2025 da Oxy: Marketing 15.5%, Comercial 2.3%, Pessoal 7.2%, Administrativa 10.4%)
+            </p>
           </div>
 
           {/* Resumo Operacional Mensal */}

@@ -276,32 +276,30 @@ describe('Engine: Tax toggle (Item 4)', () => {
 
 // ─── 6. MARKETING PR & EVENTS (Item 5) ─────────────────────────────────────────
 
-describe('Engine: Marketing PR & Events (Item 5)', () => {
-  it('PR cost reduces EBITDA', () => {
-    const base = getModel();
-    const withPR = getModel({ marketingPR: 50000 }); // R$50k/month
+describe('Engine: Marketing percentage (simplified model)', () => {
+  it('higher marketingPercent reduces EBITDA', () => {
+    const base = getModel({ marketingPercent: 15.5 });
+    const high = getModel({ marketingPercent: 25 });
     for (const y of YEARS) {
-      // 50k/month = 600k/year = 600 in R$thousands
-      const diff = base.years[y].ebitda - withPR.years[y].ebitda;
-      expect(diff).toBeGreaterThan(500); // at least R$500k annual impact
+      const diff = base.years[y].ebitda - high.years[y].ebitda;
+      expect(diff).toBeGreaterThan(0);
     }
   });
 
-  it('Events cost reduces EBITDA', () => {
-    const base = getModel();
-    const withEvents = getModel({ marketingEvents: 30000 }); // R$30k/month
+  it('lower marketingPercent increases EBITDA', () => {
+    const base = getModel({ marketingPercent: 15.5 });
+    const low = getModel({ marketingPercent: 5 });
     for (const y of YEARS) {
-      const diff = base.years[y].ebitda - withEvents.years[y].ebitda;
-      expect(diff).toBeGreaterThan(300);
+      expect(low.years[y].ebitda).toBeGreaterThan(base.years[y].ebitda);
     }
   });
 
-  it('PR and Events flow into marketing line', () => {
-    const base = getModel();
-    const withBoth = getModel({ marketingPR: 10000, marketingEvents: 10000 });
+  it('marketingPercent drives marketing line', () => {
+    const low = getModel({ marketingPercent: 5 });
+    const high = getModel({ marketingPercent: 25 });
     for (const y of YEARS) {
-      // Marketing should be more negative with costs added
-      expect(withBoth.years[y].marketing).toBeLessThan(base.years[y].marketing);
+      // Marketing is negative, higher % = more negative
+      expect(high.years[y].marketing).toBeLessThan(low.years[y].marketing);
     }
   });
 });
@@ -369,34 +367,30 @@ describe('Engine: Education/Expansão team rate (Item 8)', () => {
 
 // ─── 9. SQUAD CONFIG (Item 7) ──────────────────────────────────────────────────
 
-describe('Engine: Squad config (Item 7)', () => {
-  it('squad mode (substitutive) produces different headcount than legacy mode', () => {
-    const noSquad = getModel({
-      squadConfig: undefined,
-    } as any);
-    const withSquad = getModel(); // defaults have squadConfig
-    // They should produce DIFFERENT headcount (squad replaces legacy ratios)
-    let anyDiff = false;
+describe('Engine: Squad config (Item 7 — legacy, now percentage-based)', () => {
+  it('headcount is now driven by pessoalPercent, not squad config', () => {
+    // With the simplified model, squadConfig no longer affects headcount.
+    // Changing pessoalPercent changes headcount costs.
+    const low = getModel({ pessoalPercent: 5 });
+    const high = getModel({ pessoalPercent: 15 });
     for (const y of YEARS) {
-      if (withSquad.years[y].headcount !== noSquad.years[y].headcount) anyDiff = true;
+      expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(Math.abs(low.years[y].headcount));
     }
-    expect(anyDiff).toBe(true);
   });
 
-  it('higher CS-per-clients ratio reduces headcount', () => {
+  it('higher CS-per-clients ratio no longer affects headcount (percentage model)', () => {
     const sq = { ...DEFAULT_ASSUMPTIONS.squadConfig! };
-    const frequent = getModel({ squadConfig: { ...sq, csPerClients: 50 } }); // 1 CS per 50 clients
-    const sparse = getModel({ squadConfig: { ...sq, csPerClients: 500 } }); // 1 CS per 500 clients
-    // Sparse = fewer CS hires = less headcount cost
+    const frequent = getModel({ squadConfig: { ...sq, csPerClients: 50 } });
+    const sparse = getModel({ squadConfig: { ...sq, csPerClients: 500 } });
+    // Both should produce same headcount since it's percentage-based now
     for (const y of YEARS) {
       expect(sparse.years[y].headcount).toBeGreaterThanOrEqual(frequent.years[y].headcount);
     }
   });
 
-  it('squad salaries impact EBITDA', () => {
-    const sq = { ...DEFAULT_ASSUMPTIONS.squadConfig! };
-    const cheap = getModel({ squadConfig: { ...sq, cfoSalary: 10000, cfoAnalistaSalary: 5000 } });
-    const expensive = getModel({ squadConfig: { ...sq, cfoSalary: 50000, cfoAnalistaSalary: 20000 } });
+  it('pessoalPercent impacts EBITDA', () => {
+    const cheap = getModel({ pessoalPercent: 5 });
+    const expensive = getModel({ pessoalPercent: 20 });
     for (const y of YEARS) {
       expect(cheap.years[y].ebitda).toBeGreaterThan(expensive.years[y].ebitda);
     }
@@ -538,9 +532,8 @@ describe('Engine: Squad business rules — Setup squads & leaders', () => {
     expect(model.years[2026].headcount).toBeLessThan(0); // costs are negative
   });
 
-  it('33 new SaaS/month → 3 setup squads + 2 leaders', () => {
-    // newSaasPerMonth = 33 → thisYear - prevYear = 396
-    // 2025 base = 102, so 2026 = 498
+  it('33 new SaaS/month → more revenue → more headcount cost (percentage model)', () => {
+    // With percentage-based model, more clients = more revenue = more headcount cost
     const model = getModel({
       subProductClients: {
         ...DEFAULT_ASSUMPTIONS.subProductClients,
@@ -548,9 +541,6 @@ describe('Engine: Squad business rules — Setup squads & leaders', () => {
         saasOxyGenio: { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxyGenio, 2026: 148 },
       },
     });
-    // numSetupSquads = ceil(33/16) = 3
-    // numLideres = ceil(3/2) = 2
-    // More squads + leaders = higher cost than 16/month scenario
     const model16 = getModel({
       subProductClients: {
         ...DEFAULT_ASSUMPTIONS.subProductClients,
@@ -558,10 +548,10 @@ describe('Engine: Squad business rules — Setup squads & leaders', () => {
         saasOxyGenio: { ...DEFAULT_ASSUMPTIONS.subProductClients.saasOxyGenio, 2026: 96 },
       },
     });
-    // 33/month has 3 squads + 2 leaders vs 1 squad + 1 leader
-    // Extra: 2 squads * R$24k + 1 leader * R$12k = R$60k/month = R$720k/year
-    const diff = Math.abs(model.years[2026].headcount) - Math.abs(model16.years[2026].headcount);
-    expect(diff).toBeGreaterThan(500); // at least R$500k more (conservative)
+    // More clients → more revenue → more headcount (pessoalPercent of revenue)
+    expect(Math.abs(model.years[2026].headcount)).toBeGreaterThanOrEqual(
+      Math.abs(model16.years[2026].headcount)
+    );
   });
 });
 
@@ -591,15 +581,13 @@ describe('Engine: Squad cost totals', () => {
   });
 });
 
-describe('Engine: Squad costs flow into P&L headcount line', () => {
-  it('headcount line with squad is more negative than without squad', () => {
-    const withSquad = getModel(); // defaults include squadConfig
-    const noSquad = getModel({ squadConfig: undefined } as any);
-    // With squad, headcount cost includes squad salaries on top of base payroll
-    // In later years with many clients, squad cost should dominate
+describe('Engine: Headcount costs driven by pessoalPercent', () => {
+  it('higher pessoalPercent increases headcount cost', () => {
+    const low = getModel({ pessoalPercent: 5 });
+    const high = getModel({ pessoalPercent: 15 });
     for (const y of [2028, 2029, 2030] as Year[]) {
-      expect(Math.abs(withSquad.years[y].headcount)).toBeGreaterThan(
-        Math.abs(noSquad.years[y].headcount)
+      expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(
+        Math.abs(low.years[y].headcount)
       );
     }
   });

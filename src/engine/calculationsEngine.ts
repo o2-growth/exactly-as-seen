@@ -649,6 +649,14 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
   }
   const revenueScale = baseAnnualRev2025 > 0 ? estRevenue / baseAnnualRev2025 : 1;
 
+  // ── DESPESAS FIXAS (simplified: % of gross revenue) ──
+  const fixedRates = {
+    marketing: (assumptions.marketingPercent ?? 15.5) / 100,
+    commercial: (assumptions.commercialPercent ?? 2.3) / 100,
+    pessoal: (assumptions.pessoalPercent ?? 7.2) / 100,
+    sga: (assumptions.sgaPercent ?? 10.4) / 100,
+  };
+
   for (let m = 0; m < 12; m++) {
     const rev = calcMonthlyRevenue(m, year, assumptions, sMult.revenue);
     const grossRev = rev.total / 1000; // Convert to R$ thousands
@@ -736,60 +744,27 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
     // Gross profit
     const gp = netRev + totalCogs;
 
-    // Commissions (from March for CaaS)
-    const commCaas = (year === 2025 && m < 2) ? 0 : -caasRev * commissionRate.caas;
-    const commSaas = -saasRev * commissionRate.saas;
-    const commEdu = -eduRev * commissionRate.education;
-    const totalComm = commCaas + commSaas + commEdu;
+    // Commissions are now zero (absorbed into commercial %)
+    const totalComm = 0;
 
-    // Marketing (CAC × new clients + HC costs)
+    // Marketing = % of gross revenue (negative = expense)
     const totalClientsM = calcTotalClients(m, year, assumptions);
-    const prevClients = m > 0 ? calcTotalClients(m - 1, year, assumptions) :
-      (year > 2025 ? calcTotalClients(11, year - 1, assumptions) : 0);
-    const newClients = Math.max(0, totalClientsM - prevClients);
+    const mktCaas = 0, mktSaas = 0, mktEdu = 0, mktBaas = 0;
+    const mktPR = 0, mktEvents = 0;
+    const totalMkt = -(grossRev * fixedRates.marketing);
 
-    const cpc = assumptions.cacPerProduct;
-    const cacCaas = cpc?.caasAssessoria ?? cacPerClient.caas;
-    const cacSaas = cpc?.saasOxy ?? cacPerClient.saas;
-    const cacEdu = cpc?.educationDonoCFO ?? cacPerClient.education;
-    const cacBaasVal = cpc?.baas ?? cacPerClient.baas;
-
-    const mktCaas = (-newClients * 0.4 * cacCaas + marketingHeadcount.caas) / 1000;
-    const mktSaas = (-newClients * 0.35 * cacSaas) / 1000;
-    const mktEdu = (-newClients * 0.15 * cacEdu) / 1000;
-    const mktBaas = (-newClients * 0.10 * cacBaasVal) / 1000;
-    const mktPR = -(assumptions.marketingPR ?? 0) / 1000;
-    const mktEvents = -(assumptions.marketingEvents ?? 0) / 1000;
-    const totalMkt = mktCaas + mktSaas + mktEdu + mktBaas + mktPR + mktEvents;
-
-    // Contribution margin (eduExpTeamTotal now included in COS)
+    // Contribution margin
     const cm = gp + totalComm + totalMkt;
 
-    // Reuse COS client counts for headcount
-    const caasClientsM = caasClientsForCOS;
-    const saasClientsM = saasSubClientsM;
-    const caasSaasClientsM = caasClientsM + saasClientsM;
+    // Headcount / Pessoal = % of gross revenue
+    const totalHC = -(grossRev * fixedRates.pessoal);
+    const hc = { salaries: totalHC * 0.7, benefits: totalHC * 0.3 }; // approximate split for detail
 
-    // Headcount (uses CaaS-only for CFO/FP&A/PF, CaaS+SaaS for others)
-    const hc = calcMonthlyHeadcount(m, year, caasClientsM, caasSaasClientsM, totalClientsM, assumptions);
-    const totalHC = hc.salaries + hc.benefits;
+    // SG&A / Administrativas = % of gross revenue
+    const sga = -(grossRev * fixedRates.sga);
 
-    // Estimate total headcount for SG&A scaling
-    const baseHC = 22;
-    const hRatios = assumptions.headcountRatios ?? headcountRatios;
-    const addCFOs = Math.max(0, Math.ceil(caasClientsM / Math.max(1, hRatios.clientsPerCFO)) - 9);
-    const addFPA = Math.max(0, Math.ceil(caasClientsM / Math.max(1, hRatios.clientsPerFPA)) - 3);
-    const addCSM = Math.max(0, Math.ceil(caasSaasClientsM / Math.max(1, hRatios.clientsPerCSM)) - 1);
-    const saasScale = Math.max(0, Math.floor(caasSaasClientsM / 500));
-    const estTotalHC = baseHC + addCFOs + addFPA + addCSM +
-      Math.min(saasScale, 5) + Math.min(saasScale * 2, 10) +
-      Math.min(Math.floor(saasScale / 2), 3) + Math.min(Math.ceil(saasScale / 3), 3);
-
-    // SG&A (uses gross revenue for PDD, headcount for scaling)
-    const sga = calcMonthlySGA(m, year, grossRev, estTotalHC, assumptions);
-
-    // Commercial
-    const commercial = calcMonthlyCommercial(m, year);
+    // Commercial = % of gross revenue
+    const commercial = -(grossRev * fixedRates.commercial);
 
     // Other expenses (code 10 — temporary services, only 2025)
     let other: number;
