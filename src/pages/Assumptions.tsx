@@ -3979,92 +3979,87 @@ export default function Assumptions() {
         {/* ─── BLOCO 5: ECONOMIC AND FINANCIAL RESULTS ─── */}
         <TabsContent value="economic" className="space-y-6 mt-4">
 
-          {/* Finance KPI / Selic */}
+          {/* Resultado Financeiro & Não Operacional (% da Receita Bruta) */}
           <div className="gradient-card p-5">
-            <h3 className="text-sm font-semibold mb-4">Finance KPI</h3>
-            <div className="flex items-center gap-4 mb-4">
-              <div className="flex items-center gap-2">
-                <label className="text-xs text-muted-foreground font-medium">Selic Mensal (%):</label>
-                <input type="number" step="0.01"
-                  className="w-20 bg-secondary border border-border rounded px-2 py-1 text-right text-xs tabular-nums text-foreground outline-none focus:ring-1 focus:ring-primary"
-                  value={((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}
-                  onChange={e => {
-                    const v = (Number(e.target.value) || 0) / 100;
-                    updateModel(prev => ({ ...prev, selicMonthly: v }));
-                  }}
-                />
-                <span className="text-[10px] text-muted-foreground">({((data.selicMonthly ?? 0.0117) * 100).toFixed(2)}% a.m. = {((Math.pow(1 + (data.selicMonthly ?? 0.0117), 12) - 1) * 100).toFixed(1)}% a.a.)</span>
-              </div>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left p-3 text-muted-foreground font-medium min-w-[200px]">Indicador</th>
-                  {MONTHS.map(m => (
-                    <th key={m} className="text-right p-3 text-muted-foreground font-medium min-w-[58px]">{m}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-border/20 hover:bg-secondary/20 transition-colors">
-                  <td className="p-3 font-medium">Selic Mensal</td>
-                  {MONTHS.map((_, i) => {
-                    const monthlyPct = ((data.selicMonthly ?? 0.0117) * 100);
-                    return (
-                      <td key={i} className="text-right p-3 tabular-nums text-xs">{monthlyPct.toFixed(3)}%</td>
-                    );
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Resumo de Dívidas */}
-          <div className="gradient-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Landmark className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Resumo de Dívidas</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Saldo Total Devedor</p>
-                <p className="text-sm font-semibold tabular-nums">{formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.outstanding, 0))}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Parcela Mensal Total</p>
-                <p className="text-sm font-semibold tabular-nums">{formatCurrencyFull(debtSchedule.reduce((s, d) => s + d.monthlyPayment, 0))}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Nº de Contratos</p>
-                <p className="text-sm font-semibold tabular-nums">{debtSchedule.length}</p>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Contrato</th>
-                    <th className="text-left py-2 text-muted-foreground font-medium text-xs">Credor</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Saldo (R$)</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcela/mês</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Parcelas rest.</th>
-                    <th className="text-right py-2 text-muted-foreground font-medium text-xs">Previsão final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {debtSchedule.map(d => (
-                    <tr key={d.name} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
-                      <td className="py-2 text-xs font-medium">{d.name}</td>
-                      <td className="py-2 text-xs text-muted-foreground">{d.creditor}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.outstanding)}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{formatCurrencyFull(d.monthlyPayment)}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{d.remainingInstallments}</td>
-                      <td className="py-2 text-right text-xs tabular-nums">{d.finalDate ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <h3 className="text-sm font-semibold mb-4">Resultado Financeiro & Não Operacional (% da Receita Bruta)</h3>
+            {(() => {
+              type FinKey = 'receitasFinanceirasPercent' | 'despesasFinanceirasPercent' | 'outrasReceitasPercent' | 'despesasNaoOperacionaisPercent';
+              const finRows: { key: FinKey; label: string; fallback: number; sign: 'positive' | 'negative' }[] = [
+                { key: 'receitasFinanceirasPercent', label: 'Receitas Financeiras', fallback: 0.5, sign: 'positive' },
+                { key: 'despesasFinanceirasPercent', label: 'Despesas Financeiras', fallback: 1.5, sign: 'negative' },
+                { key: 'outrasReceitasPercent', label: 'Outras Receitas', fallback: 0, sign: 'positive' },
+                { key: 'despesasNaoOperacionaisPercent', label: 'Despesas Não Operacionais', fallback: 0, sign: 'negative' },
+              ];
+              const getVal = (field: FinKey, yr: Year, fb: number): number => {
+                const v = data[field] as any;
+                if (v === undefined || v === null) return fb;
+                if (typeof v === 'number') return v;
+                return (v as Record<Year, number>)[yr] ?? fb;
+              };
+              const toRecord = (field: FinKey, fb: number): Record<Year, number> => {
+                const v = data[field] as any;
+                if (v && typeof v === 'object') return v as Record<Year, number>;
+                const flat = typeof v === 'number' ? v : fb;
+                return { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat } as Record<Year, number>;
+              };
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-primary/10">
+                        <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium min-w-[200px]">Categoria</th>
+                        {activeYears.map(yr => (
+                          <th key={yr} className="text-right py-1.5 px-1 text-muted-foreground font-medium min-w-[70px]">{yr}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {finRows.map(({ key, label, fallback, sign }) => (
+                        <tr key={key} className="border-b border-primary/5">
+                          <td className={`py-1.5 pr-3 ${sign === 'positive' ? 'text-emerald-500' : 'text-red-400'}`}>{label}</td>
+                          {activeYears.map(yr => (
+                            <td key={yr} className="py-1 px-1 text-right">
+                              {editing ? (
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className={`w-16 bg-secondary border border-primary/30 rounded px-1.5 py-1 text-xs text-right tabular-nums outline-none focus:ring-1 focus:ring-primary ${sign === 'positive' ? 'text-emerald-500' : 'text-red-400'}`}
+                                  value={getVal(key, yr, fallback)}
+                                  onChange={e => {
+                                    const val = Number(e.target.value) || 0;
+                                    const rec = toRecord(key, fallback);
+                                    setAssumptions(prev => ({
+                                      ...prev,
+                                      [key]: { ...rec, [yr]: val },
+                                    }));
+                                  }}
+                                />
+                              ) : (
+                                <span className={`tabular-nums ${sign === 'positive' ? 'text-emerald-500' : 'text-red-400'}`}>{getVal(key, yr, fallback)}</span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      {/* Net total row */}
+                      <tr className="border-t border-primary/20 font-semibold">
+                        <td className="py-1.5 pr-3">Resultado Líquido</td>
+                        {activeYears.map(yr => {
+                          const net = getVal('receitasFinanceirasPercent', yr, 0.5)
+                            - getVal('despesasFinanceirasPercent', yr, 1.5)
+                            + getVal('outrasReceitasPercent', yr, 0)
+                            - getVal('despesasNaoOperacionaisPercent', yr, 0);
+                          return <td key={yr} className={`py-1.5 px-1 text-right tabular-nums ${net >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>{net.toFixed(1)}%</td>;
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+            <p className="text-[10px] text-muted-foreground mt-2">
+              Resultado Financeiro = (Receitas Fin. - Despesas Fin. + Outras Receitas - Desp. Não Operacionais) x Receita Bruta
+            </p>
           </div>
 
         </TabsContent>

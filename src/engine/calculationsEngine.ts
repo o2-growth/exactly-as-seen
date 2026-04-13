@@ -784,24 +784,13 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
     // EBITDA
     const ebitda = cm + sga + totalHC + commercial + other;
 
-    // Financial result — use real monthly values for 2025, formula-based after
-    let financialResult: number;
-    if (year === 2025) {
-      const jurosChEsp = financialItems2025['8.01_jurosChEspecial'][m] / 1000;
-      const iof = financialItems2025['8.03_iof'][m] / 1000;
-      const jurosEmp = financialItems2025['8.04_jurosEmprestimos'][m] / 1000;
-      // Boleto tariff: real Jan-Mar, then f(clients) Apr+
-      const boletoReal = financialItems2025['8.05_tarifaBoletos'][m];
-      const boleto = m < 3 ? boletoReal / 1000 : -(totalClientsM * revenueTaxes.baasBoletoPerClient) / 1000;
-      const antecipacao = financialItems2025['8.08_antecipacao'][m] / 1000;
-      const recFinanceira = financialItems2025['8.09_receitaFinanceira'][m] / 1000;
-      financialResult = jurosChEsp + iof + jurosEmp + boleto + antecipacao + recFinanceira;
-    } else {
-      // BaaS boleto only for later years
-      const baasClientsForBoleto = getMonthlyClientCount('baas', 'assinatura', m, year, assumptions);
-      const boleto = -(baasClientsForBoleto * revenueTaxes.baasBoletoPerClient) / 1000;
-      financialResult = boleto;
-    }
+    // Financial result — percentage-based (same pattern as SG&A)
+    const recFinRate = getYearPercent(assumptions.receitasFinanceirasPercent, year, 0.5) / 100;
+    const despFinRate = getYearPercent(assumptions.despesasFinanceirasPercent, year, 1.5) / 100;
+    const outrasRecRate = getYearPercent(assumptions.outrasReceitasPercent, year, 0) / 100;
+    const despNaoOpRate = getYearPercent(assumptions.despesasNaoOperacionaisPercent, year, 0) / 100;
+
+    const financialResult = grossRev * (recFinRate - despFinRate + outrasRecRate - despNaoOpRate);
 
     // EBT
     const ebt = ebitda + financialResult;

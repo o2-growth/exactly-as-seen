@@ -156,6 +156,12 @@ export interface Assumptions {
     customLabels: Record<string, string>;
     hiddenItems: string[];
   };
+
+  // ─── Financial Result categories (% of Receita Bruta) ───
+  receitasFinanceirasPercent: Record<Year, number>;       // % positive
+  despesasFinanceirasPercent: Record<Year, number>;       // % negative (stored as positive, applied as negative)
+  outrasReceitasPercent: Record<Year, number>;             // % positive
+  despesasNaoOperacionaisPercent: Record<Year, number>;    // % negative (stored as positive, applied as negative)
 }
 
 export interface BUTaxConfig {
@@ -643,6 +649,10 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   marketingPercent: { 2025: 15.5, 2026: 15.5, 2027: 15.5, 2028: 15.5, 2029: 15.5, 2030: 15.5 },
   commercialPercent: { 2025: 2.3, 2026: 2.3, 2027: 2.3, 2028: 2.3, 2029: 2.3, 2030: 2.3 },
   pessoalPercent: { 2025: 7.2, 2026: 7.2, 2027: 7.2, 2028: 7.2, 2029: 7.2, 2030: 7.2 },
+  receitasFinanceirasPercent: { 2025: 0.5, 2026: 0.5, 2027: 0.5, 2028: 0.5, 2029: 0.5, 2030: 0.5 },
+  despesasFinanceirasPercent: { 2025: 1.5, 2026: 1.5, 2027: 1.5, 2028: 1.5, 2029: 1.5, 2030: 1.5 },
+  outrasReceitasPercent: { 2025: 0, 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 0 },
+  despesasNaoOperacionaisPercent: { 2025: 0, 2026: 0, 2027: 0, 2028: 0, 2029: 0, 2030: 0 },
   headcountGrowth: 10,
   headcountSalaries: {
     'CFOs': 8500,
