@@ -10,6 +10,8 @@ import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
 import { getMonthlyClients } from '@/lib/monthlyData';
 import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodResolution';
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
+import { useHistoricalClients } from '@/hooks/useHistoricalClients';
+import { isProductMrr } from '@/lib/financialData';
 
 interface FinancialModelContextType {
   assumptions: Assumptions;
@@ -214,6 +216,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
+  // Historical data from Supabase (real Oxy values)
+  const { data: historicalData } = useHistoricalClients();
+
   // Compute full model from engine
   const model = useMemo(
     () => computeFullModel(assumptions, scenario),
@@ -221,13 +226,23 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   );
 
   // Patch pnlTree revenue nodes to match the per-product computation used by Assumptions.
-  // The engine's calcMonthlyRevenue produces slightly different values than the Assumptions'
-  // getAnnualRevenue (different formulas, MRR vs non-MRR handling, overrides).
-  // This patch ensures P&L shows the EXACT same revenue as Assumptions.
+  // Uses the EXACT same logic as getAnnualRevenue in Assumptions.tsx:
+  // - For MRR historical months with Supabase data: use apiEntry.total_revenue (exact)
+  // - For non-MRR: use newClients × ticket (from monthlyNewClientOverrides or engine delta)
+  // - For MRR projected: use clients × ticket
   const pnlTree = useMemo(() => {
     const tree = model.pnlTree;
 
-    // Helper: compute annual revenue for a product (same logic as Assumptions header)
+    const isHistorical = (year: Year, monthIdx: number): boolean => {
+      if (year < 2026) return true;
+      if (year === 2026) return monthIdx < 3;
+      return false;
+    };
+
+    const toPeriod = (year: Year, monthIdx: number): string =>
+      `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+
+    // Helper: compute annual revenue for a product (EXACT same as Assumptions getAnnualRevenue)
     const productRevenue = (key: string, y: Year): number => {
       const monthly = getMonthlyClients(
         key as any, y,
@@ -237,10 +252,27 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
         assumptions.monthlyNewClientOverrides,
       );
       const ticketVal = (assumptions.tickets as any)[key] ?? 0;
-      return monthly.reduce((sum, clients, i) => {
+      const hcIsMrr = isProductMrr(key as TicketKey);
+
+      let total = 0;
+      for (let i = 0; i < 12; i++) {
+        const hist = isHistorical(y, i);
+        const period = toPeriod(y, i);
+        const apiEntry = hist ? historicalData[key]?.[period] : undefined;
         const monthTicket = (assumptions.monthlyTickets as any)?.[key]?.[y]?.[i] ?? ticketVal;
-        return sum + Math.round(clients) * monthTicket;
-      }, 0);
+
+        // For MRR historical with Supabase: use exact total_revenue from Oxy
+        if (hist && apiEntry && hcIsMrr && apiEntry.total_revenue > 0 && apiEntry.client_names) {
+          total += apiEntry.total_revenue;
+        } else if (hist && apiEntry && !hcIsMrr) {
+          // Non-MRR historical: use Supabase total_revenue if available
+          total += apiEntry.total_revenue;
+        } else {
+          // Projected or no Supabase data: use clients × ticket
+          total += Math.round(monthly[i]) * monthTicket;
+        }
+      }
+      return total;
     };
 
     // Compute per-BU and total revenue
@@ -270,7 +302,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     }
 
     return tree;
-  }, [model, assumptions]);
+  }, [model, assumptions, historicalData]);
 
   // Derive projections from engine output (backwards-compatible interface)
   const projections: ProjectionData = useMemo(() => {
