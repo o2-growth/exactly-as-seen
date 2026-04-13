@@ -134,19 +134,13 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
   const subKey = keyMap[`${bu}.${product}`];
   if (!subKey) return 0;
 
-  // For MRR products: pass monthlyClientOverrides (accumulated active counts).
-  // For non-MRR products: pass monthlyNewClientOverrides (per-month new counts from user edits).
-  // This ensures the engine's revenue matches what the Assumptions page shows.
-  const isMrr = isProductMrr(subKey as TicketKey);
-  const overrides = isMrr
-    ? assumptions.monthlyClientOverrides
-    : assumptions.monthlyNewClientOverrides;
   const monthly = getMonthlyClientsFromData(
     subKey as any,
     year as Year,
     assumptions.subProductClients,
     assumptions.tickets,
-    overrides,
+    assumptions.monthlyClientOverrides,
+    assumptions.monthlyNewClientOverrides,
   );
   return monthly[month] ?? 0;
 }

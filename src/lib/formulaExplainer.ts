@@ -38,7 +38,7 @@ export function explainRevenue(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions, model: FullModelOutput,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const ticket = assumptions.tickets[key] ?? 0;
   const totalClients = monthly.reduce((s, v) => s + v, 0);
   const totalRev = monthly.reduce((s, v, i) => {
@@ -67,7 +67,7 @@ export function explainClients(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const total = monthly.reduce((s, v) => s + v, 0);
   const dec = Math.round(monthly[11]);
   const jan = Math.round(monthly[0]);
@@ -76,7 +76,7 @@ export function explainClients(
   let prevDec = 0;
   if (year > 2025) {
     const prevYr = (year - 1) as Year;
-    const prevMonthly = getMonthlyClients(key, prevYr, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prevMonthly = getMonthlyClients(key, prevYr, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     prevDec = Math.round(prevMonthly[11]);
   }
 
@@ -339,7 +339,7 @@ export function explainChurn(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const churnRates = assumptions.monthlyChurnRates?.[key]?.[year];
   const isArray = Array.isArray(churnRates);
   const rateJan = isArray ? (churnRates as number[])[0] : (typeof churnRates === 'number' ? churnRates : 0);
@@ -351,7 +351,7 @@ export function explainChurn(
     const rate = isArray ? (churnRates as number[])[i] : rateJan;
     const prevActive = i === 0
       ? (year > 2025
-        ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides)[11]
+        ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides)[11]
         : monthly[0])
       : monthly[i - 1];
     totalChurned += prevActive * (rate / 100);
@@ -374,7 +374,7 @@ export function explainChurn(
       const m = findRepresentativeMonth(monthly);
       const prevActive = m === 0
         ? (year > 2025
-          ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides)[11]
+          ? getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides)[11]
           : monthly[0])
         : monthly[m - 1];
       const rateM = isArray ? (churnRates as number[])[m] : rateJan;
@@ -390,12 +390,12 @@ export function explainNovosClientes(
   assumptions: Assumptions,
 ): FormulaExplanation {
   const newOverrides = assumptions.monthlyNewClientOverrides?.[key]?.[year];
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
 
   // Compute new clients per month (delta + churn)
   let prevDec = 0;
   if (year > 2025) {
-    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     prevDec = prev[11];
   } else {
     prevDec = monthly[0]; // approximate
@@ -440,13 +440,13 @@ export function explainClientesAtivos(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const jan = Math.round(monthly[0]);
   const dec = Math.round(monthly[11]);
 
   let prevDec = 0;
   if (year > 2025) {
-    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     prevDec = Math.round(prev[11]);
   }
 
@@ -477,13 +477,13 @@ export function explainFaturamentoBase(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const ticketBase = assumptions.tickets[key] ?? 0;
 
   // Previous December revenue
   let prevDecRev = 0;
   if (year > 2025) {
-    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     const prevTicket = assumptions.monthlyTickets?.[key]?.[(year - 1) as Year]?.[11] ?? ticketBase;
     prevDecRev = prev[11] * prevTicket;
   }
@@ -530,12 +530,12 @@ export function explainIncremento(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const ticketBase = assumptions.tickets[key] ?? 0;
 
   let prevDec = 0;
   if (year > 2025) {
-    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     prevDec = prev[11];
   } else {
     prevDec = monthly[0];
@@ -575,7 +575,7 @@ export function explainRevenueChurn(
   key: TicketKey, label: string, year: Year,
   assumptions: Assumptions,
 ): FormulaExplanation {
-  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+  const monthly = getMonthlyClients(key, year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
   const ticketBase = assumptions.tickets[key] ?? 0;
   const churnRates = assumptions.monthlyChurnRates?.[key]?.[year];
   const isArray = Array.isArray(churnRates);
@@ -583,7 +583,7 @@ export function explainRevenueChurn(
 
   let prevDec = 0;
   if (year > 2025) {
-    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides);
+    const prev = getMonthlyClients(key, (year - 1) as Year, assumptions.subProductClients, assumptions.tickets, assumptions.monthlyClientOverrides, assumptions.monthlyNewClientOverrides);
     prevDec = prev[11];
   } else {
     prevDec = monthly[0];

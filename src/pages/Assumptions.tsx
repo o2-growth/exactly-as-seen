@@ -260,7 +260,7 @@ export default function Assumptions() {
 
   /** Get annual client sum using API data for historical months, engine for projected */
   const getAnnualClientSum = (key: SubProductKey, year: Year): number => {
-    const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    const engineMonthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
 
     // Compute "new clients in the year" — same logic for both MRR and non-MRR products.
     // For historical months: max(0, activeCur - activePrev + churnedCur) using API data.
@@ -284,7 +284,7 @@ export default function Assumptions() {
           if (decApiP && decApiP.client_count > 0) {
             activePrev = decApiP.client_count;
           } else {
-            activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+            activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]);
           }
         }
         let churnedCur = 0;
@@ -312,7 +312,7 @@ export default function Assumptions() {
             if (decApiP && decApiP.client_count > 0) {
               activePrev = decApiP.client_count;
             } else {
-              activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+              activePrev = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]);
             }
           }
           const churnedCur = Math.round(activePrev * getChurnForMonth(key, data, year, i));
@@ -337,7 +337,7 @@ export default function Assumptions() {
       if (decApiP && decApiP.client_count > 0) {
         activeAtStart = decApiP.client_count;
       } else {
-        activeAtStart = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]);
+        activeAtStart = Math.round(getMonthlyClients(key, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]);
       }
     }
 
@@ -346,14 +346,14 @@ export default function Assumptions() {
 
   /** Get annual revenue using same faturamentoTotal logic as expanded section */
   const getAnnualRevenue = (key: SubProductKey, year: Year): number => {
-    const monthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+    const monthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
     const ticketVal = data.tickets[key as TicketKey] ?? 0;
     const hcIsMrr = isProductMrr(key as FinTicketKey);
     const churnApplicable = hcIsMrr && !data.churnNotApplicable?.[key];
 
     // Previous year December data for month 0 base
     const prevYrMonthly = year > 2025
-      ? getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)
+      ? getMonthlyClients(key, (year - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)
       : null;
     const prevDecPeriod = year > 2025 ? toPeriod((year - 1) as Year, 11) : '';
     const prevDecApi = year > 2025 ? historicalData[key]?.[prevDecPeriod] : undefined;
@@ -751,7 +751,7 @@ export default function Assumptions() {
         if (histEntry) {
           prevActive = histEntry.client_count;
         } else {
-          const engineMonthly = getMonthlyClients(key, year, prevAssumptions.subProductClients, prevAssumptions.tickets, prevAssumptions.monthlyClientOverrides);
+          const engineMonthly = getMonthlyClients(key, year, prevAssumptions.subProductClients, prevAssumptions.tickets, prevAssumptions.monthlyClientOverrides, prevAssumptions.monthlyNewClientOverrides);
           prevActive = Math.round(engineMonthly[m]);
         }
       } else {
@@ -771,7 +771,7 @@ export default function Assumptions() {
     const decPeriod = toPeriod(prevYr, 11);
     const decApi = historicalData[key]?.[decPeriod];
     if (decApi && decApi.client_count > 0) return decApi.client_count;
-    const prevYrMonthly = getMonthlyClients(key, prevYr, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
+    const prevYrMonthly = getMonthlyClients(key, prevYr, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides, prev.monthlyNewClientOverrides);
     return Math.round(prevYrMonthly[11]);
   };
 
@@ -876,7 +876,7 @@ export default function Assumptions() {
           // Build NEW clients projection with growth %, then compute active
           const existingNew = data.monthlyNewClientOverrides?.[k]?.[y];
           const manualFlags = data.manualMonthlyClientOverrideFlags?.[k]?.[y];
-          const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+          const base = getMonthlyClients(k, y, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
 
           // Determine previous month's new clients for growth base
           let prevNew = 0;
@@ -894,7 +894,7 @@ export default function Assumptions() {
             if (isHistorical(y, m)) {
               // Keep historical — compute from active differences
               const activeCur = Math.round(base[m]);
-              const activePrevM = m > 0 ? Math.round(base[m - 1]) : (y > 2025 ? Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]) : 0);
+              const activePrevM = m > 0 ? Math.round(base[m - 1]) : (y > 2025 ? Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]) : 0);
               const churnRate = getChurnForMonth(k, data, y, m);
               const churned = Math.floor(activePrevM * churnRate);
               newClientsArr[m] = Math.max(0, activeCur - activePrevM + churned);
@@ -912,7 +912,7 @@ export default function Assumptions() {
           newClientsAccum[k]![y] = newClientsArr;
 
           // Compute active from new
-          const prevDecActive = y === 2025 ? 0 : (decTargets[k]?.[(y - 1)] ?? Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]));
+          const prevDecActive = y === 2025 ? 0 : (decTargets[k]?.[(y - 1)] ?? Math.round(getMonthlyClients(k, (y - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]));
           const activeArr = computeActiveFromNew(k, y, newClientsArr, prevDecActive, data);
           if (!activeAccum[k]) activeAccum[k] = {};
           activeAccum[k]![y] = activeArr;
@@ -997,7 +997,7 @@ export default function Assumptions() {
       for (const y of yearsToApply) {
         const arr = newGrowthArrays[y];
         const isFutureYear = y > year;
-        const base = getMonthlyClients(key, y, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
+        const base = getMonthlyClients(key, y, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides, prev.monthlyNewClientOverrides);
         const existingNew = prev.monthlyNewClientOverrides?.[key as TicketKey]?.[y as Year];
         const manualFlags = prev.manualMonthlyClientOverrideFlags?.[key as TicketKey]?.[y as Year];
 
@@ -1062,7 +1062,7 @@ export default function Assumptions() {
 
       for (const y of yearsToApply) {
         const existingNew = prev.monthlyNewClientOverrides?.[key as TicketKey]?.[y as Year];
-        const base = getMonthlyClients(key, y as Year, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
+        const base = getMonthlyClients(key, y as Year, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides, prev.monthlyNewClientOverrides);
 
         // If no new client overrides exist, derive from current active
         const newClientsArr: (number | null)[] = existingNew ? [...existingNew] : Array(12).fill(null);
@@ -1109,7 +1109,7 @@ export default function Assumptions() {
 
       for (const y of yearsToApply) {
         const existingNew = prev.monthlyNewClientOverrides?.[key as TicketKey]?.[y as Year];
-        const base = getMonthlyClients(key, y as Year, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides);
+        const base = getMonthlyClients(key, y as Year, prev.subProductClients, prev.tickets, prev.monthlyClientOverrides, prev.monthlyNewClientOverrides);
 
         const newClientsArr: (number | null)[] = existingNew ? [...existingNew] : Array(12).fill(null);
         if (!existingNew) {
@@ -1392,7 +1392,7 @@ export default function Assumptions() {
                       const growthArr = growthRates[selectedYear]?.[rowKey] ?? Array(12).fill(0.06);
                       const churn = row.dataKey ? getChurnMonthly(row.dataKey, data, selectedYear) : 0;
                       const monthly: number[] = row.dataKey
-                        ? getMonthlyClients(row.dataKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides).map(v => Math.round(v))
+                        ? getMonthlyClients(row.dataKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides).map(v => Math.round(v))
                         : Array(12).fill(0);
                       const ticketVal = row.dataKey ? data.tickets[row.dataKey as TicketKey] ?? 0 : 0;
 
@@ -1466,7 +1466,7 @@ export default function Assumptions() {
                                     <p className="text-xs font-semibold text-muted-foreground mb-2">Clientes ativos em Dezembro</p>
                                     <div className="grid grid-cols-6 gap-2">
                                       {activeYears.map(y => {
-                                        const engineMonthlyYr = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                        const engineMonthlyYr = getMonthlyClients(prodKey as SubProductKey, y, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
                                         const decPeriod = toPeriod(y, 11);
                                         const decApi = historicalData[prodKey]?.[decPeriod];
                                         // API e soberana para meses historicos: respeita 0 do Oxy
@@ -1610,7 +1610,7 @@ export default function Assumptions() {
                                             if (decApiPrev && decApiPrev.client_count > 0) {
                                               activePrev = decApiPrev.client_count;
                                             } else {
-                                              const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                              const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
                                               activePrev = Math.round(prevYrMonthly[11]);
                                             }
                                           }
@@ -1635,7 +1635,7 @@ export default function Assumptions() {
                                               activePrev = monthly[i - 1];
                                             } else if (selectedYear > 2025) {
                                               const prevYr = (selectedYear - 1) as Year;
-                                              const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides);
+                                              const prevYrMonthly = getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
                                               activePrev = Math.round(prevYrMonthly[11]);
                                             }
                                             const churnRate = getChurnForMonth(prodKey, data, selectedYear, i);
@@ -1682,7 +1682,7 @@ export default function Assumptions() {
                                                 const decPeriodP = toPeriod(prevYr, 11);
                                                 const decApiP = historicalData[prodKey]?.[decPeriodP];
                                                 if (decApiP && decApiP.client_count > 0) { activePrev = decApiP.client_count; }
-                                                else { activePrev = Math.round(getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]); }
+                                                else { activePrev = Math.round(getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]); }
                                               }
                                               let churnedCur = 0;
                                               if (hcEntryCur) { churnedCur = hcEntryCur.churned_clients ?? 0; }
@@ -1703,7 +1703,7 @@ export default function Assumptions() {
                                                 const decPeriodP = toPeriod(prevYr, 11);
                                                 const decApiP = historicalData[prodKey]?.[decPeriodP];
                                                 if (decApiP && decApiP.client_count > 0) { activePrevP = decApiP.client_count; }
-                                                else { activePrevP = Math.round(getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]); }
+                                                else { activePrevP = Math.round(getMonthlyClients(prodKey as SubProductKey, prevYr, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]); }
                                               }
                                               const churnedCurP = Math.round(activePrevP * getChurnForMonth(prodKey, data, selectedYear, i));
                                               return sum + Math.max(0, Math.round(activeCurP) - Math.round(activePrevP) + churnedCurP);
@@ -1742,7 +1742,7 @@ export default function Assumptions() {
                                       // Used both for the delta fallback (when Supabase data absent)
                                       // AND for consistent logoChurn computation.
                                       const prevClientsForChurn = i === 0
-                                        ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11]))
+                                        ? (selectedYear === 2025 ? 0 : Math.round(getMonthlyClients(prodKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11]))
                                         : monthly[i - 1];
                                       const curClientsForChurn = monthly[i];
 
@@ -2294,7 +2294,7 @@ export default function Assumptions() {
 
                                     // Previous year December data for month 0 base
                                     const prevYrMonthly = selectedYear > 2025
-                                      ? getMonthlyClients(prodKey as SubProductKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides)
+                                      ? getMonthlyClients(prodKey as SubProductKey, (selectedYear - 1) as Year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)
                                       : null;
                                     const prevDecPeriod = selectedYear > 2025 ? toPeriod((selectedYear - 1) as Year, 11) : '';
                                     const prevDecApi = selectedYear > 2025 ? historicalData[prodKey]?.[prevDecPeriod] : undefined;
@@ -2867,7 +2867,7 @@ export default function Assumptions() {
                     // Dez: use API if available, otherwise engine
                     const decPeriod = toPeriod(selectedYear, 11);
                     const decApi = historicalData[row.dataKey!]?.[decPeriod];
-                    const decEngine = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11];
+                    const decEngine = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11];
                     const dez = (decApi && isHistorical(selectedYear, 11)) ? decApi.client_count : Math.round(decEngine);
                     return { label: row.label, group: row.group, key: row.dataKey!, somaAno, dez, receita };
                   });
@@ -2913,7 +2913,7 @@ export default function Assumptions() {
                                   const somaAno = getAnnualClientSum(row.dataKey as SubProductKey, selectedYear);
                                   const decPeriod2 = toPeriod(selectedYear, 11);
                                   const decApi2 = historicalData[row.dataKey!]?.[decPeriod2];
-                                  const decEng2 = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides)[11];
+                                  const decEng2 = getMonthlyClients(row.dataKey as SubProductKey, selectedYear, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides)[11];
                                   const dez = (decApi2 && isHistorical(selectedYear, 11)) ? decApi2.client_count : Math.round(decEng2);
                                   return (
                                     <label key={row.dataKey} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${isIncluded ? 'bg-primary/5 border-primary/30' : 'bg-secondary/30 border-border opacity-60'}`}>

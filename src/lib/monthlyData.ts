@@ -128,6 +128,7 @@ export function getMonthlyClients(
   subProductClients: SubProductClients,
   ticketPrices?: Partial<Record<SubProductKey, number>>,
   monthlyClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
+  monthlyNewClientOverrides?: Partial<Record<SubProductKey, Partial<Record<Year, (number | null)[]>>>>,
 ): number[] {
   // Determine the ticket price for this sub-product
   const STATIC_TICKET_FALLBACK: Record<SubProductKey, number> = {
@@ -156,13 +157,16 @@ export function getMonthlyClients(
   };
   const ticket = ticketPrices?.[key] ?? STATIC_TICKET_FALLBACK[key];
 
-  // Helper: apply monthly client overrides on top of base result.
-  // The caller is responsible for passing the correct type of overrides:
-  // - MRR callers: pass monthlyClientOverrides (accumulated active counts)
-  // - Non-MRR callers: pass monthlyNewClientOverrides (per-month new client counts)
-  // This ensures the override values match the product's semantics.
+  // Helper: apply monthly overrides on top of base result.
+  // Automatically selects the correct override source by product type:
+  // - MRR: uses monthlyClientOverrides (accumulated active client counts)
+  // - Non-MRR: uses monthlyNewClientOverrides (per-month new client counts from user edits)
+  // monthlyClientOverrides for non-MRR contains stale accumulated values that must NOT be used.
+  const isNonMrr = !isProductMrr(key as TicketKey);
   const applyOverrides = (base: number[]): number[] => {
-    const overrides = monthlyClientOverrides?.[key]?.[year];
+    const overrides = isNonMrr
+      ? monthlyNewClientOverrides?.[key]?.[year]
+      : monthlyClientOverrides?.[key]?.[year];
     if (!overrides) return base;
     return base.map((v, i) => {
       const ov = overrides[i];
@@ -188,14 +192,14 @@ export function getMonthlyClients(
     const sumFallback = Array.from({ length: 12 }, (_, m) => {
       let total = 0;
       for (const src of sources) {
-        const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides);
+        const srcMonthly = getMonthlyClients(src, year, subProductClients, ticketPrices, monthlyClientOverrides, monthlyNewClientOverrides);
         const curActive = Math.round(srcMonthly[m]);
         let prevActive = 0;
         if (m > 0) {
           prevActive = Math.round(srcMonthly[m - 1]);
         } else if (year > 2025) {
           // Cross-year boundary: get Dec of previous year
-          const prevYrMonthly = getMonthlyClients(src, (year - 1) as Year, subProductClients, ticketPrices, monthlyClientOverrides);
+          const prevYrMonthly = getMonthlyClients(src, (year - 1) as Year, subProductClients, ticketPrices, monthlyClientOverrides, monthlyNewClientOverrides);
           prevActive = Math.round(prevYrMonthly[11]);
         }
         // Only count positive delta (new entries). Churn doesn't generate negative setups.
