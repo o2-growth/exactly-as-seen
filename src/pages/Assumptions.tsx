@@ -3591,6 +3591,190 @@ export default function Assumptions() {
                     <span>Custos CaaS/SaaS/CS = headcount mensal × 12. Education/Expansão/Tax = % aplicado sobre receita bruta anual.</span>
                   </div>
                 </div>
+
+                {/* ─── Squads Projetados por Ano ─── */}
+                <div className="gradient-card p-5 space-y-3">
+                  <h3 className="text-sm font-semibold">Squads Projetados por Ano</h3>
+                  <p className="text-[10px] text-muted-foreground">Headcount necessário baseado na projeção de clientes ativos e novos clientes/mês.</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left px-2 py-2 text-muted-foreground font-medium">Cargo / Squad</th>
+                          {activeYears.map(y => (
+                            <th key={y} className={`text-right px-2 py-2 text-muted-foreground font-medium ${y === selectedYear ? 'text-primary' : ''}`}>{y}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* CaaS headcount */}
+                        <tr className="border-b border-border/30 bg-secondary/10">
+                          <td className="px-2 py-1.5 font-semibold text-muted-foreground" colSpan={activeYears.length + 1}>CaaS</td>
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Clientes CaaS (base)</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.caasEnd}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Project Finance Directors</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numPFD}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">CFOs</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numCFO}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">FP&A Analysts</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numFPA}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30 font-medium">
+                          <td className="px-2 py-1.5 pl-4">Subtotal CaaS</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numPFD + yi.numCFO + yi.numFPA}</td>)}
+                        </tr>
+
+                        {/* SaaS headcount */}
+                        <tr className="border-b border-border/30 bg-secondary/10">
+                          <td className="px-2 py-1.5 font-semibold text-muted-foreground" colSpan={activeYears.length + 1}>SaaS Assinaturas</td>
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Clientes SaaS (base)</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.saasSubEnd}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Dev Seniors</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numDevSr}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Customer Success</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numCSSaaS}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30 font-medium">
+                          <td className="px-2 py-1.5 pl-4">Subtotal SaaS</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numDevSr + yi.numCSSaaS}</td>)}
+                        </tr>
+
+                        {/* Setup */}
+                        <tr className="border-b border-border/30 bg-secondary/10">
+                          <td className="px-2 py-1.5 font-semibold text-muted-foreground" colSpan={activeYears.length + 1}>Setup (novos clientes/mês)</td>
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Novos clientes/mês</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.newPerMonth}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Squads Setup</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numSetupSquads}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">Heads of Data</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numHeadData}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30 font-medium">
+                          <td className="px-2 py-1.5 pl-4">Subtotal Setup</td>
+                          {yearImpact.map(yi => {
+                            const setupPeople = yi.numSetupSquads * (cos.dataAnalystPerSquad + cos.processAnalystPerSquad) + yi.numHeadData;
+                            return <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{setupPeople}</td>;
+                          })}
+                        </tr>
+
+                        {/* CS */}
+                        <tr className="border-b border-border/30 bg-secondary/10">
+                          <td className="px-2 py-1.5 font-semibold text-muted-foreground" colSpan={activeYears.length + 1}>Customer Success</td>
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 pl-4">CX Analysts</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numCX}</td>)}
+                        </tr>
+
+                        {/* Total */}
+                        <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                          <td className="px-2 py-2">TOTAL HEADCOUNT COS</td>
+                          {yearImpact.map(yi => {
+                            const setupPeople = yi.numSetupSquads * (cos.dataAnalystPerSquad + cos.processAnalystPerSquad) + yi.numHeadData;
+                            const total = yi.numPFD + yi.numCFO + yi.numFPA + yi.numDevSr + yi.numCSSaaS + setupPeople + yi.numCX;
+                            return <td key={yi.year} className="text-right px-2 py-2 tabular-nums">{total}</td>;
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* ─── Resumo Financeiro Real ─── */}
+                <div className="gradient-card p-5 space-y-3">
+                  <h3 className="text-sm font-semibold">Resumo Financeiro — COS vs Receita</h3>
+                  <p className="text-[10px] text-muted-foreground">Dados consolidados do engine, incluindo impostos das premissas tributárias configuradas.</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left px-2 py-2 text-muted-foreground font-medium">Indicador</th>
+                          {activeYears.map(y => (
+                            <th key={y} className={`text-right px-2 py-2 text-muted-foreground font-medium ${y === selectedYear ? 'text-primary' : ''}`}>{y}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 font-medium">Receita Bruta</td>
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].grossRevenue)}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 text-destructive">(-) Deduções / Impostos</td>
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].deductions)}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30 font-medium">
+                          <td className="px-2 py-1.5">Receita Líquida</td>
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].netRevenue)}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 text-destructive">(-) COS Total</td>
+                          {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(yi.grandTotal)}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5 font-medium">Clientes Totais</td>
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{model.years[y].totalClients.toLocaleString('pt-BR')}</td>)}
+                        </tr>
+                        <tr className="border-b border-border/30">
+                          <td className="px-2 py-1.5">Headcount COS</td>
+                          {yearImpact.map(yi => {
+                            const setupPeople = yi.numSetupSquads * (cos.dataAnalystPerSquad + cos.processAnalystPerSquad) + yi.numHeadData;
+                            const total = yi.numPFD + yi.numCFO + yi.numFPA + yi.numDevSr + yi.numCSSaaS + setupPeople + yi.numCX;
+                            return <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{total}</td>;
+                          })}
+                        </tr>
+                        <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
+                          <td className="px-2 py-2">Lucro Bruto</td>
+                          {activeYears.map((y, i) => {
+                            const gp = model.years[y].netRevenue - yearImpact[i].grandTotal / 1000;
+                            return <td key={y} className={`text-right px-2 py-2 tabular-nums ${gp < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{formatCurrency(gp)}</td>;
+                          })}
+                        </tr>
+                        <tr className="bg-primary/5 font-bold">
+                          <td className="px-2 py-2">Margem Bruta %</td>
+                          {activeYears.map((y, i) => {
+                            const nr = model.years[y].netRevenue;
+                            const gp = nr - yearImpact[i].grandTotal / 1000;
+                            const margin = nr > 0 ? (gp / nr * 100) : 0;
+                            return (
+                              <td key={y} className="text-right px-2 py-2 tabular-nums">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                  margin > 60 ? 'bg-emerald-500/15 text-emerald-500' :
+                                  margin > 40 ? 'bg-amber-500/15 text-amber-500' :
+                                  'bg-destructive/15 text-destructive'
+                                }`}>{margin.toFixed(1)}%</span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <Info className="h-3 w-3 mt-0.5 shrink-0" />
+                    <span>Lucro Bruto = Receita Líquida − COS Total. Impostos calculados pelas premissas tributárias configuradas na plataforma.</span>
+                  </div>
+                </div>
               </>
             );
           })()}
