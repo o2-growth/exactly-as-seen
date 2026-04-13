@@ -4,7 +4,7 @@
  * Replaces hardcoded values with formula-driven calculations.
  */
 
-import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS, computeMixPresumido, getEffectivePresumido, resolveSlices } from '@/lib/financialData';
+import { Year, YEARS, Assumptions, DEFAULT_ASSUMPTIONS, Scenario, TicketKey, BUTaxConfig, SubProductTaxConfig, ALL_SUBPRODUCT_KEYS, getSubProductTaxRate, CosConfig, DEFAULT_COS_CONFIG, MRR_KEYS, computeMixPresumido, getEffectivePresumido, resolveSlices, isProductMrr } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { getMonthlyClients as getMonthlyClientsFromData } from '@/lib/monthlyData';
 import {
@@ -134,12 +134,19 @@ function getMonthlyClientCount(bu: string, product: string, month: number, year:
   const subKey = keyMap[`${bu}.${product}`];
   if (!subKey) return 0;
 
+  // For MRR products: pass monthlyClientOverrides (accumulated active counts).
+  // For non-MRR products: pass monthlyNewClientOverrides (per-month new counts from user edits).
+  // This ensures the engine's revenue matches what the Assumptions page shows.
+  const isMrr = isProductMrr(subKey as TicketKey);
+  const overrides = isMrr
+    ? assumptions.monthlyClientOverrides
+    : assumptions.monthlyNewClientOverrides;
   const monthly = getMonthlyClientsFromData(
     subKey as any,
     year as Year,
     assumptions.subProductClients,
     assumptions.tickets,
-    assumptions.monthlyClientOverrides,
+    overrides,
   );
   return monthly[month] ?? 0;
 }
