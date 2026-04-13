@@ -156,8 +156,15 @@ export function getMonthlyClients(
   };
   const ticket = ticketPrices?.[key] ?? STATIC_TICKET_FALLBACK[key];
 
-  // Helper: apply monthly client overrides on top of base result
+  // Helper: apply monthly client overrides on top of base result.
+  // For non-MRR products, monthlyClientOverrides may contain stale ACCUMULATED
+  // values from old computations (when the product was treated as MRR). These
+  // would override the correct per-month deltas. So for non-MRR, we SKIP
+  // monthlyClientOverrides entirely — the per-month values come from the
+  // engine's delta conversion or from monthlyNewClientOverrides (handled elsewhere).
+  const isNonMrr = !isProductMrr(key as TicketKey);
   const applyOverrides = (base: number[]): number[] => {
+    if (isNonMrr) return base; // non-MRR: no accumulated overrides
     const overrides = monthlyClientOverrides?.[key]?.[year];
     if (!overrides) return base;
     return base.map((v, i) => {
