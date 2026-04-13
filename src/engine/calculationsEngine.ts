@@ -1297,13 +1297,11 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   // DESPESAS FIXAS total
   const fixedExpenses2025 = hist2025('DESPESAS FIXAS');
 
-  // Revenue nodes (1, 1.1-1.6, 1.x.x) — NO LONGER OVERRIDDEN.
-  // The engine's own computation via calcMonthlyRevenue → getMonthlyClientCount →
-  // getMonthlyClients (monthlyData.ts) already reads real historical data from
-  // historicalRevenueItems. Overriding with stale historicalRevenue/historicalMetrics
-  // values caused the P&L to diverge from the Assumptions page (which uses
-  // getAnnualRevenue, a per-product computation from the same data source).
-  // By letting the engine's own values flow through, P&L matches Assumptions.
+  // Revenue total override from real Oxy DRE (always available in historicalMetrics).
+  // This ensures P&L shows the real RECEITA BRUTA even before Supabase hook loads.
+  // The context patch (FinancialModelContext) will later override with per-product
+  // computed values once Supabase data is available for exact match with Assumptions.
+  override('1', 2025, grossRev2025);
 
   // Deductions node (code '2' is a child of '1' in the tree)
   override('2', 2025, deductions2025);
@@ -1380,11 +1378,9 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
     d.marketing + d.commercial + d.headcount + d.sga
   );
 
-  // Revenue nodes 2026 (1, 1.1-1.6, 1.x.x) — NO LONGER OVERRIDDEN.
-  // Same rationale as 2025: the engine's own computation via getMonthlyClientCount →
-  // getMonthlyClients now reads real historical data for Jan-Mar 2026 and projects
-  // Apr-Dec using the user's assumptions. Overriding with stale mixedYear values
-  // from historicalRevenue caused divergence with the Assumptions page.
+  // Revenue total override for 2026 (Jan-Mar real + Apr-Dec engine).
+  // Same as 2025: ensures P&L shows reasonable value before Supabase loads.
+  override('1', 2026, grossRev2026);
 
   // Deductions
   override('2', 2026, deductions2026);

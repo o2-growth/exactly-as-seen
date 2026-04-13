@@ -230,10 +230,16 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   );
 
   // Patch pnlTree revenue nodes using the SHARED computeProductAnnualRevenue function.
-  // This is the EXACT SAME function that Assumptions uses (via revenueCalc.ts),
-  // guaranteeing identical numbers on both pages by construction.
+  // ONLY when historicalData is loaded from Supabase. Without Supabase data, the function
+  // falls back to clients × ticket which produces HIGHER values than the engine raw
+  // (because it uses monthlyNewClientOverrides which compound differently).
+  // When Supabase is empty, the engine's own values are closer to reality.
   const pnlTree = useMemo(() => {
     const tree = model.pnlTree;
+
+    // Guard: only patch if Supabase data is available
+    const hasHistData = Object.keys(historicalData).length > 0;
+    if (!hasHistData) return tree;
 
     const buGroups: Array<{ code: string; keys: readonly string[] }> = [
       { code: '1.1', keys: CAAS_KEYS },
