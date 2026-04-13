@@ -1753,9 +1753,11 @@ export default function Assumptions() {
                                       let churnRate: number;
                                       if (data.churnNotApplicable?.[prodKey]) {
                                         churnRate = 0;
-                                      } else if (hcChurnEntry && (hcChurnEntry.churn_rate ?? 0) > 0) {
+                                      } else if (hist && hcChurnEntry) {
+                                        // API soberana: historical months use Supabase value even if 0.
+                                        // churn_rate = 0 means "no churn this month" (real), not "unknown".
                                         // Supabase stores monthly % → divide by 100 for decimal (NOT /12)
-                                        churnRate = hcChurnEntry.churn_rate / 100;
+                                        churnRate = (hcChurnEntry.churn_rate ?? 0) / 100;
                                       } else if (hasManualChurn) {
                                         // Manual override stored as ANNUAL % → divide by 100 and by 12
                                         churnRate = storedArr[i] / 100 / 12;
