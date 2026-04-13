@@ -7,6 +7,11 @@ import { describe, it, expect } from 'vitest';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
 import { DEFAULT_ASSUMPTIONS, Assumptions, YEARS, Year } from '@/lib/financialData';
 
+/** Create a per-year record filled with the same value for all years */
+function perYear(v: number): Record<Year, number> {
+  return { 2025: v, 2026: v, 2027: v, 2028: v, 2029: v, 2030: v };
+}
+
 function getModel(overrides?: Partial<Assumptions>): FullModelOutput {
   const assumptions = overrides ? { ...DEFAULT_ASSUMPTIONS, ...overrides } : DEFAULT_ASSUMPTIONS;
   return computeFullModel(assumptions, 'BASE');
@@ -83,8 +88,8 @@ describe('Assumptions → P&L: Client count changes affect revenue', () => {
 
 describe('Assumptions → P&L: SG&A percentage affects costs', () => {
   it('higher sgaPercent increases SG&A (Despesas Administrativas)', () => {
-    const base = getModel({ sgaPercent: 10.4 });
-    const high = getModel({ sgaPercent: 20 });
+    const base = getModel({ sgaPercent: perYear(10.4) });
+    const high = getModel({ sgaPercent: perYear(20) });
 
     for (const y of [2027, 2028, 2029, 2030] as Year[]) {
       const baseSGA = Math.abs(base.years[y].sga);
@@ -94,8 +99,8 @@ describe('Assumptions → P&L: SG&A percentage affects costs', () => {
   });
 
   it('sgaPercent = 5 costs less than sgaPercent = 20', () => {
-    const low = getModel({ sgaPercent: 5 });
-    const high = getModel({ sgaPercent: 20 });
+    const low = getModel({ sgaPercent: perYear(5) });
+    const high = getModel({ sgaPercent: perYear(20) });
     for (const y of [2028, 2029, 2030] as Year[]) {
       expect(Math.abs(low.years[y].sga)).toBeLessThan(Math.abs(high.years[y].sga));
     }
@@ -106,8 +111,8 @@ describe('Assumptions → P&L: SG&A percentage affects costs', () => {
 
 describe('Assumptions → P&L: Pessoal percentage affects costs', () => {
   it('higher pessoalPercent increases headcount (Despesas com Pessoal)', () => {
-    const base = getModel({ pessoalPercent: 7.2 });
-    const high = getModel({ pessoalPercent: 20 });
+    const base = getModel({ pessoalPercent: perYear(7.2) });
+    const high = getModel({ pessoalPercent: perYear(20) });
 
     for (const y of [2027, 2028, 2029, 2030] as Year[]) {
       const baseHC = Math.abs(base.years[y].headcount);
@@ -123,8 +128,8 @@ describe('Assumptions → P&L: Headcount ratios (legacy — now percentage-based
   it('headcount is now driven by pessoalPercent, not ratios', () => {
     // With the simplified model, headcountRatios no longer affect Despesas com Pessoal.
     // Changing pessoalPercent changes headcount costs.
-    const low = getModel({ pessoalPercent: 5 });
-    const high = getModel({ pessoalPercent: 15 });
+    const low = getModel({ pessoalPercent: perYear(5) });
+    const high = getModel({ pessoalPercent: perYear(15) });
 
     for (const y of [2028, 2029, 2030] as Year[]) {
       expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(Math.abs(low.years[y].headcount));
@@ -137,8 +142,8 @@ describe('Assumptions → P&L: Headcount ratios (legacy — now percentage-based
 describe('Assumptions → P&L: Salary ranges (legacy — now percentage-based)', () => {
   it('headcount is now driven by pessoalPercent, salaries no longer affect it', () => {
     // With the simplified model, salaryRanges no longer affect Despesas com Pessoal.
-    const base = getModel({ pessoalPercent: 7.2 });
-    const high = getModel({ pessoalPercent: 14.4 });
+    const base = getModel({ pessoalPercent: perYear(7.2) });
+    const high = getModel({ pessoalPercent: perYear(14.4) });
 
     for (const y of [2028, 2029, 2030] as Year[]) {
       const baseCost = Math.abs(base.years[y].headcount);
@@ -189,8 +194,8 @@ describe('Assumptions → P&L: Tax rates affect deductions', () => {
 
 describe('Assumptions → P&L: Marketing costs', () => {
   it('higher marketingPercent increases marketing expense', () => {
-    const base = getModel({ marketingPercent: 15.5 });
-    const high = getModel({ marketingPercent: 25 });
+    const base = getModel({ marketingPercent: perYear(15.5) });
+    const high = getModel({ marketingPercent: perYear(25) });
 
     for (const y of YEARS) {
       const baseMkt = Math.abs(base.years[y].marketing);

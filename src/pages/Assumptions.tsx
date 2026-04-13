@@ -3950,57 +3950,85 @@ export default function Assumptions() {
             </div>
           </div>
 
-          {/* Despesas Fixas (% da Receita Bruta) */}
+          {/* Despesas Fixas (% da Receita Bruta) — per-year table */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Receipt className="h-4 w-4 text-primary" />
               <h3 className="text-sm font-semibold">Despesas Fixas (% da Receita Bruta)</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Despesas de Marketing</p>
-                <div className="text-sm font-semibold flex items-center gap-1">
-                  {editing ? (
-                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.marketingPercent ?? 15.5} onChange={e => setAssumptions(p => ({ ...p, marketingPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.marketingPercent ?? 15.5}</span>}
-                  <span className="text-xs text-muted-foreground">%</span>
+            {(() => {
+              const sgaRows: { key: 'marketingPercent' | 'commercialPercent' | 'pessoalPercent' | 'sgaPercent'; label: string; fallback: number }[] = [
+                { key: 'marketingPercent', label: 'Marketing', fallback: 15.5 },
+                { key: 'commercialPercent', label: 'Comerciais', fallback: 2.3 },
+                { key: 'pessoalPercent', label: 'Pessoal', fallback: 7.2 },
+                { key: 'sgaPercent', label: 'Administrativa', fallback: 10.4 },
+              ];
+              const getVal = (field: typeof sgaRows[number]['key'], yr: Year, fb: number): number => {
+                const v = data[field] as any;
+                if (v === undefined || v === null) return fb;
+                if (typeof v === 'number') return v;
+                return (v as Record<Year, number>)[yr] ?? fb;
+              };
+              const toRecord = (field: typeof sgaRows[number]['key'], fb: number): Record<Year, number> => {
+                const v = data[field] as any;
+                if (v && typeof v === 'object') return v as Record<Year, number>;
+                const flat = typeof v === 'number' ? v : fb;
+                return { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat } as Record<Year, number>;
+              };
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-primary/10">
+                        <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium w-28">Categoria</th>
+                        {activeYears.map(yr => (
+                          <th key={yr} className="text-right py-1.5 px-1 text-muted-foreground font-medium">{yr}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sgaRows.map(({ key, label, fallback }) => (
+                        <tr key={key} className="border-b border-primary/5">
+                          <td className="py-1.5 pr-3 text-muted-foreground">{label}</td>
+                          {activeYears.map(yr => (
+                            <td key={yr} className="py-1 px-1 text-right">
+                              {editing ? (
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  className="w-16 bg-secondary border border-primary/30 rounded px-1.5 py-1 text-xs text-foreground text-right tabular-nums outline-none focus:ring-1 focus:ring-primary"
+                                  value={getVal(key, yr, fallback)}
+                                  onChange={e => {
+                                    const val = Number(e.target.value) || 0;
+                                    const rec = toRecord(key, fallback);
+                                    setAssumptions(prev => ({
+                                      ...prev,
+                                      [key]: { ...rec, [yr]: val },
+                                    }));
+                                  }}
+                                />
+                              ) : (
+                                <span className="tabular-nums">{getVal(key, yr, fallback)}</span>
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                      {/* Total row */}
+                      <tr className="border-t border-primary/20 font-semibold">
+                        <td className="py-1.5 pr-3">Total</td>
+                        {activeYears.map(yr => {
+                          const total = sgaRows.reduce((s, { key, fallback }) => s + getVal(key, yr, fallback), 0);
+                          return <td key={yr} className="py-1.5 px-1 text-right tabular-nums">{total.toFixed(1)}%</td>;
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Despesas Comerciais</p>
-                <div className="text-sm font-semibold flex items-center gap-1">
-                  {editing ? (
-                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.commercialPercent ?? 2.3} onChange={e => setAssumptions(p => ({ ...p, commercialPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.commercialPercent ?? 2.3}</span>}
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Despesas com Pessoal</p>
-                <div className="text-sm font-semibold flex items-center gap-1">
-                  {editing ? (
-                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.pessoalPercent ?? 7.2} onChange={e => setAssumptions(p => ({ ...p, pessoalPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.pessoalPercent ?? 7.2}</span>}
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Despesas Administrativas</p>
-                <div className="text-sm font-semibold flex items-center gap-1">
-                  {editing ? (
-                    <input type="number" step="0.1" className="w-20 bg-secondary border border-primary/30 rounded px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-                      value={data.sgaPercent ?? 10.4} onChange={e => setAssumptions(p => ({ ...p, sgaPercent: Number(e.target.value) || 0 }))} />
-                  ) : <span>{data.sgaPercent ?? 10.4}</span>}
-                  <span className="text-xs text-muted-foreground">%</span>
-                </div>
-              </div>
-            </div>
+              );
+            })()}
             <p className="text-[10px] text-muted-foreground mt-3">
-              Total: {((data.marketingPercent ?? 15.5) + (data.commercialPercent ?? 2.3) + (data.pessoalPercent ?? 7.2) + (data.sgaPercent ?? 10.4)).toFixed(1)}% da Receita Bruta
-              (Padrao baseado no realizado 2025 da Oxy: Marketing 15.5%, Comercial 2.3%, Pessoal 7.2%, Administrativa 10.4%)
+              Padrao baseado no realizado 2025 da Oxy: Marketing 15.5%, Comercial 2.3%, Pessoal 7.2%, Administrativa 10.4%
             </p>
           </div>
 

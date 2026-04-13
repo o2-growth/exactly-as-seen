@@ -609,6 +609,13 @@ function calcularDeducoesPorBU(
   return { deducaoPIS, deducaoCOFINS, deducaoISSQN, deducoesTotal: deducaoPIS + deducaoCOFINS + deducaoISSQN };
 }
 
+// ─── HELPER: per-year percent with backwards compat ───
+function getYearPercent(val: number | Record<Year, number> | undefined, year: Year, fallback: number): number {
+  if (val === undefined || val === null) return fallback;
+  if (typeof val === 'number') return val; // legacy flat format
+  return (val as Record<Year, number>)[year] ?? fallback;
+}
+
 // ─── COMPUTE FULL YEAR ───
 
 function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, prevYearGrossRev: number = 0): AnnualOutput {
@@ -651,10 +658,10 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
 
   // ── DESPESAS FIXAS (simplified: % of gross revenue) ──
   const fixedRates = {
-    marketing: (assumptions.marketingPercent ?? 15.5) / 100,
-    commercial: (assumptions.commercialPercent ?? 2.3) / 100,
-    pessoal: (assumptions.pessoalPercent ?? 7.2) / 100,
-    sga: (assumptions.sgaPercent ?? 10.4) / 100,
+    marketing: getYearPercent(assumptions.marketingPercent as any, year, 15.5) / 100,
+    commercial: getYearPercent(assumptions.commercialPercent as any, year, 2.3) / 100,
+    pessoal: getYearPercent(assumptions.pessoalPercent as any, year, 7.2) / 100,
+    sga: getYearPercent(assumptions.sgaPercent as any, year, 10.4) / 100,
   };
 
   for (let m = 0; m < 12; m++) {

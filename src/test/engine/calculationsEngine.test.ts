@@ -14,6 +14,11 @@ function getModel(overrides?: Partial<Assumptions>, scenario: 'BASE' | 'BULL' | 
   return computeFullModel(assumptions, scenario);
 }
 
+/** Create a per-year record filled with the same value for all years */
+function perYear(v: number): Record<Year, number> {
+  return { 2025: v, 2026: v, 2027: v, 2028: v, 2029: v, 2030: v };
+}
+
 function getYear(model: FullModelOutput, year: Year): AnnualOutput {
   return model.years[year];
 }
@@ -278,8 +283,8 @@ describe('Engine: Tax toggle (Item 4)', () => {
 
 describe('Engine: Marketing percentage (simplified model)', () => {
   it('higher marketingPercent reduces EBITDA', () => {
-    const base = getModel({ marketingPercent: 15.5 });
-    const high = getModel({ marketingPercent: 25 });
+    const base = getModel({ marketingPercent: perYear(15.5) });
+    const high = getModel({ marketingPercent: perYear(25) });
     for (const y of YEARS) {
       const diff = base.years[y].ebitda - high.years[y].ebitda;
       expect(diff).toBeGreaterThan(0);
@@ -287,16 +292,16 @@ describe('Engine: Marketing percentage (simplified model)', () => {
   });
 
   it('lower marketingPercent increases EBITDA', () => {
-    const base = getModel({ marketingPercent: 15.5 });
-    const low = getModel({ marketingPercent: 5 });
+    const base = getModel({ marketingPercent: perYear(15.5) });
+    const low = getModel({ marketingPercent: perYear(5) });
     for (const y of YEARS) {
       expect(low.years[y].ebitda).toBeGreaterThan(base.years[y].ebitda);
     }
   });
 
   it('marketingPercent drives marketing line', () => {
-    const low = getModel({ marketingPercent: 5 });
-    const high = getModel({ marketingPercent: 25 });
+    const low = getModel({ marketingPercent: perYear(5) });
+    const high = getModel({ marketingPercent: perYear(25) });
     for (const y of YEARS) {
       // Marketing is negative, higher % = more negative
       expect(high.years[y].marketing).toBeLessThan(low.years[y].marketing);
@@ -371,8 +376,8 @@ describe('Engine: Squad config (Item 7 — legacy, now percentage-based)', () =>
   it('headcount is now driven by pessoalPercent, not squad config', () => {
     // With the simplified model, squadConfig no longer affects headcount.
     // Changing pessoalPercent changes headcount costs.
-    const low = getModel({ pessoalPercent: 5 });
-    const high = getModel({ pessoalPercent: 15 });
+    const low = getModel({ pessoalPercent: perYear(5) });
+    const high = getModel({ pessoalPercent: perYear(15) });
     for (const y of YEARS) {
       expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(Math.abs(low.years[y].headcount));
     }
@@ -389,8 +394,8 @@ describe('Engine: Squad config (Item 7 — legacy, now percentage-based)', () =>
   });
 
   it('pessoalPercent impacts EBITDA', () => {
-    const cheap = getModel({ pessoalPercent: 5 });
-    const expensive = getModel({ pessoalPercent: 20 });
+    const cheap = getModel({ pessoalPercent: perYear(5) });
+    const expensive = getModel({ pessoalPercent: perYear(20) });
     for (const y of YEARS) {
       expect(cheap.years[y].ebitda).toBeGreaterThan(expensive.years[y].ebitda);
     }
@@ -583,8 +588,8 @@ describe('Engine: Squad cost totals', () => {
 
 describe('Engine: Headcount costs driven by pessoalPercent', () => {
   it('higher pessoalPercent increases headcount cost', () => {
-    const low = getModel({ pessoalPercent: 5 });
-    const high = getModel({ pessoalPercent: 15 });
+    const low = getModel({ pessoalPercent: perYear(5) });
+    const high = getModel({ pessoalPercent: perYear(15) });
     for (const y of [2028, 2029, 2030] as Year[]) {
       expect(Math.abs(high.years[y].headcount)).toBeGreaterThan(
         Math.abs(low.years[y].headcount)
