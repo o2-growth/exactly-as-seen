@@ -1491,7 +1491,20 @@ export default function Assumptions() {
                                         // The old non-MRR branch that used a delta formula is removed — for non-MRR
                                         // (one-shot products), each month's active count = that month's new clients,
                                         // so the direct read already gives the correct value.
-                                        const displayClients: number = hcEntry ? hcEntry.client_count : monthly[i];
+                                        // For non-MRR projected months: read from monthlyNewClientOverrides
+                                        // (same source as Novos Clientes display) so both rows match.
+                                        // For MRR or historical: use hcEntry (Supabase) or monthly[i] (engine).
+                                        let displayClients: number;
+                                        if (hcEntry) {
+                                          displayClients = hcEntry.client_count;
+                                        } else if (isProductNonMrr && !hist) {
+                                          const storedNew = data.monthlyNewClientOverrides?.[prodKey]?.[selectedYear]?.[i];
+                                          displayClients = (storedNew !== null && storedNew !== undefined)
+                                            ? storedNew
+                                            : Math.round(monthly[i]);
+                                        } else {
+                                          displayClients = monthly[i];
+                                        }
                                         return (
                                           <div key={m} className={`text-center space-y-1 p-1.5 rounded ${hist ? 'bg-secondary/40' : 'bg-card border border-border/50'}`}>
                                             <p className="text-[9px] text-muted-foreground font-medium">{m}{hist ? ' 🔒' : ''}{hcEntry ? <span className="ml-0.5 text-[8px] text-sky-500 font-semibold" title="Dado real da API">API</span> : ''}</p>
