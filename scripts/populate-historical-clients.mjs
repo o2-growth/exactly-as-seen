@@ -17,7 +17,7 @@ const CATEGORIES = [
   { api: 'Enterprise', key: 'caasEnterprise', mrr: true },
   { api: 'Corporate', key: 'caasCorporate', mrr: true },
   { api: 'Serviços Especializados', key: 'caasAssessoria', mrr: false },
-  { api: 'BPO Financeiro', key: 'caasSetup', mrr: false },
+  { api: 'BPO Financeiro', key: 'caasSetup', mrr: true },
   { api: 'Parceiros', key: 'caasParceiros', mrr: false },  // CaaS Parceiros
   { api: 'Oxy', key: 'saasOxy', mrr: true },
   { api: 'Oxy + Gênio', key: 'saasOxyGenio', mrr: true },

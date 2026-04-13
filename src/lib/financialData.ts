@@ -391,7 +391,7 @@ export const TAX_KEYS: TicketKey[] = ['taxAT', 'taxGPT', 'taxRCT', 'taxRT', 'tax
 export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...EDUCATION_KEYS, ...EXPANSAO_KEYS, ...TAX_KEYS];
 
 /** Products with Monthly Recurring Revenue (MRR) — used for ARR/MRR calculations and Faturamento Base */
-export const MRR_KEYS: TicketKey[] = ['caasEnterprise', 'caasCorporate', 'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp', 'taxAT'];
+export const MRR_KEYS: TicketKey[] = ['caasEnterprise', 'caasCorporate', 'caasSetup', 'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp', 'taxAT'];
 
 /** Check if a product key is MRR */
 export function isProductMrr(key: TicketKey): boolean {
