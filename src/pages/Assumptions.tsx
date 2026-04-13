@@ -781,18 +781,21 @@ export default function Assumptions() {
       newArr[monthIdx] = newCount;
       manualFlags[monthIdx] = true;
 
-      // Recalculate subsequent non-manual NEW client months using growth %
+      // Clear manual flags for subsequent months so compound growth propagates
+      // from the new value. Without this, months previously set by handleApplyRow
+      // (which sets all flags to true) would be skipped and keep their old values.
+      for (let j = monthIdx + 1; j < 12; j++) {
+        manualFlags[j] = false;
+      }
+
+      // Recalculate subsequent months using compound growth from the new base.
       // Keep prevVal as FLOAT across iterations so compounding works even
       // with small base values (e.g. 2 * 1.10 = 2.2 → rounded display 2,
       // but internal accumulator keeps 2.2 → 2.42 → 2.66 ...).
       let prevVal = newCount;
       for (let j = monthIdx + 1; j < 12; j++) {
-        if (manualFlags[j] && newArr[j] !== null && newArr[j] !== undefined) {
-          prevVal = newArr[j]!;
-        } else {
-          prevVal = Math.max(0, prevVal * (1 + rate));
-          newArr[j] = Math.round(prevVal);
-        }
+        prevVal = Math.max(0, prevVal * (1 + rate));
+        newArr[j] = Math.round(prevVal);
       }
 
       // Compute active clients from new clients
