@@ -1327,49 +1327,13 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   // DESPESAS FIXAS total
   const fixedExpenses2025 = hist2025('DESPESAS FIXAS');
 
-  // Revenue top level
-  override('1', 2025, grossRev2025);
-  override('1.1', 2025, caas2025);
-  override('1.2', 2025, saas2025);
-  override('1.3', 2025, edu2025);
-  override('1.5', 2025, expansao2025);
-  override('1.6', 2025, tax2025);
-
-  // CaaS sub-items (code, historicalRevenueItems["CaaS"] key)
-  override('1.1.1', 2025, histItem2025('CaaS', 'Serviços Especializados'));
-  override('1.1.2', 2025, histItem2025('CaaS', 'Enterprise'));
-  override('1.1.3', 2025, histItem2025('CaaS', 'Corporate'));
-  override('1.1.4', 2025, histItem2025('CaaS', 'Parceiros'));
-  override('1.1.5', 2025, histItem2025('CaaS', 'BPO Financeiro'));
-
-  // SaaS sub-items — merge "Oxy + Gênio" and "Oxy + Gênio + Especialista" into 1.2.2
-  const saasOxy2025      = histItem2025('SaaS', 'Oxy');
-  const saasOxyGenio2025 = histItem2025('SaaS', 'Oxy + Gênio') + histItem2025('SaaS', 'Oxy + Gênio + Especialista');
-  const saasSetup2025    = histItem2025('SaaS', 'Setup');
-  const saasParceiros2025 = histItem2025('SaaS', 'Parceiros');
-  override('1.2.1', 2025, saasOxy2025);
-  override('1.2.2', 2025, saasOxyGenio2025);
-  override('1.2.3', 2025, saasSetup2025);
-  override('1.2.4', 2025, saasParceiros2025);
-  override('1.2.5', 2025, 0); // merged into 1.2.2
-
-  // Education sub-items
-  override('1.3.1', 2025, histItem2025('Education', 'Dono CFO'));
-  override('1.3.2', 2025, histItem2025('Education', 'Engenheiro de Negócios'));
-  override('1.3.3', 2025, histItem2025('Education', 'Financeiro Raiz'));
-  override('1.3.4', 2025, histItem2025('Education', 'Finance Sales Program'));
-
-  // Expansão sub-items
-  override('1.5.1', 2025, histItem2025('Expansão', 'Oxy Hacker - Micro Franqueado'));
-  override('1.5.2', 2025, histItem2025('Expansão', 'Franquia'));
-  override('1.5.3', 2025, histItem2025('Expansão', 'Master Franquia'));
-
-  // Tax sub-items
-  override('1.6.1', 2025, histItem2025('Tax', 'AT - Assessoria Tributária'));
-  override('1.6.2', 2025, histItem2025('Tax', 'GPT - Gestão passivo tributário'));
-  override('1.6.3', 2025, histItem2025('Tax', 'RCT - Recuperação Crédito tributário'));
-  override('1.6.4', 2025, histItem2025('Tax', 'RT - Reforma tributária'));
-  override('1.6.5', 2025, histItem2025('Tax', 'Diagnóstico Tributário & Compliance Tributário'));
+  // Revenue nodes (1, 1.1-1.6, 1.x.x) — NO LONGER OVERRIDDEN.
+  // The engine's own computation via calcMonthlyRevenue → getMonthlyClientCount →
+  // getMonthlyClients (monthlyData.ts) already reads real historical data from
+  // historicalRevenueItems. Overriding with stale historicalRevenue/historicalMetrics
+  // values caused the P&L to diverge from the Assumptions page (which uses
+  // getAnnualRevenue, a per-product computation from the same data source).
+  // By letting the engine's own values flow through, P&L matches Assumptions.
 
   // Deductions node (code '2' is a child of '1' in the tree)
   override('2', 2025, deductions2025);
@@ -1446,57 +1410,11 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
     d.marketing + d.commercial + d.headcount + d.sga
   );
 
-  // Revenue top level
-  override('1', 2026, grossRev2026);
-  override('1.1', 2026, caas2026);
-  override('1.2', 2026, saas2026);
-  override('1.3', 2026, edu2026);
-  override('1.5', 2026, expansao2026);
-  override('1.6', 2026, tax2026);
-
-  // CaaS sub-items 2026
-  const histItem2026 = (group: string, item: string) =>
-    getPartialHistoricalAnnual(
-      historicalRevenueItems[group] ?? {},
-      item,
-      2026,
-      eng26,
-      () => 0, // no per-sub-item engine monthly breakdown; just use real months
-    );
-  override('1.1.1', 2026, histItem2026('CaaS', 'Serviços Especializados'));
-  override('1.1.2', 2026, histItem2026('CaaS', 'Enterprise'));
-  override('1.1.3', 2026, histItem2026('CaaS', 'Corporate'));
-  override('1.1.4', 2026, histItem2026('CaaS', 'Parceiros'));
-  override('1.1.5', 2026, histItem2026('CaaS', 'BPO Financeiro'));
-
-  // SaaS sub-items 2026
-  const saasOxy2026       = histItem2026('SaaS', 'Oxy');
-  const saasOxyGenio2026  = histItem2026('SaaS', 'Oxy + Gênio') + histItem2026('SaaS', 'Oxy + Gênio + Especialista');
-  const saasSetup2026     = histItem2026('SaaS', 'Setup');
-  const saasParceiros2026 = histItem2026('SaaS', 'Parceiros');
-  override('1.2.1', 2026, saasOxy2026);
-  override('1.2.2', 2026, saasOxyGenio2026);
-  override('1.2.3', 2026, saasSetup2026);
-  override('1.2.4', 2026, saasParceiros2026);
-  override('1.2.5', 2026, 0);
-
-  // Education sub-items 2026
-  override('1.3.1', 2026, histItem2026('Education', 'Dono CFO'));
-  override('1.3.2', 2026, histItem2026('Education', 'Engenheiro de Negócios'));
-  override('1.3.3', 2026, histItem2026('Education', 'Financeiro Raiz'));
-  override('1.3.4', 2026, histItem2026('Education', 'Finance Sales Program'));
-
-  // Expansão sub-items 2026
-  override('1.5.1', 2026, histItem2026('Expansão', 'Oxy Hacker - Micro Franqueado'));
-  override('1.5.2', 2026, histItem2026('Expansão', 'Franquia'));
-  override('1.5.3', 2026, histItem2026('Expansão', 'Master Franquia'));
-
-  // Tax sub-items 2026
-  override('1.6.1', 2026, histItem2026('Tax', 'AT - Assessoria Tributária'));
-  override('1.6.2', 2026, histItem2026('Tax', 'GPT - Gestão passivo tributário'));
-  override('1.6.3', 2026, histItem2026('Tax', 'RCT - Recuperação Crédito tributário'));
-  override('1.6.4', 2026, histItem2026('Tax', 'RT - Reforma tributária'));
-  override('1.6.5', 2026, histItem2026('Tax', 'Diagnóstico Tributário & Compliance Tributário'));
+  // Revenue nodes 2026 (1, 1.1-1.6, 1.x.x) — NO LONGER OVERRIDDEN.
+  // Same rationale as 2025: the engine's own computation via getMonthlyClientCount →
+  // getMonthlyClients now reads real historical data for Jan-Mar 2026 and projects
+  // Apr-Dec using the user's assumptions. Overriding with stale mixedYear values
+  // from historicalRevenue caused divergence with the Assumptions page.
 
   // Deductions
   override('2', 2026, deductions2026);
