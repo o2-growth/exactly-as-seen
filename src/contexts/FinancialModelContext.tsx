@@ -2,9 +2,12 @@ import React, { createContext, useContext, useState, useMemo, useCallback, useEf
 import {
   Assumptions, DEFAULT_ASSUMPTIONS, Scenario, Year, YEARS,
   ProjectionData, PeriodPreset, DataSource, DateRange, getFilteredYears,
+  CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS,
+  TicketKey,
 } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
+import { getMonthlyClients } from '@/lib/monthlyData';
 import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodResolution';
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
 
@@ -217,6 +220,58 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     [assumptions, scenario]
   );
 
+  // Patch pnlTree revenue nodes to match the per-product computation used by Assumptions.
+  // The engine's calcMonthlyRevenue produces slightly different values than the Assumptions'
+  // getAnnualRevenue (different formulas, MRR vs non-MRR handling, overrides).
+  // This patch ensures P&L shows the EXACT same revenue as Assumptions.
+  const pnlTree = useMemo(() => {
+    const tree = model.pnlTree;
+
+    // Helper: compute annual revenue for a product (same logic as Assumptions header)
+    const productRevenue = (key: string, y: Year): number => {
+      const monthly = getMonthlyClients(
+        key as any, y,
+        assumptions.subProductClients,
+        assumptions.tickets,
+        assumptions.monthlyClientOverrides,
+        assumptions.monthlyNewClientOverrides,
+      );
+      const ticketVal = (assumptions.tickets as any)[key] ?? 0;
+      return monthly.reduce((sum, clients, i) => {
+        const monthTicket = (assumptions.monthlyTickets as any)?.[key]?.[y]?.[i] ?? ticketVal;
+        return sum + Math.round(clients) * monthTicket;
+      }, 0);
+    };
+
+    // Compute per-BU and total revenue
+    const buGroups: Array<{ code: string; keys: readonly string[] }> = [
+      { code: '1.1', keys: CAAS_KEYS },
+      { code: '1.2', keys: SAAS_KEYS },
+      { code: '1.3', keys: EDUCATION_KEYS },
+      { code: '1.5', keys: EXPANSAO_KEYS },
+      { code: '1.6', keys: TAX_KEYS },
+    ];
+
+    const node1 = tree.find(n => n.code === '1');
+    if (node1) {
+      for (const y of YEARS) {
+        let total = 0;
+        for (const bu of buGroups) {
+          const buTotal = bu.keys.reduce((sum, key) => sum + productRevenue(key, y), 0);
+          const buTotalK = Math.round(buTotal / 1000); // R$ → R$ thousands
+          // Patch BU child node
+          const buNode = node1.children?.find(c => c.code === bu.code);
+          if (buNode) buNode.annual[y] = buTotalK;
+          total += buTotal;
+        }
+        // Patch total revenue node
+        node1.annual[y] = Math.round(total / 1000);
+      }
+    }
+
+    return tree;
+  }, [model, assumptions]);
+
   // Derive projections from engine output (backwards-compatible interface)
   const projections: ProjectionData = useMemo(() => {
     const p: ProjectionData = {
@@ -244,8 +299,6 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     }
     return p;
   }, [model]);
-
-  const pnlTree = model.pnlTree;
 
   const filteredYears = useMemo(() => getFilteredYears(dateRange), [dateRange]);
   const focalYear = useMemo(() => getFocalYear(filteredYears), [filteredYears]);
