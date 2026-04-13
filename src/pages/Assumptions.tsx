@@ -1249,9 +1249,13 @@ export default function Assumptions() {
       {/* Item 9: KPI Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {(() => {
-          // Read from pnlTree (same source as P&L page — includes historical overrides)
+          // Use getAnnualRevenue per sub-product (same source as the "Total de Clientes" table).
+          // This ensures the header KPI, the chart, and the table all show the SAME number.
+          // Previously this read from pnlTree which diverged from the per-product calculation.
           const findNode = (code: string) => model.pnlTree.find(n => n.code === code);
-          const gr = findNode('1')?.annual[selectedYear] ?? model.years[selectedYear].grossRevenue;
+          const grFromProducts = ALL_SUBPRODUCT_KEYS.reduce((sum, key) =>
+            sum + getAnnualRevenue(key, selectedYear), 0);
+          const gr = grFromProducts / 1000; // getAnnualRevenue returns R$ full, KPI expects R$ thousands
           const nrNode = findNode('NR');
           const nr = nrNode?.annual[selectedYear] ?? model.years[selectedYear].netRevenue;
           const gpNode = findNode('GP');
@@ -1289,19 +1293,17 @@ export default function Assumptions() {
           <h3 className="text-sm font-semibold mb-3">Receita Projetada por BU (R$ mil)</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={activeYears.map(y => {
-              // Use pnlTree BU nodes (same source as P&L — includes historical overrides)
-              const findChild = (parentCode: string, childCode: string) => {
-                const parent = model.pnlTree.find(n => n.code === parentCode);
-                return parent?.children?.find(c => c.code === childCode)?.annual[y] ?? 0;
-              };
-              const findParent = (code: string) => model.pnlTree.find(n => n.code === code)?.annual[y] ?? 0;
+              // Sum getAnnualRevenue per BU (same source as "Total de Clientes" table).
+              // This ensures chart, header KPI, and table all show the SAME values.
+              const sumBU = (keys: readonly string[]) =>
+                keys.reduce((sum, key) => sum + getAnnualRevenue(key as SubProductKey, y), 0) / 1000;
               return {
                 year: y,
-                CaaS: findChild('1', '1.1') || model.years[y].caasRevenue,
-                SaaS: findChild('1', '1.2') || model.years[y].saasRevenue,
-                Education: findChild('1', '1.3') || model.years[y].educationRevenue,
-                Expansão: findChild('1', '1.5') || model.years[y].baasRevenue,
-                Tax: findChild('1', '1.6') || model.years[y].taxRevenue,
+                CaaS: sumBU(CAAS_KEYS),
+                SaaS: sumBU(SAAS_KEYS),
+                Education: sumBU(EDUCATION_KEYS),
+                Expansão: sumBU(EXPANSAO_KEYS),
+                Tax: sumBU(TAX_KEYS),
               };
             })}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
