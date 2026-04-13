@@ -1487,27 +1487,35 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
   const cogsCaasAn = a(y => y.cogsDetail.caas), cogsCSAn = a(y => y.cogsDetail.customerService);
   const cogsSaasAn = a(y => y.cogsDetail.saas), cogsEduAn = a(y => y.cogsDetail.education);
   const cogsBaasAn = a(y => y.cogsDetail.baas); // BaaS COGS flows into Custos Expansão
+  const cogsTaxAn = a(y => y.cogsDetail.tax);
 
   // Combine commissions + marketing into a single "Despesas de Marketing" total for DESPESAS FIXAS
   // (commissions are now under Despesas Comerciais in the Oxy structure)
 
-  // Helper: build zero COGS children for a BU (structural placeholders)
-  function buildCostChildren(buName: string, hasVariavel: boolean = false): PnlNode[] {
-    const items: string[] = [
-      `Custo com Deslocamento ${buName}`,
-      `Custo com Alimentação ${buName}`,
-      `Equipe ${buName}`,
-      `Custo com Viagens e Estadias ${buName}`,
-      `Softwares e Ferramentas - ${buName}`,
-      `Benefícios - ${buName}`,
+  // Helper: build COGS children for a BU.
+  // The headcount/formula-based cost goes into "Equipe (BU)".
+  // Other sub-items (Deslocamento, Alimentação, etc.) are structural placeholders at zero.
+  function buildCostChildren(
+    buName: string,
+    equipeAnnual: Record<Year, number>,
+    equipeMo: Record<Year, number[]>,
+    hasVariavel: boolean = false,
+  ): PnlNode[] {
+    const items: Array<{ label: string; annual: Record<Year, number>; monthly: Record<Year, number[]> }> = [
+      { label: `Custo com Deslocamento ${buName}`, annual: z, monthly: zMo() },
+      { label: `Custo com Alimentação ${buName}`, annual: z, monthly: zMo() },
+      { label: `Equipe ${buName}`, annual: equipeAnnual, monthly: equipeMo },
+      { label: `Custo com Viagens e Estadias ${buName}`, annual: z, monthly: zMo() },
+      { label: `Softwares e Ferramentas - ${buName}`, annual: z, monthly: zMo() },
+      { label: `Benefícios - ${buName}`, annual: z, monthly: zMo() },
     ];
-    if (hasVariavel) items.push(`Custo Variável ${buName}`);
-    items.push(`Remuneração de Estagiários - ${buName}`);
-    return items.map((label, i) => ({
+    if (hasVariavel) items.push({ label: `Custo Variável ${buName}`, annual: z, monthly: zMo() });
+    items.push({ label: `Remuneração de Estagiários - ${buName}`, annual: z, monthly: zMo() });
+    return items.map(item => ({
       code: '',
-      label,
-      annual: z,
-      monthly: zMo(),
+      label: item.label,
+      annual: item.annual,
+      monthly: item.monthly,
     }));
   }
 
@@ -1577,27 +1585,27 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     { code: 'CV_HDR', label: 'CUSTOS VARIÁVEIS', isHeader: true, annual: z, monthly: zMo() },
     {
       code: '3.1', label: 'Custos CaaS', annual: cogsCaasAn, monthly: allocMo(cogsMo, cogsCaasAn, cogsAn),
-      children: buildCostChildren('CaaS'),
+      children: buildCostChildren('CaaS', cogsCaasAn, allocMo(cogsMo, cogsCaasAn, cogsAn)),
     },
     {
       code: '3.2', label: 'Custos SaaS', annual: cogsSaasAn, monthly: allocMo(cogsMo, cogsSaasAn, cogsAn),
-      children: buildCostChildren('SaaS'),
+      children: buildCostChildren('SaaS', cogsSaasAn, allocMo(cogsMo, cogsSaasAn, cogsAn)),
     },
     {
       code: '3.3', label: 'Custos Education', annual: cogsEduAn, monthly: allocMo(cogsMo, cogsEduAn, cogsAn),
-      children: buildCostChildren('Education', true),
+      children: buildCostChildren('Education', cogsEduAn, allocMo(cogsMo, cogsEduAn, cogsAn), true),
     },
     {
       code: '3.4', label: 'Custos Customer Success', annual: cogsCSAn, monthly: allocMo(cogsMo, cogsCSAn, cogsAn),
-      children: buildCostChildren('Customer Success'),
+      children: buildCostChildren('Customer Success', cogsCSAn, allocMo(cogsMo, cogsCSAn, cogsAn)),
     },
     {
       code: '3.5', label: 'Custos Expansão', annual: cogsBaasAn, monthly: allocMo(cogsMo, cogsBaasAn, cogsAn),
-      children: buildCostChildren('Expansão'),
+      children: buildCostChildren('Expansão', cogsBaasAn, allocMo(cogsMo, cogsBaasAn, cogsAn)),
     },
     {
-      code: '3.6', label: 'Custos Tax', annual: z, monthly: zMo(),
-      children: buildCostChildren('Tax'),
+      code: '3.6', label: 'Custos Tax', annual: cogsTaxAn, monthly: allocMo(cogsMo, cogsTaxAn, cogsAn),
+      children: buildCostChildren('Tax', cogsTaxAn, allocMo(cogsMo, cogsTaxAn, cogsAn)),
     },
 
     // ── LUCRO BRUTO ──
