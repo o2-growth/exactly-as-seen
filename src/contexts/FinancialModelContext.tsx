@@ -185,7 +185,10 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           } catch {}
         }
 
-        setAssumptions(fixed);
+        // Merge with defaults so that newly-added fields (marketingPercent,
+        // receitasFinanceirasPercent, etc.) get default values when loading
+        // old saved data that doesn't have them yet.
+        setAssumptions({ ...DEFAULT_ASSUMPTIONS, ...fixed });
       }
       // Mark as loaded AFTER state is set — prevents debounce from saving defaults
       hasLoaded.current = true;
@@ -289,6 +292,35 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
         if (adicNode) adicNode.annual[y] = -aggregated.adicionalIrpj / 1000;
         if (csllNode) csllNode.annual[y] = -aggregated.csll / 1000;
       }
+    }
+
+    // Patch financial result nodes (8R, 8D, OR, DNO) — use percentage-based formula
+    // on the patched revenue total, matching what the engine computes.
+    const getYearPct = (val: number | Record<Year, number> | undefined, yr: Year, fb: number): number => {
+      if (val === undefined || val === null) return fb;
+      if (typeof val === 'number') return val;
+      return (val as Record<Year, number>)[yr] ?? fb;
+    };
+
+    const finNodes = {
+      '8D': tree.find(n => n.code === '8D'),   // Despesas Financeiras
+      'OR': tree.find(n => n.code === 'OR'),     // Outras Receitas
+      'DNO': tree.find(n => n.code === 'DNO'),   // Despesas Não Operacionais
+    };
+    // Find Receitas Financeiras node (8R)
+    const recFinNode = tree.find(n => n.code === '8R');
+
+    for (const y of YEARS) {
+      const revenueTotal = node1?.annual[y] ?? 0; // already patched above (R$ thousands)
+      const recFinRate = getYearPct(assumptions.receitasFinanceirasPercent, y, 0.5) / 100;
+      const despFinRate = getYearPct(assumptions.despesasFinanceirasPercent, y, 1.5) / 100;
+      const outrasRecRate = getYearPct(assumptions.outrasReceitasPercent, y, 0) / 100;
+      const despNaoOpRate = getYearPct(assumptions.despesasNaoOperacionaisPercent, y, 0) / 100;
+
+      if (recFinNode) recFinNode.annual[y] = revenueTotal * recFinRate;
+      if (finNodes['8D']) finNodes['8D'].annual[y] = -(revenueTotal * despFinRate);
+      if (finNodes['OR']) finNodes['OR'].annual[y] = revenueTotal * outrasRecRate;
+      if (finNodes['DNO']) finNodes['DNO'].annual[y] = -(revenueTotal * despNaoOpRate);
     }
 
     return tree;
