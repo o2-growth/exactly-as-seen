@@ -741,7 +741,19 @@ export default function Assumptions() {
     for (let m = 0; m < 12; m++) {
       const nc = newClientsArr[m];
       if (nc === null || nc === undefined) {
+        // Historical month skipped (new clients not set).
+        // Update prevActive from real data (Supabase or engine) so that
+        // the NEXT non-null month starts from the correct base.
+        // Without this, prevActive stays at Dec of previous year (e.g. 0)
+        // and the first projected month ignores the historical buildup.
         activeArr[m] = null;
+        const histEntry = historicalData[key]?.[toPeriod(year, m)];
+        if (histEntry) {
+          prevActive = histEntry.client_count;
+        } else {
+          const engineMonthly = getMonthlyClients(key, year, prevAssumptions.subProductClients, prevAssumptions.tickets, prevAssumptions.monthlyClientOverrides);
+          prevActive = Math.round(engineMonthly[m]);
+        }
       } else {
         const churnRate = getChurnForMonth(key, prevAssumptions, year, m);
         const churned = Math.floor(prevActive * churnRate);
