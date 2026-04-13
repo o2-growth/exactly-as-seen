@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { computeProductAnnualRevenue } from '@/lib/revenueCalc';
 
 /** Input with local state buffer — commits on blur/Enter, syncs when not focused */
 function MonthlyClientInput({ value, onCommit, className, readOnly }: { value: number; onCommit: (v: number) => void; className?: string; readOnly?: boolean }) {
@@ -344,8 +345,15 @@ export default function Assumptions() {
     return Math.round(activeAtStart + newInYear);
   };
 
-  /** Get annual revenue using same faturamentoTotal logic as expanded section */
+  /** Get annual revenue — delegates to shared computeProductAnnualRevenue */
   const getAnnualRevenue = (key: SubProductKey, year: Year): number => {
+    return computeProductAnnualRevenue(key, year, data, historicalData);
+  };
+
+  /** LEGACY inline version — replaced by computeProductAnnualRevenue in revenueCalc.ts.
+   *  Keeping structure here for reference but the function above short-circuits to the shared one.
+   */
+  const _getAnnualRevenueLegacy = (key: SubProductKey, year: Year): number => {
     const monthly = getMonthlyClients(key, year, data.subProductClients, data.tickets, data.monthlyClientOverrides, data.monthlyNewClientOverrides);
     const ticketVal = data.tickets[key as TicketKey] ?? 0;
     const hcIsMrr = isProductMrr(key as FinTicketKey);

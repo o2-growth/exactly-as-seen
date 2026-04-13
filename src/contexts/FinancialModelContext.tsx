@@ -7,7 +7,7 @@ import {
 } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
-import { getMonthlyClients } from '@/lib/monthlyData';
+import { computeProductAnnualRevenue } from '@/lib/revenueCalc';
 import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodResolution';
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
@@ -225,57 +225,12 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     [assumptions, scenario]
   );
 
-  // Patch pnlTree revenue nodes to match the per-product computation used by Assumptions.
-  // Uses the EXACT same logic as getAnnualRevenue in Assumptions.tsx:
-  // - For MRR historical months with Supabase data: use apiEntry.total_revenue (exact)
-  // - For non-MRR: use newClients × ticket (from monthlyNewClientOverrides or engine delta)
-  // - For MRR projected: use clients × ticket
+  // Patch pnlTree revenue nodes using the SHARED computeProductAnnualRevenue function.
+  // This is the EXACT SAME function that Assumptions uses (via revenueCalc.ts),
+  // guaranteeing identical numbers on both pages by construction.
   const pnlTree = useMemo(() => {
     const tree = model.pnlTree;
 
-    const isHistorical = (year: Year, monthIdx: number): boolean => {
-      if (year < 2026) return true;
-      if (year === 2026) return monthIdx < 3;
-      return false;
-    };
-
-    const toPeriod = (year: Year, monthIdx: number): string =>
-      `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
-
-    // Helper: compute annual revenue for a product (EXACT same as Assumptions getAnnualRevenue)
-    const productRevenue = (key: string, y: Year): number => {
-      const monthly = getMonthlyClients(
-        key as any, y,
-        assumptions.subProductClients,
-        assumptions.tickets,
-        assumptions.monthlyClientOverrides,
-        assumptions.monthlyNewClientOverrides,
-      );
-      const ticketVal = (assumptions.tickets as any)[key] ?? 0;
-      const hcIsMrr = isProductMrr(key as TicketKey);
-
-      let total = 0;
-      for (let i = 0; i < 12; i++) {
-        const hist = isHistorical(y, i);
-        const period = toPeriod(y, i);
-        const apiEntry = hist ? historicalData[key]?.[period] : undefined;
-        const monthTicket = (assumptions.monthlyTickets as any)?.[key]?.[y]?.[i] ?? ticketVal;
-
-        // For MRR historical with Supabase: use exact total_revenue from Oxy
-        if (hist && apiEntry && hcIsMrr && apiEntry.total_revenue > 0 && apiEntry.client_names) {
-          total += apiEntry.total_revenue;
-        } else if (hist && apiEntry && !hcIsMrr) {
-          // Non-MRR historical: use Supabase total_revenue if available
-          total += apiEntry.total_revenue;
-        } else {
-          // Projected or no Supabase data: use clients × ticket
-          total += Math.round(monthly[i]) * monthTicket;
-        }
-      }
-      return total;
-    };
-
-    // Compute per-BU and total revenue
     const buGroups: Array<{ code: string; keys: readonly string[] }> = [
       { code: '1.1', keys: CAAS_KEYS },
       { code: '1.2', keys: SAAS_KEYS },
@@ -289,14 +244,12 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       for (const y of YEARS) {
         let total = 0;
         for (const bu of buGroups) {
-          const buTotal = bu.keys.reduce((sum, key) => sum + productRevenue(key, y), 0);
-          const buTotalK = Math.round(buTotal / 1000); // R$ → R$ thousands
-          // Patch BU child node
+          const buTotal = bu.keys.reduce((sum, key) =>
+            sum + computeProductAnnualRevenue(key, y, assumptions, historicalData), 0);
           const buNode = node1.children?.find(c => c.code === bu.code);
-          if (buNode) buNode.annual[y] = buTotalK;
+          if (buNode) buNode.annual[y] = Math.round(buTotal / 1000);
           total += buTotal;
         }
-        // Patch total revenue node
         node1.annual[y] = Math.round(total / 1000);
       }
     }
