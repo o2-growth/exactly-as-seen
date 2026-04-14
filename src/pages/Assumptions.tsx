@@ -3941,11 +3941,17 @@ export default function Assumptions() {
                                   value={getVal(key, yr, fallback)}
                                   onChange={e => {
                                     const val = Number(e.target.value) || 0;
-                                    const rec = toRecord(key, fallback);
-                                    setAssumptions(prev => ({
-                                      ...prev,
-                                      [key]: { ...rec, [yr]: val },
-                                    }));
+                                    setAssumptions(prev => {
+                                      const existing = prev[key] as any;
+                                      let rec: Record<Year, number>;
+                                      if (existing && typeof existing === 'object') {
+                                        rec = existing as Record<Year, number>;
+                                      } else {
+                                        const flat = typeof existing === 'number' ? existing : fallback;
+                                        rec = { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat };
+                                      }
+                                      return { ...prev, [key]: { ...rec, [yr]: val } };
+                                    });
                                   }}
                                 />
                               ) : (
@@ -4027,11 +4033,17 @@ export default function Assumptions() {
                                   value={getVal(key, yr, fallback)}
                                   onChange={e => {
                                     const val = Number(e.target.value) || 0;
-                                    const rec = toRecord(key, fallback);
-                                    setAssumptions(prev => ({
-                                      ...prev,
-                                      [key]: { ...rec, [yr]: val },
-                                    }));
+                                    setAssumptions(prev => {
+                                      const existing = prev[key] as any;
+                                      let rec: Record<Year, number>;
+                                      if (existing && typeof existing === 'object') {
+                                        rec = existing as Record<Year, number>;
+                                      } else {
+                                        const flat = typeof existing === 'number' ? existing : fallback;
+                                        rec = { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat };
+                                      }
+                                      return { ...prev, [key]: { ...rec, [yr]: val } };
+                                    });
                                   }}
                                 />
                               ) : (
