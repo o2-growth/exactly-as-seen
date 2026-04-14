@@ -72,7 +72,7 @@ function deepDiffAssumptions(a: Assumptions, b: Assumptions): VersionDiff[] {
 
   if (a.churnCaas !== b.churnCaas) diffs.push({ field: 'Churn CaaS', oldValue: a.churnCaas, newValue: b.churnCaas });
   if (a.churnSaas !== b.churnSaas) diffs.push({ field: 'Churn SaaS', oldValue: a.churnSaas, newValue: b.churnSaas });
-  if (JSON.stringify(a.sgaPercent) !== JSON.stringify(b.sgaPercent)) diffs.push({ field: 'SG&A %', oldValue: a.sgaPercent, newValue: b.sgaPercent });
+  if (JSON.stringify(a.sgaPercent) !== JSON.stringify(b.sgaPercent)) diffs.push({ field: 'SG&A %', oldValue: JSON.stringify(a.sgaPercent), newValue: JSON.stringify(b.sgaPercent) });
   if (a.headcountGrowth !== b.headcountGrowth) diffs.push({ field: 'Headcount Growth', oldValue: a.headcountGrowth, newValue: b.headcountGrowth });
   if (a.sgaGrowthRate !== b.sgaGrowthRate) diffs.push({ field: 'SG&A Growth Rate', oldValue: a.sgaGrowthRate, newValue: b.sgaGrowthRate });
 
