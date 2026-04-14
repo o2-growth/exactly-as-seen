@@ -150,8 +150,17 @@ export function VersionHistoryProvider({ children }: { children: React.ReactNode
   );
 }
 
+const FALLBACK_CTX: VersionHistoryContextType = {
+  versions: [],
+  currentVersion: '1.0',
+  previewVersion: null,
+  saveVersion: () => {},
+  previewVersionById: () => {},
+  restoreVersion: () => DEFAULT_ASSUMPTIONS,
+  getDiff: () => [],
+};
+
 export function useVersionHistory() {
   const ctx = useContext(VersionHistoryContext);
-  if (!ctx) throw new Error('useVersionHistory must be used within VersionHistoryProvider');
-  return ctx;
+  return ctx ?? FALLBACK_CTX;
 }
