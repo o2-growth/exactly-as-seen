@@ -59,7 +59,7 @@ async function fetchCategory(category, startDate, endDate) {
   try {
     const res = await fetch(url, {
       headers: { 'x-api-key': OXY_API_KEY },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(60000),
     });
     if (!res.ok) return { data: [] };
     const json = await res.json();
@@ -71,13 +71,23 @@ async function fetchCategory(category, startDate, endDate) {
 }
 
 async function insertToSupabase(rows) {
+  // Delete existing rows for this period first, then insert fresh
+  const period = rows[0]?.period;
+  if (period) {
+    await fetch(`${SUPABASE_URL}/rest/v1/historical_clients?period=eq.${period}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+  }
   const res = await fetch(`${SUPABASE_URL}/rest/v1/historical_clients`, {
     method: 'POST',
     headers: {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates',
     },
     body: JSON.stringify(rows),
   });

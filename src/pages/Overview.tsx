@@ -1,5 +1,5 @@
 import { useFinancialModel } from '@/contexts/FinancialModelContext';
-import { YEARS, HEADCOUNT, Year } from '@/lib/financialData';
+import { YEARS, HEADCOUNT, Year, CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS } from '@/lib/financialData';
 import { formatCurrency, formatPercent, formatNumber } from '@/lib/formatters';
 import { TrendingUp, Users, DollarSign, BarChart3, Percent } from 'lucide-react';
 import {
@@ -53,7 +53,7 @@ const DreTooltip = ({ active, payload, label }: any) => {
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
             <span className="text-[13px] text-muted-foreground">{key}</span>
             <span className="ml-auto text-[13px] tabular-nums font-semibold text-foreground">
-              R$ {Number(entry.value).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+              R$ {Number(entry.value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         );
@@ -136,16 +136,21 @@ export default function Overview() {
 
   // Client chart with actual BU data from assumptions + YoY growth
   const clientChartData = activeYears.map((y, i) => {
-    const baasClients = assumptions.subProductClients.baas[y];
-    const total = assumptions.caasClients[y] + assumptions.saasClients[y] + assumptions.educationClients[y] + baasClients;
-    const prevBaas = i > 0 ? assumptions.subProductClients.baas[activeYears[i-1]] : 0;
-    const prevTotal = i > 0 ? assumptions.caasClients[activeYears[i-1]] + assumptions.saasClients[activeYears[i-1]] + assumptions.educationClients[activeYears[i-1]] + prevBaas : 0;
+    const sp = assumptions.subProductClients;
+    const sumBU = (keys: readonly string[]) => keys.reduce((s, k) => s + (sp[k]?.[y] ?? 0), 0);
+    const caas = sumBU(CAAS_KEYS);
+    const saas = sumBU(SAAS_KEYS);
+    const edu = sumBU(EDUCATION_KEYS);
+    const baasClients = sumBU(EXPANSAO_KEYS);
+    const total = caas + saas + edu + baasClients;
+    const prevSumBU = (keys: readonly string[]) => keys.reduce((s, k) => s + (sp[k]?.[activeYears[i-1]] ?? 0), 0);
+    const prevTotal = i > 0 ? prevSumBU(CAAS_KEYS) + prevSumBU(SAAS_KEYS) + prevSumBU(EDUCATION_KEYS) + prevSumBU(EXPANSAO_KEYS) : 0;
     const growthPct = i > 0 && prevTotal > 0 ? Number((((total - prevTotal) / prevTotal) * 100).toFixed(0)) : 0;
     return {
       year: y.toString(),
-      CaaS: assumptions.caasClients[y],
-      SaaS: assumptions.saasClients[y],
-      Education: assumptions.educationClients[y],
+      CaaS: caas,
+      SaaS: saas,
+      Education: edu,
       BaaS: baasClients,
       'Growth %': growthPct,
     };

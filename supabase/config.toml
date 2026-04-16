@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.fetch-oxy-cashflow]
 verify_jwt = false
+
+[functions.sync-dre-from-oxy]
+verify_jwt = false

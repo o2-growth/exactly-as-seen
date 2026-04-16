@@ -6,7 +6,7 @@
 import {
   Year, Assumptions, TicketKey, SubProductTaxConfig,
   getSubProductTaxRate, getEffectivePresumido, getEffectiveTaxRates,
-  CosConfig, DEFAULT_COS_CONFIG,
+  CosConfig, DEFAULT_COS_CONFIG, CAAS_KEYS, SAAS_KEYS,
 } from '@/lib/financialData';
 import { formatCurrency, formatCurrencyFull, formatPercent } from '@/lib/formatters';
 import { getMonthlyClients, MONTHS } from '@/lib/monthlyData';
@@ -146,7 +146,7 @@ export function explainCOS(
 ): FormulaExplanation {
   const cos = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
   const yr = model.years[year];
-  const caasEnd = assumptions.caasClients[year] ?? 0;
+  const caasEnd = CAAS_KEYS.reduce((s, k) => s + (assumptions.subProductClients[k]?.[year] ?? 0), 0);
 
   const steps: FormulaStep[] = [];
 
@@ -614,5 +614,255 @@ export function explainRevenueChurn(
       const ticketM = assumptions.monthlyTickets?.[key]?.[year]?.[m] ?? ticketBase;
       return `Ex: ${prevClients.toFixed(0)} × ${rateM.toFixed(2)}% = ${churnedM.toFixed(1)} churns × ${formatCurrencyFull(Math.round(ticketM))} = ${formatCurrencyFull(Math.round(churnedM * ticketM))} (${MONTHS[m]})`;
     })(),
+  };
+}
+
+// ─── RESUMO FINANCEIRO (COS vs Receita) ───
+
+export function explainResumoFinanceiro(
+  metric: 'grossRevenue' | 'deductions' | 'netRevenue' | 'cogs' | 'grossProfit' | 'grossMargin',
+  year: Year, model: FullModelOutput,
+): FormulaExplanation {
+  const yr = model.years[year];
+
+  if (metric === 'grossRevenue') {
+    return {
+      title: `Receita Bruta — ${year}`,
+      formula: 'Σ Receita de todos os sub-produtos (Assumptions)',
+      steps: [
+        { label: 'CaaS', value: formatCurrency(yr.caasRevenue * 1000), source: 'Σ sub-produtos CaaS' },
+        { label: 'SaaS', value: formatCurrency(yr.saasRevenue * 1000), source: 'Σ sub-produtos SaaS' },
+        { label: 'Education', value: formatCurrency(yr.educationRevenue * 1000), source: 'educationDonoCFO' },
+        { label: 'Expansão', value: formatCurrency(yr.baasRevenue * 1000), source: 'BaaS' },
+        { label: 'Tax', value: formatCurrency(yr.taxRevenue * 1000), source: 'Σ sub-produtos Tax' },
+      ],
+      result: formatCurrency(yr.grossRevenue * 1000),
+    };
+  }
+
+  if (metric === 'deductions') {
+    const dd = yr.dedDetail;
+    return {
+      title: `Deduções / Impostos — ${year}`,
+      formula: 'PIS + COFINS + ISS + CSLL ret. + PIS ret. + COFINS ret. + IRRF ret. + ICMS',
+      steps: [
+        { label: 'PIS', value: formatCurrency(dd.pis * 1000), source: 'Premissa tributária' },
+        { label: 'COFINS', value: formatCurrency(dd.cofins * 1000), source: 'Premissa tributária' },
+        { label: 'ISS', value: formatCurrency(dd.iss * 1000), source: 'Premissa tributária' },
+        { label: 'CSLL Retido', value: formatCurrency(dd.csllRetido * 1000), source: 'Premissa tributária' },
+        { label: 'PIS Retido', value: formatCurrency(dd.pisRetido * 1000), source: 'Premissa tributária' },
+        { label: 'COFINS Retido', value: formatCurrency(dd.cofinsRetido * 1000), source: 'Premissa tributária' },
+        { label: 'IRRF Retido', value: formatCurrency(dd.irrfRetido * 1000), source: 'Premissa tributária' },
+        { label: 'ICMS', value: formatCurrency(dd.icms * 1000), source: 'Premissa tributária' },
+      ],
+      result: formatCurrency(yr.deductions * 1000),
+    };
+  }
+
+  if (metric === 'netRevenue') {
+    return {
+      title: `Receita Líquida — ${year}`,
+      formula: 'Receita Bruta − Deduções',
+      steps: [
+        { label: 'Receita Bruta', value: formatCurrency(yr.grossRevenue * 1000), source: 'Σ sub-produtos' },
+        { label: 'Deduções', value: formatCurrency(yr.deductions * 1000), source: 'Impostos sobre faturamento' },
+      ],
+      result: formatCurrency(yr.netRevenue * 1000),
+      example: `${formatCurrency(yr.grossRevenue * 1000)} + (${formatCurrency(yr.deductions * 1000)}) = ${formatCurrency(yr.netRevenue * 1000)}`,
+    };
+  }
+
+  if (metric === 'cogs') {
+    const cd = yr.cogsDetail;
+    return {
+      title: `COS Total — ${year}`,
+      formula: 'CaaS + CS + SaaS + Education + Expansão + Tax',
+      steps: [
+        { label: 'CaaS (headcount)', value: formatCurrency(cd.caas * 1000), source: 'PFD + CFO + FPA × salário × 12' },
+        { label: 'Customer Success', value: formatCurrency(cd.customerService * 1000), source: 'CX Analysts × salário × 12' },
+        { label: 'SaaS (headcount+setup)', value: formatCurrency(cd.saas * 1000), source: 'DevSr + CS + Setup squads × 12' },
+        { label: 'Education', value: formatCurrency(cd.education * 1000), source: `${((yr.educationRevenue !== 0 ? Math.abs(cd.education / yr.educationRevenue) : 0) * 100).toFixed(0)}% da receita edu` },
+        { label: 'Expansão', value: formatCurrency(cd.baas * 1000), source: `% da receita expansão` },
+        { label: 'Tax', value: formatCurrency((cd.tax ?? 0) * 1000), source: `% da receita tax` },
+      ],
+      result: formatCurrency(yr.cogs * 1000),
+    };
+  }
+
+  if (metric === 'grossProfit') {
+    return {
+      title: `Lucro Bruto — ${year}`,
+      formula: 'Receita Líquida − COS Total',
+      steps: [
+        { label: 'Receita Líquida', value: formatCurrency(yr.netRevenue * 1000), source: 'Receita Bruta − Deduções' },
+        { label: 'COS Total', value: formatCurrency(yr.cogs * 1000), source: 'Custos dos Serviços' },
+      ],
+      result: formatCurrency(yr.grossProfit * 1000),
+      example: `${formatCurrency(yr.netRevenue * 1000)} + (${formatCurrency(yr.cogs * 1000)}) = ${formatCurrency(yr.grossProfit * 1000)}`,
+    };
+  }
+
+  // grossMargin
+  const gm = yr.netRevenue > 0 ? (yr.grossProfit / yr.netRevenue * 100) : 0;
+  return {
+    title: `Margem Bruta — ${year}`,
+    formula: 'Lucro Bruto ÷ Receita Líquida × 100',
+    steps: [
+      { label: 'Lucro Bruto', value: formatCurrency(yr.grossProfit * 1000), source: 'Receita Líq. − COS' },
+      { label: 'Receita Líquida', value: formatCurrency(yr.netRevenue * 1000), source: 'Receita Bruta − Deduções' },
+    ],
+    result: `${gm.toFixed(1)}%`,
+    example: `${formatCurrency(yr.grossProfit * 1000)} ÷ ${formatCurrency(yr.netRevenue * 1000)} × 100 = ${gm.toFixed(1)}%`,
+  };
+}
+
+// ─── SG&A EXPLANATION ───
+
+export function explainSGA(
+  year: Year, assumptions: Assumptions, model: FullModelOutput,
+): FormulaExplanation {
+  const yr = model.years[year];
+  const getP = (field: string, fb: number): number => {
+    const v = (assumptions as any)[field];
+    if (v && typeof v === 'object') return v[year] ?? fb;
+    return typeof v === 'number' ? v : fb;
+  };
+  const mk = getP('marketingPercent', 15.5);
+  const co = getP('commercialPercent', 2.3);
+  const pe = getP('pessoalPercent', 7.2);
+  const ad = getP('sgaPercent', 10.4);
+  const total = mk + co + pe + ad;
+  const revBruta = yr.grossRevenue * 1000;
+
+  return {
+    title: `SG&A Total — ${year}`,
+    formula: '(Marketing% + Comercial% + Pessoal% + Adm%) × Receita Bruta',
+    steps: [
+      { label: 'Marketing', value: `${mk.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Comercial', value: `${co.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Pessoal', value: `${pe.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Administrativa', value: `${ad.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Total %', value: `${total.toFixed(1)}%`, source: 'Soma das 4 categorias' },
+      { label: 'Receita Bruta', value: formatCurrency(revBruta), source: 'Engine' },
+    ],
+    result: formatCurrency(revBruta * total / 100),
+    example: `${formatCurrency(revBruta)} × ${total.toFixed(1)}% = ${formatCurrency(revBruta * total / 100)}`,
+  };
+}
+
+// ─── ECON & FIN EXPLANATION ───
+
+export function explainEconFin(
+  year: Year, assumptions: Assumptions, model: FullModelOutput,
+): FormulaExplanation {
+  const yr = model.years[year];
+  const getP = (field: string, fb: number): number => {
+    const v = (assumptions as any)[field];
+    if (v && typeof v === 'object') return v[year] ?? fb;
+    return typeof v === 'number' ? v : fb;
+  };
+  const recFin = getP('receitasFinanceirasPercent', 0.5);
+  const despFin = getP('despesasFinanceirasPercent', 1.5);
+  const outras = getP('outrasReceitasPercent', 0);
+  const despNaoOp = getP('despesasNaoOperacionaisPercent', 0);
+  const net = recFin - despFin + outras - despNaoOp;
+  const revBruta = yr.grossRevenue * 1000;
+
+  return {
+    title: `Resultado Financeiro — ${year}`,
+    formula: '(Rec.Fin − Desp.Fin + Outras − Desp.NãoOp) × Receita Bruta',
+    steps: [
+      { label: 'Receitas Financeiras', value: `+${recFin.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Despesas Financeiras', value: `-${despFin.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Outras Receitas', value: `+${outras.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Desp. Não Operacionais', value: `-${despNaoOp.toFixed(1)}%`, source: 'Premissa editável' },
+      { label: 'Resultado Líquido', value: `${net.toFixed(1)}%`, source: 'Soma algébrica' },
+      { label: 'Receita Bruta', value: formatCurrency(revBruta), source: 'Engine' },
+    ],
+    result: formatCurrency(revBruta * net / 100),
+    example: `${formatCurrency(revBruta)} × ${net.toFixed(1)}% = ${formatCurrency(revBruta * net / 100)}`,
+  };
+}
+
+// ─── SQUADS / HEADCOUNT EXPLANATION ───
+
+export function explainSquadsCaaS(
+  year: Year, assumptions: Assumptions,
+): FormulaExplanation {
+  const cos = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+  // Only advisory CaaS (assessoria + enterprise + corporate) need PFD/CFO/FPA
+  const caasEnd = (assumptions.subProductClients.caasAssessoria?.[year] ?? 0)
+    + (assumptions.subProductClients.caasEnterprise?.[year] ?? 0)
+    + (assumptions.subProductClients.caasCorporate?.[year] ?? 0);
+  const numPFD = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.pfdClientsPerOne)));
+  const numCFO = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.cfoClientsPerOne)));
+  const numFPA = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.fpaClientsPerOne)));
+
+  return {
+    title: `Squad CaaS — ${year}`,
+    formula: 'ceil(Clientes CaaS ÷ Ratio) para cada cargo',
+    steps: [
+      { label: 'Clientes CaaS (Dez)', value: caasEnd.toLocaleString('pt-BR'), source: 'Σ sub-produtos CaaS' },
+      { label: 'PFD', value: `${numPFD}`, source: `ceil(${caasEnd} ÷ ${cos.pfdClientsPerOne}) = 1 a cada ${cos.pfdClientsPerOne} clientes` },
+      { label: 'CFO', value: `${numCFO}`, source: `ceil(${caasEnd} ÷ ${cos.cfoClientsPerOne}) = 1 a cada ${cos.cfoClientsPerOne} clientes` },
+      { label: 'FP&A', value: `${numFPA}`, source: `ceil(${caasEnd} ÷ ${cos.fpaClientsPerOne}) = 1 a cada ${cos.fpaClientsPerOne} clientes` },
+    ],
+    result: `${numPFD + numCFO + numFPA} pessoas`,
+    example: `Ex CaaS: ${caasEnd} clientes ÷ ${cos.cfoClientsPerOne} = ceil(${(caasEnd / cos.cfoClientsPerOne).toFixed(1)}) = ${numCFO} CFOs`,
+  };
+}
+
+export function explainSquadsSaaS(
+  year: Year, assumptions: Assumptions,
+): FormulaExplanation {
+  const cos = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+  const saasSubEnd = (assumptions.subProductClients.saasOxy?.[year] ?? 0)
+    + (assumptions.subProductClients.saasOxyGenio?.[year] ?? 0);
+  const numDevSr = Math.max(0, Math.ceil(saasSubEnd / Math.max(1, cos.devSrClientsPerOne)));
+  const numCS = Math.max(0, Math.ceil(saasSubEnd / Math.max(1, cos.csClientsPerOne)));
+
+  return {
+    title: `Squad SaaS — ${year}`,
+    formula: 'ceil(Clientes SaaS assinatura ÷ Ratio)',
+    steps: [
+      { label: 'Oxy', value: (assumptions.subProductClients.saasOxy?.[year] ?? 0).toLocaleString('pt-BR'), source: 'subProductClients' },
+      { label: 'Oxy+Gênio', value: (assumptions.subProductClients.saasOxyGenio?.[year] ?? 0).toLocaleString('pt-BR'), source: 'subProductClients' },
+      { label: 'Total assinatura', value: saasSubEnd.toLocaleString('pt-BR'), source: 'Oxy + Oxy+Gênio' },
+      { label: 'Dev Seniors', value: `${numDevSr}`, source: `ceil(${saasSubEnd} ÷ ${cos.devSrClientsPerOne})` },
+      { label: 'Customer Success', value: `${numCS}`, source: `ceil(${saasSubEnd} ÷ ${cos.csClientsPerOne})` },
+    ],
+    result: `${numDevSr + numCS} pessoas`,
+  };
+}
+
+export function explainSquadsSetup(
+  year: Year, assumptions: Assumptions,
+): FormulaExplanation {
+  const cos = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+  const prevSaasSub = year > 2025
+    ? (assumptions.subProductClients.saasOxy?.[(year - 1) as Year] ?? 0) + (assumptions.subProductClients.saasOxyGenio?.[(year - 1) as Year] ?? 0)
+    : 0;
+  const saasSubEnd = (assumptions.subProductClients.saasOxy?.[year] ?? 0) + (assumptions.subProductClients.saasOxyGenio?.[year] ?? 0);
+  const prevCaas = year > 2025
+    ? (assumptions.subProductClients.caasEnterprise?.[(year - 1) as Year] ?? 0) + (assumptions.subProductClients.caasCorporate?.[(year - 1) as Year] ?? 0)
+    : 0;
+  const caasEnd = (assumptions.subProductClients.caasEnterprise?.[year] ?? 0) + (assumptions.subProductClients.caasCorporate?.[year] ?? 0);
+  const newPerMonth = Math.max(0, ((saasSubEnd - prevSaasSub) + (caasEnd - prevCaas)) / 12);
+  const numSquads = newPerMonth > 0 ? Math.max(1, Math.ceil(newPerMonth / Math.max(1, cos.setupClientsPerSquad))) : 0;
+  const numHeadData = newPerMonth > 0 ? Math.max(1, Math.ceil(newPerMonth / Math.max(1, cos.headDataClientsPerOne))) : 0;
+  const people = numSquads * (cos.dataAnalystPerSquad + cos.processAnalystPerSquad) + numHeadData;
+
+  return {
+    title: `Squad Setup — ${year}`,
+    formula: 'Novos clientes/mês = (ΔSaaS + ΔCaaS Enterprise+Corporate) ÷ 12',
+    steps: [
+      { label: 'Novos SaaS (ano)', value: `${saasSubEnd - prevSaasSub}`, source: `${saasSubEnd} − ${prevSaasSub}` },
+      { label: 'Novos CaaS Ent+Corp (ano)', value: `${caasEnd - prevCaas}`, source: `${caasEnd} − ${prevCaas}` },
+      { label: 'Novos/mês', value: `${Math.round(newPerMonth)}`, source: `(${saasSubEnd - prevSaasSub + caasEnd - prevCaas}) ÷ 12` },
+      { label: 'Squads Setup', value: `${numSquads}`, source: `ceil(${Math.round(newPerMonth)} ÷ ${cos.setupClientsPerSquad})` },
+      { label: 'Heads of Data', value: `${numHeadData}`, source: `ceil(${Math.round(newPerMonth)} ÷ ${cos.headDataClientsPerOne})` },
+    ],
+    result: `${people} pessoas`,
+    example: `${numSquads} squads × ${cos.dataAnalystPerSquad + cos.processAnalystPerSquad} + ${numHeadData} heads = ${people}`,
   };
 }

@@ -92,7 +92,7 @@ function findNode(code: string, nodes: PnlNode[]): PnlNode | undefined {
 function getAnnual(code: string, year: Year, tree: PnlNode[]): number {
   const node = findNode(code, tree);
   if (!node) return 0;
-  return Math.round(node.annual[year]);
+  return node.annual[year];
 }
 
 // ─── Blending logic ───────────────────────────────────────────────────────────

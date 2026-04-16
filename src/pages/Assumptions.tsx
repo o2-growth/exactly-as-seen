@@ -37,7 +37,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { debtSchedule, headcountRatios as defaultHeadcountRatios, salaryRanges as defaultSalaryRanges, commissionRate, namedEmployees2025, cacPerClient, selicRates, commercialHeadcountRatios } from '@/data/modelData';
 import { namedEmployees as hcNamedEmployees, payrollFaturamento, payrollGrossRevenueRatio, benefitsMonthly, reimbursements } from '@/data/headcountData';
-import { historicalCosts, historicalExpenses, historicalExpenseItems, historicalFinancial, HISTORICAL_PERIODS } from '@/data/historicalData';
+import { historicalCosts, historicalExpenses, historicalExpenseItems, historicalFinancial, historicalMetrics, HISTORICAL_PERIODS } from '@/data/historicalData';
 import { PnlNode } from '@/lib/pnlData';
 import { ExpandableMonthTable } from '@/components/assumptions/ExpandableMonthRow';
 import { CurrencyInput } from '@/components/assumptions/CurrencyInput';
@@ -46,7 +46,7 @@ import {
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
-import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn } from '@/lib/formulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn, explainResumoFinanceiro, explainSGA, explainEconFin, explainSquadsCaaS, explainSquadsSaaS, explainSquadsSetup } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
@@ -454,7 +454,6 @@ export default function Assumptions() {
 
   // editing always true — fields always editable, auto-save handles persistence
   const editing = true;
-  const [marketingView, setMarketingView] = useState<'planned' | 'actual'>('planned');
   const [selectedYear, setSelectedYear] = useState<Year>(2025);
 
   // Auto-select first year in range when current selectedYear is outside the active range
@@ -1344,11 +1343,11 @@ export default function Assumptions() {
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={activeYears.map(y => ({
               year: y,
-              CaaS: data.caasClients[y],
-              SaaS: data.saasClients[y],
-              Education: data.educationClients[y],
-              Expansão: data.subProductClients?.baas?.[y] ?? 0,
-              Tax: data.taxClients[y],
+              CaaS: CAAS_KEYS.reduce((s, k) => s + (data.subProductClients[k]?.[y] ?? 0), 0),
+              SaaS: SAAS_KEYS.reduce((s, k) => s + (data.subProductClients[k]?.[y] ?? 0), 0),
+              Education: EDUCATION_KEYS.reduce((s, k) => s + (data.subProductClients[k]?.[y] ?? 0), 0),
+              Expansão: EXPANSAO_KEYS.reduce((s, k) => s + (data.subProductClients[k]?.[y] ?? 0), 0),
+              Tax: TAX_KEYS.reduce((s, k) => s + (data.subProductClients[k]?.[y] ?? 0), 0),
             }))}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
@@ -3311,7 +3310,11 @@ export default function Assumptions() {
             // Compute yearly impact
             const yearImpact = activeYears.map(y => {
               const yr = model.years[y];
-              const caasEnd = data.caasClients[y] ?? 0;
+              // Only advisory CaaS products need PFD/CFO/FPA headcount
+              // caasSetup (BPO) and caasParceiros are implementation/channel — no dedicated staff
+              const caasEnd = (data.subProductClients.caasAssessoria?.[y] ?? 0)
+                + (data.subProductClients.caasEnterprise?.[y] ?? 0)
+                + (data.subProductClients.caasCorporate?.[y] ?? 0);
 
               // 3.1 CaaS
               const numPFD = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.pfdClientsPerOne)));
@@ -3644,7 +3647,7 @@ export default function Assumptions() {
                           {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numFPA}</td>)}
                         </tr>
                         <tr className="border-b border-border/30 font-medium">
-                          <td className="px-2 py-1.5 pl-4">Subtotal CaaS</td>
+                          <td className="px-2 py-1.5 pl-4 flex items-center gap-1">Subtotal CaaS <FormulaExplainer explanation={explainSquadsCaaS(selectedYear, data)} iconSize={10} /></td>
                           {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numPFD + yi.numCFO + yi.numFPA}</td>)}
                         </tr>
 
@@ -3665,7 +3668,7 @@ export default function Assumptions() {
                           {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numCSSaaS}</td>)}
                         </tr>
                         <tr className="border-b border-border/30 font-medium">
-                          <td className="px-2 py-1.5 pl-4">Subtotal SaaS</td>
+                          <td className="px-2 py-1.5 pl-4 flex items-center gap-1">Subtotal SaaS <FormulaExplainer explanation={explainSquadsSaaS(selectedYear, data)} iconSize={10} /></td>
                           {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numDevSr + yi.numCSSaaS}</td>)}
                         </tr>
 
@@ -3686,7 +3689,7 @@ export default function Assumptions() {
                           {yearImpact.map(yi => <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{yi.numHeadData}</td>)}
                         </tr>
                         <tr className="border-b border-border/30 font-medium">
-                          <td className="px-2 py-1.5 pl-4">Subtotal Setup</td>
+                          <td className="px-2 py-1.5 pl-4 flex items-center gap-1">Subtotal Setup <FormulaExplainer explanation={explainSquadsSetup(selectedYear, data)} iconSize={10} /></td>
                           {yearImpact.map(yi => {
                             const setupPeople = yi.numSetupSquads * (cos.dataAnalystPerSquad + cos.processAnalystPerSquad) + yi.numHeadData;
                             return <td key={yi.year} className="text-right px-2 py-1.5 tabular-nums">{setupPeople}</td>;
@@ -3732,19 +3735,19 @@ export default function Assumptions() {
                       </thead>
                       <tbody>
                         <tr className="border-b border-border/30">
-                          <td className="px-2 py-1.5 font-medium">Receita Bruta</td>
+                          <td className="px-2 py-1.5 font-medium flex items-center gap-1">Receita Bruta <FormulaExplainer explanation={explainResumoFinanceiro('grossRevenue', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].grossRevenue)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30">
-                          <td className="px-2 py-1.5 text-destructive">(-) Deduções / Impostos</td>
+                          <td className="px-2 py-1.5 text-destructive flex items-center gap-1">(-) Deduções / Impostos <FormulaExplainer explanation={explainResumoFinanceiro('deductions', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].deductions)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30 font-medium">
-                          <td className="px-2 py-1.5">Receita Líquida</td>
+                          <td className="px-2 py-1.5 flex items-center gap-1">Receita Líquida <FormulaExplainer explanation={explainResumoFinanceiro('netRevenue', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].netRevenue)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30">
-                          <td className="px-2 py-1.5 text-destructive">(-) COS Total</td>
+                          <td className="px-2 py-1.5 text-destructive flex items-center gap-1">(-) COS Total <FormulaExplainer explanation={explainResumoFinanceiro('cogs', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => (
                             <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].cogs)}</td>
                           ))}
@@ -3762,14 +3765,14 @@ export default function Assumptions() {
                           })}
                         </tr>
                         <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
-                          <td className="px-2 py-2">Lucro Bruto</td>
+                          <td className="px-2 py-2 flex items-center gap-1">Lucro Bruto <FormulaExplainer explanation={explainResumoFinanceiro('grossProfit', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => {
                             const gp = model.years[y].grossProfit;
                             return <td key={y} className={`text-right px-2 py-2 tabular-nums ${gp < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{formatCurrency(gp)}</td>;
                           })}
                         </tr>
                         <tr className="bg-primary/5 font-bold">
-                          <td className="px-2 py-2">Margem Bruta %</td>
+                          <td className="px-2 py-2 flex items-center gap-1">Margem Bruta % <FormulaExplainer explanation={explainResumoFinanceiro('grossMargin', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => {
                             const nr = model.years[y].netRevenue;
                             const margin = model.years[y].grossMarginPct;
@@ -3799,174 +3802,168 @@ export default function Assumptions() {
         </TabsContent>
         <TabsContent value="sga" className="space-y-6 mt-4">
 
-          {/* Marketing Planejado vs Realizado */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <h3 className="text-sm font-semibold">Marketing — Planejado vs Realizado</h3>
-            <div className="flex bg-secondary rounded-lg p-0.5 border border-border">
-              {(['planned', 'actual'] as const).map(v => (
-                <button
-                  key={v}
-                  onClick={() => setMarketingView(v)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all capitalize ${
-                    marketingView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {v === 'planned' ? 'Planejado' : 'Realizado'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {marketingView === 'actual' && (() => {
-            const isHistPeriod = (monthIdx: number) => isHistorical(selectedYear, monthIdx);
-            const mkRows: { label: string; key: string; isSummary?: boolean }[] = [
-              { label: 'Despesas de Marketing', key: 'Despesas de Marketing', isSummary: true },
-              { label: 'Despesas Comerciais', key: 'Despesas Comerciais' },
-            ];
-            const getHistVal = (key: string, monthIdx: number): number => {
-              const period = `${selectedYear}-${String(monthIdx + 1).padStart(2, '0')}`;
-              return historicalExpenses[key]?.[period] ?? 0;
-            };
-            const getAnnual = (key: string): number =>
-              MONTHS.reduce((s, _, i) => s + getHistVal(key, i), 0);
-            const statusBadge = selectedYear <= 2025
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Realizado</span>
-              : selectedYear === 2026
-              ? <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Jan–Mar Realizado</span>
-              : <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Projetado</span>;
-
-            return (
-              <div className="gradient-card overflow-x-auto">
-                <h3 className="text-sm font-semibold p-5 pb-3 flex items-center flex-wrap gap-1">
-                  Gastos de Marketing — {selectedYear}
-                  {statusBadge}
-                </h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="sticky left-0 z-10 bg-card text-left px-4 py-2 text-muted-foreground font-medium min-w-[200px]">Linha</th>
-                      {MONTHS.map((m, i) => (
-                        <th key={m} className={`text-right px-2 py-2 text-muted-foreground font-medium min-w-[72px]${selectedYear === 2026 && i === 2 ? ' border-r border-primary/30' : ''}`}>{m}</th>
-                      ))}
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium min-w-[88px]">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mkRows.map(row => (
-                      <tr key={row.key} className={`border-b border-border/20 transition-colors ${row.isSummary ? 'bg-secondary/40 hover:bg-secondary/60 font-semibold' : 'hover:bg-secondary/20'}`}>
-                        <td className={`sticky left-0 z-10 px-4 py-1.5 font-medium ${row.isSummary ? 'bg-secondary/40' : 'bg-card'}`}>{row.label}</td>
-                        {MONTHS.map((_, i) => {
-                          const val = getHistVal(row.key, i);
-                          const isHist = isHistPeriod(i);
-                          const isCutoffBorder = selectedYear === 2026 && i === 2;
-                          return (
-                            <td key={i} className={`text-right px-2 py-1.5 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
-                              {!isHist && val === 0 ? '—' : formatCurrency(val)}
-                            </td>
-                          );
-                        })}
-                        <td className="text-right px-3 py-1.5 tabular-nums font-medium">{formatCurrency(getAnnual(row.key))}</td>
-                      </tr>
-                    ))}
-                    <tr className="border-t-2 border-border bg-primary/5 font-bold">
-                      <td className="sticky left-0 z-10 bg-primary/5 px-4 py-2">TOTAL MARKETING</td>
-                      {MONTHS.map((_, i) => {
-                        const val = mkRows.reduce((s, r) => s + getHistVal(r.key, i), 0);
-                        const isHist = isHistPeriod(i);
-                        const isCutoffBorder = selectedYear === 2026 && i === 2;
-                        return (
-                          <td key={i} className={`text-right px-2 py-2 tabular-nums${isCutoffBorder ? ' border-r border-primary/30' : ''}${!isHist ? ' text-muted-foreground/60 italic' : ''}`}>
-                            {formatCurrency(val)}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right px-3 py-2 tabular-nums">{formatCurrency(mkRows.reduce((s, r) => s + getAnnual(r.key), 0))}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p className="text-[10px] text-muted-foreground p-3 pt-1">
-                  Fonte: Oxy DB — dados reais de despesas de marketing e comerciais extraídos do sistema financeiro.
-                </p>
-              </div>
-            );
-          })()}
-
-          {/* Despesas Fixas (% da Receita Bruta) — per-year table */}
+          {/* Despesas Fixas — Planejado vs Realizado (unified table) */}
           <div className="gradient-card p-5">
             <div className="flex items-center gap-2 mb-4">
               <Receipt className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Despesas Fixas (% da Receita Bruta)</h3>
+              <h3 className="text-sm font-semibold">Despesas Fixas (% da Receita Bruta) — Planejado vs Realizado</h3>
             </div>
             {(() => {
-              const sgaRows: { key: 'marketingPercent' | 'commercialPercent' | 'pessoalPercent' | 'sgaPercent'; label: string; fallback: number }[] = [
-                { key: 'marketingPercent', label: 'Marketing', fallback: 15.5 },
-                { key: 'commercialPercent', label: 'Comerciais', fallback: 2.3 },
-                { key: 'pessoalPercent', label: 'Pessoal', fallback: 7.2 },
-                { key: 'sgaPercent', label: 'Administrativa', fallback: 10.4 },
+              type SgaKey = 'marketingPercent' | 'commercialPercent' | 'pessoalPercent' | 'sgaPercent';
+              const sgaRows: { key: SgaKey; label: string; fallback: number; expenseKey: string }[] = [
+                { key: 'marketingPercent', label: 'Marketing', fallback: 15.5, expenseKey: 'Despesas de Marketing' },
+                { key: 'commercialPercent', label: 'Comerciais', fallback: 2.3, expenseKey: 'Despesas Comerciais' },
+                { key: 'pessoalPercent', label: 'Pessoal', fallback: 7.2, expenseKey: 'Despesas com Pessoal' },
+                { key: 'sgaPercent', label: 'Administrativa', fallback: 10.4, expenseKey: 'Despesas Administrativas' },
               ];
-              const getVal = (field: typeof sgaRows[number]['key'], yr: Year, fb: number): number => {
+
+              const getVal = (field: SgaKey, yr: Year, fb: number): number => {
                 const v = data[field] as any;
                 if (v === undefined || v === null) return fb;
                 if (typeof v === 'number') return v;
                 return (v as Record<Year, number>)[yr] ?? fb;
               };
-              const toRecord = (field: typeof sgaRows[number]['key'], fb: number): Record<Year, number> => {
-                const v = data[field] as any;
-                if (v && typeof v === 'object') return v as Record<Year, number>;
-                const flat = typeof v === 'number' ? v : fb;
-                return { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat } as Record<Year, number>;
+
+              // Compute actual % from historicalExpenses / historicalMetrics RECEITA BRUTA
+              const getActualPercent = (expenseKey: string, yr: Year): number | null => {
+                // Only years with historical data
+                if (yr > 2026) return null;
+                const months = yr < 2026 ? 12 : 3; // 2026: only Jan-Mar available
+                let totalExpense = 0;
+                let totalRevenue = 0;
+                for (let m = 1; m <= months; m++) {
+                  const period = `${yr}-${String(m).padStart(2, '0')}`;
+                  totalExpense += historicalExpenses[expenseKey]?.[period] ?? 0;
+                  totalRevenue += historicalMetrics['RECEITA BRUTA']?.[period] ?? 0;
+                }
+                if (totalRevenue === 0) return null;
+                return (totalExpense / totalRevenue) * 100;
               };
+
+              // Years that have historical expense data
+              const hasActual = (yr: Year): boolean => yr <= 2026;
+              const isPartialYear = (yr: Year): boolean => yr === 2026;
+
               return (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-primary/10">
-                        <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium w-28">Categoria</th>
+                        <th className="text-left py-1.5 pr-3 text-muted-foreground font-medium min-w-[140px]">Categoria</th>
                         {activeYears.map(yr => (
-                          <th key={yr} className="text-right py-1.5 px-1 text-muted-foreground font-medium">{yr}</th>
+                          <th key={yr} colSpan={hasActual(yr) ? 2 : 1} className="text-center py-1.5 px-1 text-muted-foreground font-medium border-l border-primary/10">
+                            {yr}
+                            {isPartialYear(yr) && <span className="ml-1 text-[9px] text-amber-400">(Jan–Mar)</span>}
+                          </th>
+                        ))}
+                      </tr>
+                      <tr className="border-b border-primary/20">
+                        <th className="text-left py-1 pr-3 text-muted-foreground/60 font-normal text-[10px]"></th>
+                        {activeYears.map(yr => (
+                          hasActual(yr) ? (
+                            <React.Fragment key={yr}>
+                              <th className="text-right py-1 px-1 text-[10px] font-medium text-emerald-500 border-l border-primary/10">Real</th>
+                              <th className="text-right py-1 px-1 text-[10px] font-medium text-blue-400">Plan</th>
+                            </React.Fragment>
+                          ) : (
+                            <th key={yr} className="text-right py-1 px-1 text-[10px] font-medium text-blue-400 border-l border-primary/10">Plan</th>
+                          )
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {sgaRows.map(({ key, label, fallback }) => (
+                      {sgaRows.map(({ key, label, fallback, expenseKey }) => (
                         <tr key={key} className="border-b border-primary/5">
                           <td className="py-1.5 pr-3 text-muted-foreground">{label}</td>
-                          {activeYears.map(yr => (
-                            <td key={yr} className="py-1 px-1 text-right">
-                              {editing ? (
-                                <input
-                                  type="number"
-                                  step="0.1"
-                                  className="w-16 bg-secondary border border-primary/30 rounded px-1.5 py-1 text-xs text-foreground text-right tabular-nums outline-none focus:ring-1 focus:ring-primary"
-                                  value={getVal(key, yr, fallback)}
-                                  onChange={e => {
-                                    const val = Number(e.target.value) || 0;
-                                    setAssumptions(prev => {
-                                      const existing = prev[key] as any;
-                                      let rec: Record<Year, number>;
-                                      if (existing && typeof existing === 'object') {
-                                        rec = existing as Record<Year, number>;
-                                      } else {
-                                        const flat = typeof existing === 'number' ? existing : fallback;
-                                        rec = { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat };
-                                      }
-                                      return { ...prev, [key]: { ...rec, [yr]: val } };
-                                    });
-                                  }}
-                                />
-                              ) : (
-                                <span className="tabular-nums">{getVal(key, yr, fallback)}</span>
-                              )}
-                            </td>
-                          ))}
+                          {activeYears.map(yr => {
+                            const planned = getVal(key, yr, fallback);
+                            const actual = hasActual(yr) ? getActualPercent(expenseKey, yr) : null;
+                            const diff = actual !== null ? actual - planned : null;
+                            return hasActual(yr) ? (
+                              <React.Fragment key={yr}>
+                                <td className="py-1 px-1 text-right border-l border-primary/10">
+                                  {actual !== null ? (
+                                    <span className={`tabular-nums ${diff !== null && Math.abs(diff) > 2 ? (diff > 0 ? 'text-red-400' : 'text-emerald-400') : 'text-foreground'}`}>
+                                      {actual.toFixed(1)}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                                <td className="py-1 px-1 text-right">
+                                  {editing ? (
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      className="w-14 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground text-right tabular-nums outline-none focus:ring-1 focus:ring-primary"
+                                      value={planned}
+                                      onChange={e => {
+                                        const val = Number(e.target.value) || 0;
+                                        setAssumptions(prev => {
+                                          const existing = prev[key] as any;
+                                          let rec: Record<Year, number>;
+                                          if (existing && typeof existing === 'object') {
+                                            rec = existing as Record<Year, number>;
+                                          } else {
+                                            const flat = typeof existing === 'number' ? existing : fallback;
+                                            rec = { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat };
+                                          }
+                                          return { ...prev, [key]: { ...rec, [yr]: val } };
+                                        });
+                                      }}
+                                    />
+                                  ) : (
+                                    <span className="tabular-nums">{planned.toFixed(1)}</span>
+                                  )}
+                                </td>
+                              </React.Fragment>
+                            ) : (
+                              <td key={yr} className="py-1 px-1 text-right border-l border-primary/10">
+                                {editing ? (
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    className="w-14 bg-secondary border border-primary/30 rounded px-1 py-0.5 text-xs text-foreground text-right tabular-nums outline-none focus:ring-1 focus:ring-primary"
+                                    value={planned}
+                                    onChange={e => {
+                                      const val = Number(e.target.value) || 0;
+                                      setAssumptions(prev => {
+                                        const existing = prev[key] as any;
+                                        let rec: Record<Year, number>;
+                                        if (existing && typeof existing === 'object') {
+                                          rec = existing as Record<Year, number>;
+                                        } else {
+                                          const flat = typeof existing === 'number' ? existing : fallback;
+                                          rec = { 2025: flat, 2026: flat, 2027: flat, 2028: flat, 2029: flat, 2030: flat };
+                                        }
+                                        return { ...prev, [key]: { ...rec, [yr]: val } };
+                                      });
+                                    }}
+                                  />
+                                ) : (
+                                  <span className="tabular-nums">{planned.toFixed(1)}</span>
+                                )}
+                              </td>
+                            );
+                          })}
                         </tr>
                       ))}
                       {/* Total row */}
                       <tr className="border-t border-primary/20 font-semibold">
-                        <td className="py-1.5 pr-3">Total</td>
+                        <td className="py-1.5 pr-3 flex items-center gap-1">Total <FormulaExplainer explanation={explainSGA(selectedYear, data, model)} iconSize={10} /></td>
                         {activeYears.map(yr => {
-                          const total = sgaRows.reduce((s, { key, fallback }) => s + getVal(key, yr, fallback), 0);
-                          return <td key={yr} className="py-1.5 px-1 text-right tabular-nums">{total.toFixed(1)}%</td>;
+                          const totalPlanned = sgaRows.reduce((s, { key, fallback }) => s + getVal(key, yr, fallback), 0);
+                          if (hasActual(yr)) {
+                            const totalActual = sgaRows.reduce((s, { expenseKey }) => {
+                              const v = getActualPercent(expenseKey, yr);
+                              return s + (v ?? 0);
+                            }, 0);
+                            return (
+                              <React.Fragment key={yr}>
+                                <td className="py-1.5 px-1 text-right tabular-nums border-l border-primary/10">{totalActual.toFixed(1)}%</td>
+                                <td className="py-1.5 px-1 text-right tabular-nums">{totalPlanned.toFixed(1)}%</td>
+                              </React.Fragment>
+                            );
+                          }
+                          return <td key={yr} className="py-1.5 px-1 text-right tabular-nums border-l border-primary/10">{totalPlanned.toFixed(1)}%</td>;
                         })}
                       </tr>
                     </tbody>
@@ -3975,7 +3972,7 @@ export default function Assumptions() {
               );
             })()}
             <p className="text-[10px] text-muted-foreground mt-3">
-              Padrao baseado no realizado 2025 da Oxy: Marketing 15.5%, Comercial 2.3%, Pessoal 7.2%, Administrativa 10.4%
+              <span className="text-emerald-500 font-medium">Real</span> = despesas reais da Oxy / receita bruta real. <span className="text-blue-400 font-medium">Plan</span> = % planejado editável. 2026 exibe Jan–Mar (parcial).
             </p>
           </div>
 
@@ -4055,7 +4052,7 @@ export default function Assumptions() {
                       ))}
                       {/* Net total row */}
                       <tr className="border-t border-primary/20 font-semibold">
-                        <td className="py-1.5 pr-3">Resultado Líquido</td>
+                        <td className="py-1.5 pr-3 flex items-center gap-1">Resultado Líquido <FormulaExplainer explanation={explainEconFin(selectedYear, data, model)} iconSize={10} /></td>
                         {activeYears.map(yr => {
                           const net = getVal('receitasFinanceirasPercent', yr, 0.5)
                             - getVal('despesasFinanceirasPercent', yr, 1.5)

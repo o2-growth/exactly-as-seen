@@ -197,9 +197,10 @@ describe('Assumptions → P&L: Marketing costs', () => {
     const base = getModel({ marketingPercent: perYear(15.5) });
     const high = getModel({ marketingPercent: perYear(25) });
 
-    for (const y of YEARS) {
-      const baseMkt = Math.abs(base.years[y].marketing);
-      const highMkt = Math.abs(high.years[y].marketing);
+    // 2025 is historical (engine marketing=0), test 2026+ only
+    for (const y of YEARS.filter(yr => yr >= 2026)) {
+      const baseMkt = Math.abs(base.years[y as Year].marketing);
+      const highMkt = Math.abs(high.years[y as Year].marketing);
       expect(highMkt).toBeGreaterThan(baseMkt);
     }
   });
@@ -244,10 +245,9 @@ describe('Assumptions → P&L: Tree consistency', () => {
     // 2025 tree value should differ from engine (historical overrides applied)
     const treeVal = receitaNode!.annual[2025];
     const engineVal = model.years[2025].grossRevenue;
-    // They CAN be equal if historical matches engine, but typically differ
-    // Just verify both are positive
-    expect(treeVal).toBeGreaterThan(0);
-    expect(engineVal).toBeGreaterThan(0);
+    // Engine returns 0 for 2025 (historical year), tree has real Oxy value
+    expect(treeVal).toBeGreaterThan(9000); // ~9923 in R$ thousands
+    expect(engineVal).toBe(0); // engine doesn't compute 2025 revenue
   });
 });
 
@@ -298,14 +298,19 @@ describe('Assumptions → P&L: Churn via monthlyClientOverrides', () => {
 // ─── 12. Assumptions page KPI vs P&L KPI ───
 
 describe('Assumptions KPIs match P&L values', () => {
-  it('engine grossRevenue used by both pages is the same source', () => {
+  it('engine grossRevenue used by both pages is the same source (2026+)', () => {
     const model = getModel();
-    // Both Assumptions and P&L read from model.years[y].grossRevenue
-    // This test verifies the engine produces consistent values
-    for (const y of YEARS) {
-      expect(model.years[y].grossRevenue).toBeGreaterThan(0);
-      expect(model.years[y].netRevenue).toBeLessThanOrEqual(model.years[y].grossRevenue);
-      expect(model.years[y].grossProfit).toBeLessThanOrEqual(model.years[y].netRevenue);
+    // 2025 is historical (engine=0), verify 2026+ only
+    for (const y of YEARS.filter(yr => yr >= 2026)) {
+      expect(model.years[y as Year].grossRevenue).toBeGreaterThan(0);
+      expect(model.years[y as Year].netRevenue).toBeLessThanOrEqual(model.years[y as Year].grossRevenue);
+      expect(model.years[y as Year].grossProfit).toBeLessThanOrEqual(model.years[y as Year].netRevenue);
     }
+  });
+
+  it('2025 P&L tree has historical revenue from Oxy', () => {
+    const model = getModel();
+    const node1 = model.pnlTree.find(n => n.code === '1');
+    expect(node1!.annual[2025]).toBeGreaterThan(9000);
   });
 });

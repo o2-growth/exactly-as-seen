@@ -399,6 +399,11 @@ export const EXPANSAO_KEYS: TicketKey[] = ['baas', 'baasFranquia', 'baasMasterFr
 export const TAX_KEYS: TicketKey[] = ['taxAT', 'taxGPT', 'taxRCT', 'taxRT', 'taxDTC'];
 export const ALL_SUBPRODUCT_KEYS: TicketKey[] = [...CAAS_KEYS, ...SAAS_KEYS, ...EDUCATION_KEYS, ...EXPANSAO_KEYS, ...TAX_KEYS];
 
+/** Sum sub-product clients for a BU category in a given year (dynamic, reflects user edits) */
+export function sumBUClients(keys: TicketKey[], subProductClients: Record<string, Record<Year, number>>, year: Year): number {
+  return keys.reduce((sum, k) => sum + (subProductClients[k]?.[year] ?? 0), 0);
+}
+
 /** Products with Monthly Recurring Revenue (MRR) — used for ARR/MRR calculations and Faturamento Base */
 export const MRR_KEYS: TicketKey[] = ['caasEnterprise', 'caasCorporate', 'caasSetup', 'saasOxy', 'saasOxyGenio', 'saasOxyGenioEsp', 'taxAT'];
 
@@ -820,20 +825,21 @@ export function calculateProjections(
   };
 
   for (const year of YEARS) {
-    const clientRatio = (
-      (assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year] + (assumptions.taxClients?.[year] ?? 0)) /
-      (DEFAULT_ASSUMPTIONS.caasClients[year] + DEFAULT_ASSUMPTIONS.saasClients[year] + DEFAULT_ASSUMPTIONS.educationClients[year] + (DEFAULT_ASSUMPTIONS.taxClients?.[year] ?? 0))
-    );
+    const sp = assumptions.subProductClients;
+    const dsp = DEFAULT_ASSUMPTIONS.subProductClients;
+    const curTotal = sumBUClients(CAAS_KEYS, sp, year) + sumBUClients(SAAS_KEYS, sp, year) + sumBUClients(EDUCATION_KEYS, sp, year) + sumBUClients(TAX_KEYS, sp, year);
+    const defTotal = sumBUClients(CAAS_KEYS, dsp, year) + sumBUClients(SAAS_KEYS, dsp, year) + sumBUClients(EDUCATION_KEYS, dsp, year) + sumBUClients(TAX_KEYS, dsp, year);
+    const clientRatio = defTotal > 0 ? curTotal / defTotal : 1;
 
     const revenueScale = clientRatio * multiplier;
 
-    projections.grossRevenue[year] = Math.round(BASE_ANNUAL_DATA.grossRevenue[year] * revenueScale);
-    projections.netRevenue[year] = Math.round(BASE_ANNUAL_DATA.netRevenue[year] * revenueScale);
-    projections.grossProfit[year] = Math.round(BASE_ANNUAL_DATA.grossProfit[year] * revenueScale);
-    projections.ebitda[year] = Math.round(BASE_ANNUAL_DATA.ebitda[year] * revenueScale);
-    projections.netIncome[year] = Math.round(BASE_ANNUAL_DATA.netIncome[year] * revenueScale);
-    projections.operatingCashFlow[year] = Math.round(BASE_ANNUAL_DATA.operatingCashFlow[year] * revenueScale);
-    projections.totalClients[year] = assumptions.caasClients[year] + assumptions.saasClients[year] + assumptions.educationClients[year] + (assumptions.taxClients?.[year] ?? 0);
+    projections.grossRevenue[year] = BASE_ANNUAL_DATA.grossRevenue[year] * revenueScale;
+    projections.netRevenue[year] = BASE_ANNUAL_DATA.netRevenue[year] * revenueScale;
+    projections.grossProfit[year] = BASE_ANNUAL_DATA.grossProfit[year] * revenueScale;
+    projections.ebitda[year] = BASE_ANNUAL_DATA.ebitda[year] * revenueScale;
+    projections.netIncome[year] = BASE_ANNUAL_DATA.netIncome[year] * revenueScale;
+    projections.operatingCashFlow[year] = BASE_ANNUAL_DATA.operatingCashFlow[year] * revenueScale;
+    projections.totalClients[year] = curTotal + sumBUClients(EXPANSAO_KEYS, sp, year);
     projections.grossMargins[year] = GROSS_MARGINS[year];
     projections.netMargins[year] = NET_MARGINS[year];
   }

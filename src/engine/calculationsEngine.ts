@@ -19,6 +19,9 @@ import {
   historicalMetrics,
   historicalRevenue,
   historicalRevenueItems,
+  historicalCosts,
+  historicalExpenses,
+  historicalFinancial,
 } from '@/data/historicalData';
 
 // ─── TYPES ───
@@ -721,7 +724,8 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
     // Net revenue
     const netRev = grossRev + ded;
 
-    // CaaS clients for COS calc
+    // CaaS clients for COS calc — only advisory products that need PFD/CFO/FPA headcount
+    // caasSetup (BPO) and caasParceiros are implementation/channel — no dedicated staff ratio
     const caasClientsForCOS = getMonthlyClientCount('caas', 'assessoria', m, year, assumptions)
       + getMonthlyClientCount('caas', 'enterprise', m, year, assumptions)
       + getMonthlyClientCount('caas', 'corporate', m, year, assumptions);
@@ -916,7 +920,7 @@ function computeYear(year: Year, assumptions: Assumptions, scenario: Scenario, p
   annualNI += annualAdicionalIrpj;
   annualFinal += annualAdicionalIrpj;
 
-  const r = (v: number) => Math.round(v);
+  const r = (v: number) => v;
 
   // ─── PMR / Receivables Change ───
   // Ending receivables = annual gross revenue * weighted PMR / 365
@@ -994,7 +998,7 @@ export function computeFullModel(assumptions: Assumptions, scenario: Scenario): 
     validateOutputs(years);
   }
 
-  const pnlTree = buildPnlTree(years);
+  const pnlTree = buildPnlTree(years, assumptions);
   applyHistoricalOverrides(pnlTree, years);
   return { years, pnlTree };
 }
@@ -1028,14 +1032,14 @@ function validateOutputs(years: Record<Year, AnnualOutput>) {
 
 function mArr(yrs: Record<Year, AnnualOutput>, fn: (d: MonthlyPnL) => number): Record<Year, number[]> {
   const r = {} as Record<Year, number[]>;
-  for (const y of YEARS) r[y] = yrs[y].monthlyData.map(d => Math.round(fn(d)));
+  for (const y of YEARS) r[y] = yrs[y].monthlyData.map(d => fn(d));
   return r;
 }
 
 function allocMo(pMo: Record<Year, number[]>, cAn: Record<Year, number>, pAn: Record<Year, number>): Record<Year, number[]> {
   const r = {} as Record<Year, number[]>;
   for (const y of YEARS) {
-    r[y] = pAn[y] !== 0 ? pMo[y].map(v => Math.round(v * cAn[y] / pAn[y])) : new Array(12).fill(0);
+    r[y] = pAn[y] !== 0 ? pMo[y].map(v => v * cAn[y] / pAn[y]) : new Array(12).fill(0);
   }
   return r;
 }
@@ -1135,12 +1139,12 @@ function buildDetailChildren(
   const pMo = {} as Record<Year, number[]>;
   for (const y of YEARS) {
     pAn[y] = engineFn(yrs[y]);
-    pMo[y] = yrs[y].monthlyData.map(d => Math.round(moFn(d)));
+    pMo[y] = yrs[y].monthlyData.map(d => moFn(d));
   }
   return baseItems.map(it => {
     const ann = {} as Record<Year, number>;
     for (const y of YEARS) {
-      ann[y] = baseTot[y] !== 0 ? Math.round(it.v[y] * pAn[y] / baseTot[y]) : 0;
+      ann[y] = baseTot[y] !== 0 ? it.v[y] * pAn[y] / baseTot[y] : 0;
     }
     return { code: it.c, label: it.l, annual: ann, monthly: allocMo(pMo, ann, pAn) };
   });
@@ -1226,7 +1230,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   // Helper: set annual value for a year on a node found by code
   function override(code: string, year: Year, value: number): void {
     const node = findNode(tree, code);
-    if (node) node.annual[year] = Math.round(value);
+    if (node) node.annual[year] = value;
   }
 
   // Helper: get partial-year value mixing real + engine for a metric node
@@ -1280,20 +1284,14 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   // RECEITA LÍQUIDA summary
   override('NR', 2025, netRev2025);
 
-  // COGS — distribute across BU sub-nodes using engine proportions
-  const engCogs2025 = years[2025].cogs;
-  if (engCogs2025 !== 0) {
-    const engCogsCaas = years[2025].cogsDetail.caas;
-    const engCogsCS   = years[2025].cogsDetail.customerService;
-    const engCogsSaas = years[2025].cogsDetail.saas;
-    const engCogsEdu  = years[2025].cogsDetail.education;
-    const engCogsBaas = years[2025].cogsDetail.baas;
-    override('3.1', 2025, totalCogs2025 * (engCogsCaas / engCogs2025));
-    override('3.2', 2025, totalCogs2025 * (engCogsSaas / engCogs2025));
-    override('3.3', 2025, totalCogs2025 * (engCogsEdu  / engCogs2025));
-    override('3.4', 2025, totalCogs2025 * (engCogsCS   / engCogs2025));
-    override('3.5', 2025, totalCogs2025 * (engCogsBaas / engCogs2025));
-  }
+  // COGS — use real Oxy data per BU (not engine proportions)
+  const histCost2025 = (key: string) => getHistoricalAnnual(historicalCosts, key, 2025) ?? 0;
+  override('3.1', 2025, -histCost2025('Custos Caas'));
+  override('3.2', 2025, -histCost2025('Custos SaaS'));
+  override('3.3', 2025, -histCost2025('Custos Education'));
+  override('3.4', 2025, -histCost2025('Custos Customer Success'));
+  override('3.5', 2025, -histCost2025('Custos Expansão'));
+  override('3.6', 2025, -histCost2025('Custos Tax'));
 
   // LUCRO BRUTO summary
   override('GP', 2025, grossProfit2025);
@@ -1302,27 +1300,49 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const gmPct2025 = netRev2025 !== 0 ? (grossProfit2025 / netRev2025) * 100 : 0;
   override('GM%', 2025, Number(gmPct2025.toFixed(1)));
 
-  // Fixed expenses — distribute across category nodes using engine proportions
-  const engMkt2025 = years[2025].marketing;
-  const engComm2025 = years[2025].commercial;
-  const engHc2025  = years[2025].headcount;
-  const engSga2025 = years[2025].sga;
-  const engFixed2025 = engMkt2025 + engComm2025 + engHc2025 + engSga2025;
-  if (engFixed2025 !== 0) {
-    override('7', 2025, fixedExpenses2025 * (engMkt2025  / engFixed2025));
-    override('6', 2025, fixedExpenses2025 * (engComm2025 / engFixed2025));
-    override('5', 2025, fixedExpenses2025 * (engHc2025   / engFixed2025));
-    override('4', 2025, fixedExpenses2025 * (engSga2025  / engFixed2025));
-  }
+  // Fixed expenses — use real Oxy data per category (not engine proportions)
+  const histExp2025 = (key: string) => getHistoricalAnnual(historicalExpenses, key, 2025) ?? 0;
+  override('7', 2025, -histExp2025('Despesas de Marketing'));
+  override('6', 2025, -histExp2025('Despesas Comerciais'));
+  override('5', 2025, -histExp2025('Despesas com Pessoal'));
+  override('4', 2025, -histExp2025('Despesas Administrativas'));
 
   // EBITDA summary
   override('EBITDA', 2025, ebitda2025);
   const ebitdaPct2025 = netRev2025 !== 0 ? (ebitda2025 / netRev2025) * 100 : 0;
   override('EBITDA%', 2025, Number(ebitdaPct2025.toFixed(1)));
 
-  // Financial result, taxes, net income — use engine values for 2025 since historicalData
-  // does not break these out separately (RESULTADO LÍQUIDO already incorporates them)
-  // Override NI and FCR with real values
+  // Financial result — use real Oxy data per category
+  const sumFinancialGroup = (code: string, yr: number): number => {
+    const groups = historicalFinancial[code];
+    if (!groups) return 0;
+    let total = 0;
+    for (const group of Object.values(groups)) {
+      for (const item of Object.values(group)) {
+        for (let m = 1; m <= 12; m++) {
+          const period = `${yr}-${String(m).padStart(2, '0')}`;
+          total += (item as Record<string, number>)[period] ?? 0;
+        }
+      }
+    }
+    return total;
+  };
+  const recFin2025 = sumFinancialGroup('RF', 2025) / 1000;
+  const despFin2025 = sumFinancialGroup('DF', 2025) / 1000;
+  const outrasRec2025 = sumFinancialGroup('RNO', 2025) / 1000;
+  const despNaoOp2025 = sumFinancialGroup('DNO', 2025) / 1000;
+  override('8R', 2025, recFin2025);
+  override('8D', 2025, -despFin2025);
+  override('OR', 2025, outrasRec2025);
+  override('DNO', 2025, -despNaoOp2025);
+
+  // Provisão IRPJ/CSLL — real Oxy value
+  const provIrpj2025 = getHistoricalAnnual(historicalCosts, 'Provisão IRPJ/CSLL', 2025);
+  if (provIrpj2025 !== null) {
+    override('TAX', 2025, -provIrpj2025);
+  }
+
+  // Net income and final result from real Oxy
   override('NI', 2025, netIncome2025);
   const nmPct2025 = netRev2025 !== 0 ? (netIncome2025 / netRev2025) * 100 : 0;
   override('NM%', 2025, Number(nmPct2025.toFixed(1)));
@@ -1389,6 +1409,9 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const ebitdaPct2026 = netRev2026 !== 0 ? (ebitda2026 / netRev2026) * 100 : 0;
   override('EBITDA%', 2026, Number(ebitdaPct2026.toFixed(1)));
 
+  // Financial result 2026 and taxes — handled by context percentages (2026 is partial,
+  // engine already sets EBITDA/NI/FCR totals via mixedYear)
+
   override('NI', 2026, netIncome2026);
   const nmPct2026 = netRev2026 !== 0 ? (netIncome2026 / netRev2026) * 100 : 0;
   override('NM%', 2026, Number(nmPct2026.toFixed(1)));
@@ -1397,7 +1420,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
 
 // ─── BUILD PNL TREE ───
 
-function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
+function buildPnlTree(years: Record<Year, AnnualOutput>, assumptions: Assumptions): PnlNode[] {
   const a = (fn: (y: AnnualOutput) => number): Record<Year, number> => {
     const r = {} as Record<Year, number>;
     for (const y of YEARS) r[y] = fn(years[y]);
@@ -1590,11 +1613,11 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
           if (kid.code === '7.09') {
             for (const y of YEARS) kid.annual[y] = years[y].marketingDetail.pr;
             kid.monthly = {} as Record<Year, number[]>;
-            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => Math.round(d.marketingPR));
+            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => d.marketingPR);
           } else if (kid.code === '7.10') {
             for (const y of YEARS) kid.annual[y] = years[y].marketingDetail.events;
             kid.monthly = {} as Record<Year, number[]>;
-            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => Math.round(d.marketingEvents));
+            for (const y of YEARS) kid.monthly[y] = years[y].monthlyData.map(d => d.marketingEvents);
           }
         }
         return kids;
@@ -1633,27 +1656,28 @@ function buildPnlTree(years: Record<Year, AnnualOutput>): PnlNode[] {
     { code: 'EBITDA', label: 'EBITDA', isSummary: true, annual: ebitdaAn, monthly: ebitdaMo },
     { code: 'EBITDA%', label: '% EBITDA', isMargin: true, annual: a(y => y.ebitdaMarginPct) },
 
-    // ── Below EBITDA ──
-    { code: '8R', label: 'Receitas Financeiras', annual: z, monthly: zMo(), children: [
-      { code: '8.01', label: 'Rendimentos de Aplicações', annual: z, monthly: zMo() },
-      { code: '8.09', label: 'Juros Recebidos', annual: z, monthly: zMo() },
-    ]},
+    // ── Below EBITDA — Financial result decomposed into 4 nodes ──
+    // Engine computes these from percentage × grossRevenue (same as SG&A).
+    // For 2025, applyHistoricalOverrides replaces with real Oxy values.
+    // For 2026+, context may further patch when Supabase data is available.
+    { code: '8R', label: 'Receitas Financeiras',
+      annual: (() => { const r = {} as Record<Year, number>; for (const y of YEARS) { r[y] = years[y].grossRevenue * getYearPercent(assumptions.receitasFinanceirasPercent, y, 0.5) / 100; } return r; })(),
+      monthly: zMo(),
+    },
     {
-      code: '8D', label: 'Despesas Financeira', annual: finAn, monthly: finMo,
+      code: '8D', label: 'Despesas Financeira',
+      annual: (() => { const r = {} as Record<Year, number>; for (const y of YEARS) { r[y] = -(years[y].grossRevenue * getYearPercent(assumptions.despesasFinanceirasPercent, y, 1.5) / 100); } return r; })(),
+      monthly: finMo,
       children: buildDetailChildren(BASE_FINANCIAL, y => y.financialResult, d => d.financialResult, years),
     },
-    { code: 'OR', label: 'Outras Receitas', annual: z, monthly: zMo(), children: [
-      { code: 'OR.01', label: 'Reembolsos', annual: z, monthly: zMo() },
-      { code: 'OR.02', label: 'Doações', annual: z, monthly: zMo() },
-      { code: 'OR.03', label: 'Empréstimos de Bancos', annual: z, monthly: zMo() },
-      { code: 'OR.04', label: 'Receitas Não Operacionais', annual: z, monthly: zMo() },
-    ]},
+    { code: 'OR', label: 'Outras Receitas',
+      annual: (() => { const r = {} as Record<Year, number>; for (const y of YEARS) { r[y] = years[y].grossRevenue * getYearPercent(assumptions.outrasReceitasPercent, y, 0) / 100; } return r; })(),
+      monthly: zMo(),
+    },
     {
-      code: 'DNO', label: 'Despesas Não Operacionais', annual: a(y => y.otherExpenses), monthly: mo(d => d.otherExpenses),
-      children: [
-        { code: 'DNO.1', label: 'Despesa Não Operacional', annual: a(y => y.otherExpenses), monthly: mo(d => d.otherExpenses) },
-        { code: 'DNO.2', label: 'Doações', annual: z, monthly: zMo() },
-      ],
+      code: 'DNO', label: 'Despesas Não Operacionais',
+      annual: (() => { const r = {} as Record<Year, number>; for (const y of YEARS) { r[y] = -(years[y].grossRevenue * getYearPercent(assumptions.despesasNaoOperacionaisPercent, y, 0) / 100); } return r; })(),
+      monthly: mo(d => d.otherExpenses),
     },
     {
       code: 'TAX', label: 'Provisão IRPJ/CSLL', annual: taxAn, monthly: taxMo,

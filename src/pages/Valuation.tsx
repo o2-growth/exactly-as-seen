@@ -255,7 +255,7 @@ export default function Valuation() {
   const trajectoryData = (valuations: { year: Year; valuation: number }[]) =>
     valuations.map(v => ({
       year: v.year,
-      Base: Math.round(v.valuation),
+      Base: v.valuation,
     }));
 
   return (

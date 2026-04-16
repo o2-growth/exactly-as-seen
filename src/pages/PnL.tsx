@@ -99,7 +99,7 @@ function ExpandableRow({ node, depth, columns, viewMode, selectedYear, customLab
         return node.monthly[selectedYear][monthIdx] || 0;
       }
       if (node.isMargin) return node.annual[selectedYear];
-      return Math.round(node.annual[selectedYear] / 12);
+      return node.annual[selectedYear] / 12;
     }
     return node.annual[col as Year];
   };
