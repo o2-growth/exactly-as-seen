@@ -257,9 +257,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const node1 = tree.find(n => n.code === '1');
     if (node1) {
       for (const y of YEARS) {
-        // 2025 fully realized, 2026 partial (Jan-Mar real + Apr-Dec engine).
-        // Engine applyHistoricalOverrides handles both. Only recompute for 2027+.
-        if (y <= 2026) continue;
+        // 2025 fully realized — engine already set real Oxy values. Skip.
+        // 2026+ recomputed from assumptions so user edits reflect in P&L.
+        if (y <= 2025) continue;
 
         let total = 0;
         for (const bu of buGroups) {
@@ -278,9 +278,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const taxNode = tree.find(n => n.code === 'TAX');
     if (taxNode) {
       for (const y of YEARS) {
-        // 2025 fully realized, 2026 partial — engine handles both with real Oxy data.
-        // Only recompute for 2027+.
-        if (y <= 2026) continue;
+        // 2025 fully realized — engine set real Oxy Provisão. Skip.
+        // 2026+ recomputed so user edits to revenue affect tax.
+        if (y <= 2025) continue;
 
         // Compute per-product tax using the shared taxCalc.ts
         const productTaxResults = ALL_SUBPRODUCT_KEYS.map(key => {
@@ -319,9 +319,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const recFinNode = tree.find(n => n.code === '8R');
 
     for (const y of YEARS) {
-      // 2025 fully realized, 2026 partial — engine handles both with real Oxy data.
-      // Only apply percentage formula for 2027+.
-      if (y <= 2026) continue;
+      // 2025 fully realized — engine set real Oxy financial values. Skip.
+      // 2026+ use percentage formula based on patched revenue.
+      if (y <= 2025) continue;
 
       const revenueTotal = node1?.annual[y] ?? 0; // already patched above (R$ thousands)
       const recFinRate = getYearPct(assumptions.receitasFinanceirasPercent, y, 0.5) / 100;

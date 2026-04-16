@@ -63,8 +63,10 @@ export function resolveAnnualMetric(metric: string, year: Year, engineAnnualValu
     return historicalSum / 1000;
   }
 
-  const remainingRatio = (12 - months) / 12;
-  return historicalSum / 1000 + engineAnnualValue * remainingRatio;
+  // Engine annual value includes all 12 months. Subtract the engine's Q1 portion
+  // (approximated as months/12 of annual) and add the real Q1 sum instead.
+  const engineQ1Estimate = engineAnnualValue * (months / 12);
+  return historicalSum / 1000 + (engineAnnualValue - engineQ1Estimate);
 }
 
 export function resolveMonthlyMetric(metric: string, year: Year, projectedMonthlyValues: number[]): number[] {
