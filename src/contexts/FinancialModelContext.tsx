@@ -3,7 +3,7 @@ import {
   Assumptions, DEFAULT_ASSUMPTIONS, Scenario, Year, YEARS,
   ProjectionData, PeriodPreset, DataSource, DateRange, getFilteredYears,
   CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS,
-  TicketKey,
+  TicketKey, DEFAULT_COS_CONFIG,
 } from '@/lib/financialData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
@@ -273,6 +273,56 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       }
     }
 
+    // Helper: extract year-level percentage from scalar or per-year record
+    const getYearPct = (val: number | Record<Year, number> | undefined, yr: Year, fb: number): number => {
+      if (val === undefined || val === null) return fb;
+      if (typeof val === 'number') return val;
+      return (val as Record<Year, number>)[yr] ?? fb;
+    };
+
+    // ── Patch SG&A nodes (4, 5, 6, 7) — recompute as % of patched gross revenue ──
+    // Engine used its own grossRevenue; here we use the context-patched total so
+    // SG&A matches the revenue displayed in the P&L.
+    const sgaNodes = {
+      '7': tree.find(n => n.code === '7'),   // Despesas de Marketing
+      '6': tree.find(n => n.code === '6'),   // Despesas Comerciais
+      '5': tree.find(n => n.code === '5'),   // Despesas com Pessoal
+      '4': tree.find(n => n.code === '4'),   // Despesas Administrativas
+    };
+    for (const y of YEARS) {
+      if (y <= 2025) continue;
+      const patchedRevenue = node1?.annual[y] ?? 0; // already patched above (R$ thousands)
+      const mktRate = getYearPct(assumptions.marketingPercent, y, 15.5) / 100;
+      const comRate = getYearPct(assumptions.commercialPercent, y, 2.3) / 100;
+      const pesRate = getYearPct(assumptions.pessoalPercent, y, 7.2) / 100;
+      const admRate = getYearPct(assumptions.sgaPercent, y, 10.4) / 100;
+      if (sgaNodes['7']) sgaNodes['7'].annual[y] = -(patchedRevenue * mktRate);
+      if (sgaNodes['6']) sgaNodes['6'].annual[y] = -(patchedRevenue * comRate);
+      if (sgaNodes['5']) sgaNodes['5'].annual[y] = -(patchedRevenue * pesRate);
+      if (sgaNodes['4']) sgaNodes['4'].annual[y] = -(patchedRevenue * admRate);
+    }
+
+    // ── Patch COS percentage-based nodes (3.3, 3.5, 3.6) — recompute using patched BU revenue ──
+    // Education, Expansão, and Tax costs are a fixed % of their respective BU revenue.
+    // CaaS (3.1), SaaS (3.2), and Customer Success (3.4) are headcount-based — keep engine values.
+    const cosNode33 = tree.find(n => n.code === '3.3'); // Custos Education
+    const cosNode35 = tree.find(n => n.code === '3.5'); // Custos Expansão
+    const cosNode36 = tree.find(n => n.code === '3.6'); // Custos Tax
+    const cfg = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
+    for (const y of YEARS) {
+      if (y <= 2025) continue;
+      // BU revenue nodes were already patched above (R$ thousands)
+      const eduBuNode = node1?.children?.find(c => c.code === '1.3');
+      const expBuNode = node1?.children?.find(c => c.code === '1.5');
+      const taxBuNode = node1?.children?.find(c => c.code === '1.6');
+      const eduRev = eduBuNode?.annual[y] ?? 0;
+      const expRev = expBuNode?.annual[y] ?? 0;
+      const taxRev = taxBuNode?.annual[y] ?? 0;
+      if (cosNode33) cosNode33.annual[y] = -(Math.abs(eduRev) * cfg.eduCostRate);
+      if (cosNode35) cosNode35.annual[y] = -(Math.abs(expRev) * cfg.expansaoCostRate);
+      if (cosNode36) cosNode36.annual[y] = -(Math.abs(taxRev) * cfg.taxCostRate);
+    }
+
     // Patch tax nodes (TAX, 10.01, 10.02, 10.03) — recompute IRPJ/CSLL/Adicional
     // on the SAME per-product revenue used above, ensuring P&L tax matches revenue.
     const taxNode = tree.find(n => n.code === 'TAX');
@@ -304,12 +354,6 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
     // Patch financial result nodes (8R, 8D, OR, DNO) — use percentage-based formula
     // on the patched revenue total, matching what the engine computes.
-    const getYearPct = (val: number | Record<Year, number> | undefined, yr: Year, fb: number): number => {
-      if (val === undefined || val === null) return fb;
-      if (typeof val === 'number') return val;
-      return (val as Record<Year, number>)[yr] ?? fb;
-    };
-
     const finNodes = {
       '8D': tree.find(n => n.code === '8D'),   // Despesas Financeiras
       'OR': tree.find(n => n.code === 'OR'),     // Outras Receitas
