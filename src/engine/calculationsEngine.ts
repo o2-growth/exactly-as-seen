@@ -1370,47 +1370,121 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   );
 
   // Revenue total override for 2026 (Jan-Mar real + Apr-Dec engine).
-  // Same as 2025: ensures P&L shows reasonable value before Supabase loads.
   override('1', 2026, grossRev2026);
 
   // Deductions
   override('2', 2026, deductions2026);
   override('NR', 2026, netRev2026);
 
-  // COGS distribution 2026
-  const engCogs2026 = years[2026].cogs;
-  if (engCogs2026 !== 0) {
-    const { caas: ec, customerService: ecs, saas: es, education: ee, baas: eb } = years[2026].cogsDetail;
-    override('3.1', 2026, totalCogs2026 * (ec  / engCogs2026));
-    override('3.2', 2026, totalCogs2026 * (es  / engCogs2026));
-    override('3.3', 2026, totalCogs2026 * (ee  / engCogs2026));
-    override('3.4', 2026, totalCogs2026 * (ecs / engCogs2026));
-    override('3.5', 2026, totalCogs2026 * (eb  / engCogs2026));
+  // COGS 2026 — real Jan-Mar from historicalCosts + engine Apr-Dec (same as 2025)
+  const histCost2026 = (key: string) => {
+    let total = 0;
+    for (let m = 1; m <= 3; m++) {
+      const period = `2026-${String(m).padStart(2, '0')}`;
+      total += (historicalCosts[key]?.[period] ?? 0) / 1000;
+    }
+    // Add engine Apr-Dec
+    for (let m = 3; m < 12; m++) total += eng26[m].cogs * 0; // will use per-BU below
+    return total;
+  };
+  // Per-BU: real Jan-Mar + engine proportion for Apr-Dec
+  const costBUs = [
+    { code: '3.1', key: 'Custos Caas', engineFn: (d: MonthlyPnL) => d.cogsCaas },
+    { code: '3.2', key: 'Custos SaaS', engineFn: (d: MonthlyPnL) => d.cogsSaas },
+    { code: '3.3', key: 'Custos Education', engineFn: (d: MonthlyPnL) => d.cogsEdu },
+    { code: '3.4', key: 'Custos Customer Success', engineFn: (d: MonthlyPnL) => d.cogsCS },
+    { code: '3.5', key: 'Custos Expansão', engineFn: (d: MonthlyPnL) => d.cogsBaas },
+    { code: '3.6', key: 'Custos Tax', engineFn: (d: MonthlyPnL) => d.cogsTax },
+  ];
+  // Check if engine monthly data has per-BU COGS; if not, use proportion
+  const hasPerBuMonthly = 'cogsCaas' in (eng26[0] || {});
+  if (hasPerBuMonthly) {
+    for (const bu of costBUs) {
+      let val = 0;
+      for (let m = 1; m <= 3; m++) {
+        val += (historicalCosts[bu.key]?.[`2026-${String(m).padStart(2, '0')}`] ?? 0) / 1000;
+      }
+      for (let m = 3; m < 12; m++) val += bu.engineFn(eng26[m]);
+      override(bu.code, 2026, -Math.abs(val));
+    }
+  } else {
+    // Fallback: real Jan-Mar sum + engine Apr-Dec total, distributed by engine proportion
+    const realQ1 = ['Custos Caas', 'Custos SaaS', 'Custos Education', 'Custos Customer Success', 'Custos Expansão', 'Custos Tax']
+      .reduce((s, k) => {
+        for (let m = 1; m <= 3; m++) s += (historicalCosts[k]?.[`2026-${String(m).padStart(2, '0')}`] ?? 0) / 1000;
+        return s;
+      }, 0);
+    const engineQ234 = eng26.slice(3).reduce((s, d) => s + d.cogs, 0);
+    const totalMixed = realQ1 + Math.abs(engineQ234);
+    const engCogs2026 = years[2026].cogs;
+    if (engCogs2026 !== 0) {
+      const { caas: ec, customerService: ecs, saas: es, education: ee, baas: eb } = years[2026].cogsDetail;
+      const engTotal = Math.abs(engCogs2026);
+      override('3.1', 2026, -(totalMixed * (Math.abs(ec)  / engTotal)));
+      override('3.2', 2026, -(totalMixed * (Math.abs(es)  / engTotal)));
+      override('3.3', 2026, -(totalMixed * (Math.abs(ee)  / engTotal)));
+      override('3.4', 2026, -(totalMixed * (Math.abs(ecs) / engTotal)));
+      override('3.5', 2026, -(totalMixed * (Math.abs(eb)  / engTotal)));
+    }
   }
 
   override('GP', 2026, grossProfit2026);
   const gmPct2026 = netRev2026 !== 0 ? (grossProfit2026 / netRev2026) * 100 : 0;
   override('GM%', 2026, Number(gmPct2026.toFixed(1)));
 
-  // Fixed expenses distribution 2026
-  const engMkt2026  = years[2026].marketing;
-  const engComm2026 = years[2026].commercial;
-  const engHc2026   = years[2026].headcount;
-  const engSga2026  = years[2026].sga;
-  const engFixed2026 = engMkt2026 + engComm2026 + engHc2026 + engSga2026;
-  if (engFixed2026 !== 0) {
-    override('7', 2026, fixedExpenses2026 * (engMkt2026  / engFixed2026));
-    override('6', 2026, fixedExpenses2026 * (engComm2026 / engFixed2026));
-    override('5', 2026, fixedExpenses2026 * (engHc2026   / engFixed2026));
-    override('4', 2026, fixedExpenses2026 * (engSga2026  / engFixed2026));
+  // Fixed expenses 2026 — real Jan-Mar from historicalExpenses + engine Apr-Dec
+  const expCategories = [
+    { code: '7', key: 'Despesas de Marketing', engineFn: (d: MonthlyPnL) => d.marketing },
+    { code: '6', key: 'Despesas Comerciais', engineFn: (d: MonthlyPnL) => d.commercial },
+    { code: '5', key: 'Despesas com Pessoal', engineFn: (d: MonthlyPnL) => d.headcount },
+    { code: '4', key: 'Despesas Administrativas', engineFn: (d: MonthlyPnL) => d.sga },
+  ];
+  for (const exp of expCategories) {
+    let val = 0;
+    for (let m = 1; m <= 3; m++) {
+      val += (historicalExpenses[exp.key]?.[`2026-${String(m).padStart(2, '0')}`] ?? 0) / 1000;
+    }
+    for (let m = 3; m < 12; m++) val += Math.abs(exp.engineFn(eng26[m]));
+    override(exp.code, 2026, -val);
   }
 
   override('EBITDA', 2026, ebitda2026);
   const ebitdaPct2026 = netRev2026 !== 0 ? (ebitda2026 / netRev2026) * 100 : 0;
   override('EBITDA%', 2026, Number(ebitdaPct2026.toFixed(1)));
 
-  // Financial result 2026 and taxes — handled by context percentages (2026 is partial,
-  // engine already sets EBITDA/NI/FCR totals via mixedYear)
+  // Financial result 2026 — real Jan-Mar from historicalFinancial + engine Apr-Dec percentages
+  const recFin2026 = sumFinancialGroup('RF', 2026) / 1000;
+  const despFin2026 = sumFinancialGroup('DF', 2026) / 1000;
+  const outrasRec2026 = sumFinancialGroup('RNO', 2026) / 1000;
+  const despNaoOp2026 = sumFinancialGroup('DNO', 2026) / 1000;
+  // Add engine Apr-Dec financial result (already computed as percentage × grossRev per month)
+  let engRecFin = 0, engDespFin = 0;
+  for (let m = 3; m < 12; m++) {
+    const gr = eng26[m].grossRevenue;
+    engRecFin += gr * (getYearPercent(years[2026] as any, 2026, 0.5) / 100);
+    engDespFin += gr * (getYearPercent(years[2026] as any, 2026, 1.5) / 100);
+  }
+  // For simplicity, use the real Q1 values + engine computes the rest in buildPnlTree
+  // Just override with the real Q1 sum (the engine already has Apr-Dec from buildPnlTree)
+  // sumFinancialGroup sums only the 3 historical months (Jan-Mar) for 2026.
+  // The buildPnlTree already set engine values for Apr-Dec via percentage formula.
+  // We add Q1 real to the engine's annual percentage-based value.
+  const finNode8R = findNode(tree, '8R');
+  const finNode8D = findNode(tree, '8D');
+  const finNodeOR = findNode(tree, 'OR');
+  const finNodeDNO = findNode(tree, 'DNO');
+  if (finNode8R) finNode8R.annual[2026] = recFin2026 + (finNode8R.annual[2026] ?? 0) * (9/12);
+  if (finNode8D) finNode8D.annual[2026] = -despFin2026 + (finNode8D.annual[2026] ?? 0) * (9/12);
+  if (finNodeOR) finNodeOR.annual[2026] = outrasRec2026 + (finNodeOR.annual[2026] ?? 0) * (9/12);
+  if (finNodeDNO) finNodeDNO.annual[2026] = -despNaoOp2026 + (finNodeDNO.annual[2026] ?? 0) * (9/12);
+
+  // Tax 2026 — real Jan-Mar from Provisão IRPJ/CSLL + engine Apr-Dec
+  let provQ1 = 0;
+  for (let m = 1; m <= 3; m++) {
+    provQ1 += (historicalCosts['Provisão IRPJ/CSLL']?.[`2026-${String(m).padStart(2, '0')}`] ?? 0) / 1000;
+  }
+  const engTaxQ234 = eng26.slice(3).reduce((s, d) => s + Math.abs(d.taxes), 0);
+  override('TAX', 2026, -(provQ1 + engTaxQ234));
 
   override('NI', 2026, netIncome2026);
   const nmPct2026 = netRev2026 !== 0 ? (netIncome2026 / netRev2026) * 100 : 0;

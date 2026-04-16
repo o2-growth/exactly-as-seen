@@ -257,9 +257,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const node1 = tree.find(n => n.code === '1');
     if (node1) {
       for (const y of YEARS) {
-        // 2025 is fully realized — engine already set real Oxy values from historicalMetrics/Revenue.
-        // Only recompute revenue from sub-product assumptions for projected years.
-        if (y <= 2025) continue;
+        // 2025 fully realized, 2026 partial (Jan-Mar real + Apr-Dec engine).
+        // Engine applyHistoricalOverrides handles both. Only recompute for 2027+.
+        if (y <= 2026) continue;
 
         let total = 0;
         for (const bu of buGroups) {
@@ -278,9 +278,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const taxNode = tree.find(n => n.code === 'TAX');
     if (taxNode) {
       for (const y of YEARS) {
-        // 2025 is fully realized — engine already set real Oxy IRPJ/CSLL from Provisão.
-        // Only recompute for projected years.
-        if (y <= 2025) continue;
+        // 2025 fully realized, 2026 partial — engine handles both with real Oxy data.
+        // Only recompute for 2027+.
+        if (y <= 2026) continue;
 
         // Compute per-product tax using the shared taxCalc.ts
         const productTaxResults = ALL_SUBPRODUCT_KEYS.map(key => {
@@ -319,9 +319,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     const recFinNode = tree.find(n => n.code === '8R');
 
     for (const y of YEARS) {
-      // 2025 is fully realized — engine already set real Oxy values from historicalFinancial.
-      // 2026+ use percentage-based formula (2026 is partial but totals are set by engine mixedYear).
-      if (y <= 2025) continue;
+      // 2025 fully realized, 2026 partial — engine handles both with real Oxy data.
+      // Only apply percentage formula for 2027+.
+      if (y <= 2026) continue;
 
       const revenueTotal = node1?.annual[y] ?? 0; // already patched above (R$ thousands)
       const recFinRate = getYearPct(assumptions.receitasFinanceirasPercent, y, 0.5) / 100;
