@@ -1233,6 +1233,50 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
     if (node) node.annual[year] = value;
   }
 
+  // Helper: set monthly values from historical data source for specific months
+  // Reads from a source like historicalMetrics/historicalCosts/historicalExpenses
+  function overrideMonthly(
+    code: string, year: Year,
+    source: Record<string, Record<string, number>>,
+    key: string,
+    months: number, // how many months to override (12 for 2025, 3 for 2026)
+    sign: number = 1, // 1 for positive, -1 for negative (costs/expenses)
+  ): void {
+    const node = findNode(tree, code);
+    if (!node) return;
+    if (!node.monthly) node.monthly = {};
+    if (!node.monthly[year]) node.monthly[year] = new Array(12).fill(0);
+    for (let m = 0; m < months; m++) {
+      const period = `${year}-${String(m + 1).padStart(2, '0')}`;
+      const val = source[key]?.[period];
+      if (val !== undefined) {
+        node.monthly[year][m] = sign * val / 1000; // R$ → R$ thousands
+      }
+    }
+  }
+
+  // Helper: set monthly values from historicalFinancial (nested structure)
+  function overrideMonthlyFinancial(
+    code: string, year: Year, finCode: string, months: number, sign: number = 1,
+  ): void {
+    const node = findNode(tree, code);
+    if (!node) return;
+    if (!node.monthly) node.monthly = {};
+    if (!node.monthly[year]) node.monthly[year] = new Array(12).fill(0);
+    const groups = historicalFinancial[finCode];
+    if (!groups) return;
+    for (let m = 0; m < months; m++) {
+      const period = `${year}-${String(m + 1).padStart(2, '0')}`;
+      let total = 0;
+      for (const group of Object.values(groups)) {
+        for (const item of Object.values(group)) {
+          total += (item as Record<string, number>)[period] ?? 0;
+        }
+      }
+      node.monthly[year][m] = sign * total / 1000;
+    }
+  }
+
   // Helper: get partial-year value mixing real + engine for a metric node
   function mixedYear(
     source: Record<string, Record<string, number>>,
@@ -1347,6 +1391,48 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const nmPct2025 = netRev2025 !== 0 ? (netIncome2025 / netRev2025) * 100 : 0;
   override('NM%', 2025, Number(nmPct2025.toFixed(1)));
   override('FCR', 2025, finalResult2025);
+
+  // ── 2025: Monthly overrides (all 12 months from real Oxy) ──
+  overrideMonthly('1', 2025, historicalMetrics, 'RECEITA BRUTA', 12);
+  overrideMonthly('NR', 2025, historicalMetrics, 'RECEITA LÍQUIDA', 12);
+  overrideMonthly('GP', 2025, historicalMetrics, 'LUCRO BRUTO', 12);
+  overrideMonthly('EBITDA', 2025, historicalMetrics, 'EBITDA', 12);
+  // Deductions = RECEITA BRUTA - RECEITA LÍQUIDA per month
+  {
+    const node2 = findNode(tree, '2');
+    if (node2) {
+      if (!node2.monthly) node2.monthly = {};
+      if (!node2.monthly[2025]) node2.monthly[2025] = new Array(12).fill(0);
+      for (let m = 0; m < 12; m++) {
+        const period = `2025-${String(m + 1).padStart(2, '0')}`;
+        const rb = (historicalMetrics['RECEITA BRUTA']?.[period] ?? 0) / 1000;
+        const rl = (historicalMetrics['RECEITA LÍQUIDA']?.[period] ?? 0) / 1000;
+        node2.monthly[2025][m] = rl - rb;
+      }
+    }
+  }
+  // COGS per BU
+  overrideMonthly('3.1', 2025, historicalCosts, 'Custos Caas', 12, -1);
+  overrideMonthly('3.2', 2025, historicalCosts, 'Custos SaaS', 12, -1);
+  overrideMonthly('3.3', 2025, historicalCosts, 'Custos Education', 12, -1);
+  overrideMonthly('3.4', 2025, historicalCosts, 'Custos Customer Success', 12, -1);
+  overrideMonthly('3.5', 2025, historicalCosts, 'Custos Expansão', 12, -1);
+  overrideMonthly('3.6', 2025, historicalCosts, 'Custos Tax', 12, -1);
+  // SG&A per category
+  overrideMonthly('7', 2025, historicalExpenses, 'Despesas de Marketing', 12, -1);
+  overrideMonthly('6', 2025, historicalExpenses, 'Despesas Comerciais', 12, -1);
+  overrideMonthly('5', 2025, historicalExpenses, 'Despesas com Pessoal', 12, -1);
+  overrideMonthly('4', 2025, historicalExpenses, 'Despesas Administrativas', 12, -1);
+  // Financial result
+  overrideMonthlyFinancial('8R', 2025, 'RF', 12, 1);
+  overrideMonthlyFinancial('8D', 2025, 'DF', 12, -1);
+  overrideMonthlyFinancial('OR', 2025, 'RNO', 12, 1);
+  overrideMonthlyFinancial('DNO', 2025, 'DNO', 12, -1);
+  // Tax
+  overrideMonthly('TAX', 2025, historicalCosts, 'Provisão IRPJ/CSLL', 12, -1);
+  // NI and FCR
+  overrideMonthly('NI', 2025, historicalMetrics, 'RESULTADO LÍQUIDO', 12);
+  overrideMonthly('FCR', 2025, historicalMetrics, 'RESULTADO FINAL', 12);
 
   // ── 2026: Partial year — real Jan-Mar + engine Apr-Dec ────────────────────
 
@@ -1490,6 +1576,46 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const nmPct2026 = netRev2026 !== 0 ? (netIncome2026 / netRev2026) * 100 : 0;
   override('NM%', 2026, Number(nmPct2026.toFixed(1)));
   override('FCR', 2026, finalResult2026);
+
+  // ── 2026: Monthly overrides (Jan-Mar from real Oxy, Apr-Dec keep engine values) ──
+  overrideMonthly('1', 2026, historicalMetrics, 'RECEITA BRUTA', 3);
+  overrideMonthly('NR', 2026, historicalMetrics, 'RECEITA LÍQUIDA', 3);
+  overrideMonthly('GP', 2026, historicalMetrics, 'LUCRO BRUTO', 3);
+  overrideMonthly('EBITDA', 2026, historicalMetrics, 'EBITDA', 3);
+  // Deductions per month
+  {
+    const node2 = findNode(tree, '2');
+    if (node2?.monthly?.[2026]) {
+      for (let m = 0; m < 3; m++) {
+        const period = `2026-${String(m + 1).padStart(2, '0')}`;
+        const rb = (historicalMetrics['RECEITA BRUTA']?.[period] ?? 0) / 1000;
+        const rl = (historicalMetrics['RECEITA LÍQUIDA']?.[period] ?? 0) / 1000;
+        node2.monthly[2026][m] = rl - rb;
+      }
+    }
+  }
+  // COGS per BU
+  overrideMonthly('3.1', 2026, historicalCosts, 'Custos Caas', 3, -1);
+  overrideMonthly('3.2', 2026, historicalCosts, 'Custos SaaS', 3, -1);
+  overrideMonthly('3.3', 2026, historicalCosts, 'Custos Education', 3, -1);
+  overrideMonthly('3.4', 2026, historicalCosts, 'Custos Customer Success', 3, -1);
+  overrideMonthly('3.5', 2026, historicalCosts, 'Custos Expansão', 3, -1);
+  overrideMonthly('3.6', 2026, historicalCosts, 'Custos Tax', 3, -1);
+  // SG&A per category
+  overrideMonthly('7', 2026, historicalExpenses, 'Despesas de Marketing', 3, -1);
+  overrideMonthly('6', 2026, historicalExpenses, 'Despesas Comerciais', 3, -1);
+  overrideMonthly('5', 2026, historicalExpenses, 'Despesas com Pessoal', 3, -1);
+  overrideMonthly('4', 2026, historicalExpenses, 'Despesas Administrativas', 3, -1);
+  // Financial result
+  overrideMonthlyFinancial('8R', 2026, 'RF', 3, 1);
+  overrideMonthlyFinancial('8D', 2026, 'DF', 3, -1);
+  overrideMonthlyFinancial('OR', 2026, 'RNO', 3, 1);
+  overrideMonthlyFinancial('DNO', 2026, 'DNO', 3, -1);
+  // Tax
+  overrideMonthly('TAX', 2026, historicalCosts, 'Provisão IRPJ/CSLL', 3, -1);
+  // NI and FCR
+  overrideMonthly('NI', 2026, historicalMetrics, 'RESULTADO LÍQUIDO', 3);
+  overrideMonthly('FCR', 2026, historicalMetrics, 'RESULTADO FINAL', 3);
 }
 
 // ─── BUILD PNL TREE ───
