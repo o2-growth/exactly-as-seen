@@ -268,12 +268,13 @@ export default function PnL() {
   const { customLabels, hiddenItems, setLabel, toggleHidden } = useChartOfAccounts();
   const pnlTree = useMemo(() => groupByHeaders(rawPnlTree), [rawPnlTree]);
 
-  // Gross revenue per year for vertical analysis
+  // Gross revenue per year for vertical analysis — use pnlTree (patched) values
   const grossRevenueByYear = useMemo(() => {
     const r = {} as Record<Year, number>;
-    for (const y of YEARS) r[y] = model.years[y].grossRevenue;
+    const node1 = pnlTree.find(n => n.code === '1');
+    for (const y of YEARS) r[y] = node1?.annual[y] ?? model.years[y].grossRevenue;
     return r;
-  }, [model]);
+  }, [model, pnlTree]);
 
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
