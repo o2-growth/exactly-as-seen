@@ -5,6 +5,7 @@ import {
   CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS,
   TicketKey, DEFAULT_COS_CONFIG,
 } from '@/lib/financialData';
+import { salesDeductionsByYear } from '@/data/modelData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
 import { computeProductAnnualRevenue } from '@/lib/revenueCalc';
