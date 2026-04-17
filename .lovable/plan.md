@@ -1,55 +1,55 @@
 
 
-## Lógica atual do COS e plano de melhoria
+## Plano: Fix análise vertical do P&L (linhas mostrando >100% da Receita Bruta) + build errors
 
-### Como funciona hoje
+### Diagnóstico do problema
 
-A aba COS (Cost of Service) calcula custos operacionais em 6 categorias, todas derivadas das premissas (Assumptions):
+A análise vertical divide cada linha por `grossRevenueByYear[ano]`. Para 2026, a Receita Bruta é **patchada no contexto** (`FinancialModelContext.tsx` linha 257-273) somando os subprodutos das BUs editáveis pelo usuário. Isso faz com que o valor patchado de Receita Bruta seja DIFERENTE do que o engine usou para calcular as outras linhas dependentes.
 
-```text
-Assumptions (clientes, receita, cosConfig)
-    │
-    ▼
-calcCOSFromConfig() — engine mensal
-    │
-    ├── 3.1 CaaS: Headcount por ratio (PFD 1:100, CFO 1:15, FP&A 1:7.5) × salário
-    ├── 3.2 SaaS: Dev Sr + CS por base ativa; Squad Setup por novos/mês
-    ├── 3.3 Education: 15% da receita bruta
-    ├── 3.4 Customer Success: CX Analyst 1:100 clientes CaaS
-    ├── 3.5 Expansão: 15% da receita bruta
-    └── 3.6 Tax: 15% da receita bruta
-    │
-    ▼
-P&L → Lucro Bruto → restante da plataforma
+Resultado: nós que **NÃO foram repatchados** (RECEITA LÍQUIDA `code:'NR'`, LUCRO BRUTO `code:'GP'`, EBITDA, custos COGS de algumas BUs, deduções `code:'2'`, etc.) continuam com valores baseados na Receita Bruta original do engine. Quando dividimos esses valores antigos pela nova Receita Bruta menor (patchada), aparece **123,8%** ou outros percentuais > 100%.
+
+Exemplo concreto:
+- Engine calculou Receita Bruta 2026 = R$ 40M, NR = R$ 36M, Deduções = R$ 4M.
+- User reduz tickets → contexto patcha node `'1'` para R$ 30M.
+- Mas `NR` continua R$ 36M (não foi patchado).
+- Análise vertical: 36/30 = **120%** ← bug.
+
+### Correção
+
+Em `src/contexts/FinancialModelContext.tsx`, dentro do mesmo `useMemo` que patcha node `'1'` (linhas 258-274), recalcular consistentemente para 2026+:
+
+1. **Deduções (`code:'2'`)**: aplicar a alíquota de deduções (PIS+COFINS+ISS+desc) sobre a nova Receita Bruta patchada → `dedAn = -patchedRevenue × dedRate(year)`. Usar `salesDeductionsByYear` de `data/modelData.ts`.
+2. **RECEITA LÍQUIDA (`code:'NR'`)**: `nr = patchedRevenue + dedAn` (deduções é negativo).
+3. **LUCRO BRUTO (`code:'GP'`)**: `gp = nr + cogsTotal` (somar nodes 3.1 a 3.6 já patchados).
+4. **GM% (`code:'GM%'`)**: `gp / nr × 100`.
+5. **EBITDA (`code:'EBITDA'`)**: `gp + sga(4+5+6+7)` (sga nodes já são patchados nas linhas 292-303).
+6. **EBITDA% (`code:'EBITDA%'`)**: `ebitda / nr × 100`.
+7. **NI (`code:'NI'`)**, **NM%**, **FCR (`code:'FCR'`)**: recalcular de forma análoga somando os nodes financeiros já patchados (`8R`, `8D`, `OR`, `DNO`) e provisão tributária `TAX`.
+
+Helper a adicionar:
+```ts
+const sumChildrenAnnual = (codes: string[], y: Year) =>
+  codes.reduce((s, c) => s + (findNode(tree, c)?.annual[y] ?? 0), 0);
 ```
 
-A tabela "Impacto COS por Ano" mostra os custos anuais e o % da receita, mas falta: (1) o detalhamento de headcount/squads projetados, (2) o custo real líquido considerando impostos, e (3) uma visão consolidada de margem bruta real.
+(Usaremos `findNode` exportado do engine ou uma lookup local sobre `tree`.)
 
-### O que será adicionado
+### Build errors (pré-existentes)
 
-**1. Tabela de Squads Projetados por Ano** — abaixo dos cards de configuração, uma tabela mostrando para cada ano (2025–2030):
-- Clientes CaaS ativos → PFDs, CFOs, FP&As necessários → Total headcount CaaS
-- Clientes SaaS ativos → Dev Srs, CSs necessários
-- Novos clientes/mês → Squads Setup, Head of Data
-- Clientes CaaS → CX Analysts
-- **Total de pessoas no COS** por ano
+Resolver os 18 erros de tipo em `src/engine/calculationsEngine.ts` e `src/lib/financialData.ts`:
 
-**2. Resumo Financeiro Real (final da página)** — tabela consolidada por ano:
-- Receita Bruta (do engine)
-- Impostos (usando as premissas tributárias já configuradas na plataforma — `subProductTaxRates`)
-- Receita Líquida (após deduções)
-- COS Total (valor absoluto)
-- **Lucro Bruto** (Receita Líquida - COS)
-- **Margem Bruta %** (Lucro Bruto / Receita Líquida)
-- Headcount total COS
+- **Linhas 1247, 1264, 1404**: `node.monthly = {}` precisa cast: `node.monthly = {} as Record<Year, number[]>`.
+- **Linha 1295**: `historicalRevenueItems[group] ?? {}` — o fallback `{}` precisa ser tipado como `Record<string, Record<string, number>>`.
+- **Linhas 1478-1483**: `MonthlyPnL` não tem `cogsCaas/cogsSaas/cogsEdu/cogsCS/cogsBaas/cogsTax`. A flag `hasPerBuMonthly` (linha 1486) já garante que esse bloco nunca executa em runtime, mas o TS reclama. Solução: usar cast `(d as any).cogsCaas` nas funções `engineFn`.
+- **Linhas 830-842 em `financialData.ts`**: `SubProductClients` precisa de index signature `[key: string]: Record<Year, number>` ou cast para o tipo esperado nas chamadas.
 
-Todos os valores são lidos diretamente de `model.years[y]` (que já processa impostos das premissas tributárias).
-
-### Detalhes técnicos
+### Arquivos alterados
 
 | Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/Assumptions.tsx` | Adicionar tabela de squads projetados e resumo financeiro real no final do `TabsContent value="cos"` |
+|---|---|
+| `src/contexts/FinancialModelContext.tsx` | Adicionar repatch de NR, GP, GM%, EBITDA, EBITDA%, NI, NM%, FCR e Deduções (code '2') após o patch de node '1' |
+| `src/engine/calculationsEngine.ts` | Casts de tipo em linhas 1247, 1264, 1295, 1404, 1478-1483 |
+| `src/lib/financialData.ts` | Cast em linhas 830, 831, 842 para SubProductClients |
 
-Nenhuma alteração no engine ou em `financialData.ts` — todos os dados necessários já existem em `model.years[y]` (grossRevenue, deductions, netRevenue, grossProfit, grossMarginPct) e a lógica de headcount já está calculada no `yearImpact` existente. É puramente uma adição de UI na aba COS.
+Nenhuma alteração visual — apenas a análise vertical passará a mostrar 100% para RECEITA BRUTA e percentuais corretos < 100% para as demais linhas.
 
