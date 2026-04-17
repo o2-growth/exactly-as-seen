@@ -14,8 +14,10 @@ import { getYearDataSource, resolveAnnualMetric, resolveMonthlyMetric } from '@/
 // ---------------------------------------------------------------------------
 // Period-aware data helpers
 // ---------------------------------------------------------------------------
-function getKpiValue(metric: string, year: Year, engineVal: number): number {
-  return resolveAnnualMetric(metric, year, engineVal);
+// projections now come from pnlTree (already patched with real data + context).
+// No need for resolveAnnualMetric — values are already correct.
+function getKpiValue(_metric: string, _year: Year, pnlTreeVal: number): number {
+  return pnlTreeVal;
 }
 
 /** Badge shown next to the year to indicate data type. */

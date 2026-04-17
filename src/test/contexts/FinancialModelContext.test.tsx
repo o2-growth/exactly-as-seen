@@ -92,12 +92,20 @@ describe('FinancialModelContext', () => {
     expect(result.current.filteredYears).toEqual([...YEARS]);
   });
 
-  it('projections are derived from model', () => {
+  it('projections are derived from pnlTree (patched values)', () => {
     const { result } = renderHook(() => useFinancialModel(), { wrapper });
+    const node1 = result.current.pnlTree.find(n => n.code === '1');
     for (const y of PROJECTED_YEARS) {
-      expect(result.current.projections.grossRevenue[y]).toBe(
-        result.current.model.years[y].grossRevenue
-      );
+      // projections now come from pnlTree, not raw engine output
+      const treeVal = node1?.annual[y] ?? 0;
+      if (treeVal > 0) {
+        expect(result.current.projections.grossRevenue[y]).toBe(treeVal);
+      } else {
+        // Fallback to engine if tree has no value
+        expect(result.current.projections.grossRevenue[y]).toBe(
+          result.current.model.years[y].grossRevenue
+        );
+      }
     }
   });
 });

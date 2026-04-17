@@ -395,17 +395,23 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       grossMargins: {} as Record<Year, number>,
       netMargins: {} as Record<Year, number>,
     };
+    // Use pnlTree values (already patched with real Oxy data + context adjustments)
+    // instead of raw engine values, so Overview/projections match P&L exactly.
+    const findTreeNode = (code: string) => pnlTree.find(n => n.code === code);
+    const treeVal = (code: string, yr: Year) => findTreeNode(code)?.annual[yr] ?? 0;
+
     for (const y of YEARS) {
       const yr = model.years[y];
-      p.grossRevenue[y] = yr.grossRevenue;
-      p.netRevenue[y] = yr.netRevenue;
-      p.grossProfit[y] = yr.grossProfit;
-      p.ebitda[y] = yr.ebitda;
-      p.netIncome[y] = yr.netIncome;
-      p.operatingCashFlow[y] = yr.finalResult;
+      p.grossRevenue[y] = treeVal('1', y) || yr.grossRevenue;
+      p.netRevenue[y] = treeVal('NR', y) || yr.netRevenue;
+      p.grossProfit[y] = treeVal('GP', y) || yr.grossProfit;
+      p.ebitda[y] = treeVal('EBITDA', y) || yr.ebitda;
+      p.netIncome[y] = treeVal('NI', y) || yr.netIncome;
+      p.operatingCashFlow[y] = treeVal('FCR', y) || yr.finalResult;
       p.totalClients[y] = yr.totalClients;
-      p.grossMargins[y] = yr.grossMarginPct;
-      p.netMargins[y] = yr.netMarginPct;
+      const nr = p.netRevenue[y];
+      p.grossMargins[y] = nr !== 0 ? Number(((p.grossProfit[y] / nr) * 100).toFixed(1)) : 0;
+      p.netMargins[y] = nr !== 0 ? Number(((p.netIncome[y] / nr) * 100).toFixed(1)) : 0;
     }
     return p;
   }, [model]);
