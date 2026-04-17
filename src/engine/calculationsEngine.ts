@@ -1292,7 +1292,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const hist2025 = (key: string) => getHistoricalAnnual(historicalMetrics, key, 2025) ?? 0;
   const histRev2025 = (key: string) => getHistoricalAnnual(historicalRevenue, key, 2025) ?? 0;
   const histItem2025 = (group: string, item: string) =>
-    getHistoricalAnnual((historicalRevenueItems[group] ?? {}) as Record<string, Record<string, number>>, item, 2025) ?? 0;
+    getHistoricalAnnual(((historicalRevenueItems[group] ?? {}) as unknown) as Record<string, Record<string, number>>, item, 2025) ?? 0;
 
   // Revenue BU groups
   const caas2025    = histRev2025('CaaS');
