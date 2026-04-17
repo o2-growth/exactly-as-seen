@@ -5,6 +5,7 @@ import {
   CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS,
   TicketKey, DEFAULT_COS_CONFIG,
 } from '@/lib/financialData';
+import { salesDeductionsByYear } from '@/data/modelData';
 import { PnlNode } from '@/lib/pnlData';
 import { computeFullModel, FullModelOutput } from '@/engine/calculationsEngine';
 import { computeProductAnnualRevenue } from '@/lib/revenueCalc';
@@ -377,6 +378,60 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       if (finNodes['8D']) finNodes['8D'].annual[y] = -(revenueTotal * despFinRate);
       if (finNodes['OR']) finNodes['OR'].annual[y] = revenueTotal * outrasRecRate;
       if (finNodes['DNO']) finNodes['DNO'].annual[y] = -(revenueTotal * despNaoOpRate);
+    }
+
+    // ── Recalculate dependent summary nodes (Deduções, NR, GP, GM%, EBITDA, EBITDA%, NI, NM%, FCR) ──
+    // Required so vertical analysis stays consistent: every line is referenced against the
+    // patched Receita Bruta (node '1'). Without this, NR/GP/EBITDA still hold engine values
+    // computed from the original (un-patched) gross revenue, producing % > 100%.
+    const findInTree = (code: string): PnlNode | undefined => {
+      const stack: PnlNode[] = [...tree];
+      while (stack.length) {
+        const n = stack.pop()!;
+        if (n.code === code) return n;
+        if (n.children) stack.push(...n.children);
+      }
+      return undefined;
+    };
+    const sumCodes = (codes: string[], y: Year) =>
+      codes.reduce((s, c) => s + (findInTree(c)?.annual[y] ?? 0), 0);
+
+    const node2 = findInTree('2');
+    const nodeNR = findInTree('NR');
+    const nodeGP = findInTree('GP');
+    const nodeGM = findInTree('GM%');
+    const nodeEB = findInTree('EBITDA');
+    const nodeEBp = findInTree('EBITDA%');
+    const nodeNI = findInTree('NI');
+    const nodeNM = findInTree('NM%');
+    const nodeFCR = findInTree('FCR');
+    const nodeTAX = findInTree('TAX');
+
+    for (const y of YEARS) {
+      if (y <= 2025) continue;
+      const patchedRevenue = node1?.annual[y] ?? 0;
+      const dedRate = salesDeductionsByYear[y] ?? 0.0965;
+      const dedAn = -patchedRevenue * dedRate;
+      const cogsTotal = sumCodes(['3.1', '3.2', '3.3', '3.4', '3.5', '3.6'], y);
+      const sgaTotal = sumCodes(['4', '5', '6', '7'], y);
+      const finTotal = sumCodes(['8R', '8D', 'OR', 'DNO'], y);
+      const taxAn = nodeTAX?.annual[y] ?? 0;
+
+      const nr = patchedRevenue + dedAn;
+      const gp = nr + cogsTotal;
+      const ebitda = gp + sgaTotal;
+      const ni = ebitda + finTotal + taxAn;
+      const fcr = ni;
+
+      if (node2) node2.annual[y] = dedAn;
+      if (nodeNR) nodeNR.annual[y] = nr;
+      if (nodeGP) nodeGP.annual[y] = gp;
+      if (nodeGM) nodeGM.annual[y] = nr !== 0 ? (gp / nr) * 100 : 0;
+      if (nodeEB) nodeEB.annual[y] = ebitda;
+      if (nodeEBp) nodeEBp.annual[y] = nr !== 0 ? (ebitda / nr) * 100 : 0;
+      if (nodeNI) nodeNI.annual[y] = ni;
+      if (nodeNM) nodeNM.annual[y] = nr !== 0 ? (ni / nr) * 100 : 0;
+      if (nodeFCR) nodeFCR.annual[y] = fcr;
     }
 
     return tree;
