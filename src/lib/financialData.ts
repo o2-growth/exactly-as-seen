@@ -825,8 +825,8 @@ export function calculateProjections(
   };
 
   for (const year of YEARS) {
-    const sp = assumptions.subProductClients;
-    const dsp = DEFAULT_ASSUMPTIONS.subProductClients;
+    const sp = assumptions.subProductClients as unknown as Record<string, Record<Year, number>>;
+    const dsp = DEFAULT_ASSUMPTIONS.subProductClients as unknown as Record<string, Record<Year, number>>;
     const curTotal = sumBUClients(CAAS_KEYS, sp, year) + sumBUClients(SAAS_KEYS, sp, year) + sumBUClients(EDUCATION_KEYS, sp, year) + sumBUClients(TAX_KEYS, sp, year);
     const defTotal = sumBUClients(CAAS_KEYS, dsp, year) + sumBUClients(SAAS_KEYS, dsp, year) + sumBUClients(EDUCATION_KEYS, dsp, year) + sumBUClients(TAX_KEYS, dsp, year);
     const clientRatio = defTotal > 0 ? curTotal / defTotal : 1;

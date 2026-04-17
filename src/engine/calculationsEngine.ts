@@ -1244,7 +1244,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   ): void {
     const node = findNode(tree, code);
     if (!node) return;
-    if (!node.monthly) node.monthly = {};
+    if (!node.monthly) node.monthly = {} as Record<Year, number[]>;
     if (!node.monthly[year]) node.monthly[year] = new Array(12).fill(0);
     for (let m = 0; m < months; m++) {
       const period = `${year}-${String(m + 1).padStart(2, '0')}`;
@@ -1261,7 +1261,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   ): void {
     const node = findNode(tree, code);
     if (!node) return;
-    if (!node.monthly) node.monthly = {};
+    if (!node.monthly) node.monthly = {} as Record<Year, number[]>;
     if (!node.monthly[year]) node.monthly[year] = new Array(12).fill(0);
     const groups = historicalFinancial[finCode];
     if (!groups) return;
@@ -1292,7 +1292,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   const hist2025 = (key: string) => getHistoricalAnnual(historicalMetrics, key, 2025) ?? 0;
   const histRev2025 = (key: string) => getHistoricalAnnual(historicalRevenue, key, 2025) ?? 0;
   const histItem2025 = (group: string, item: string) =>
-    getHistoricalAnnual(historicalRevenueItems[group] ?? {}, item, 2025) ?? 0;
+    getHistoricalAnnual((historicalRevenueItems[group] ?? {}) as Record<string, Record<string, number>>, item, 2025) ?? 0;
 
   // Revenue BU groups
   const caas2025    = histRev2025('CaaS');
@@ -1401,7 +1401,7 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   {
     const node2 = findNode(tree, '2');
     if (node2) {
-      if (!node2.monthly) node2.monthly = {};
+      if (!node2.monthly) node2.monthly = {} as Record<Year, number[]>;
       if (!node2.monthly[2025]) node2.monthly[2025] = new Array(12).fill(0);
       for (let m = 0; m < 12; m++) {
         const period = `2025-${String(m + 1).padStart(2, '0')}`;
@@ -1475,12 +1475,12 @@ function applyHistoricalOverrides(tree: PnlNode[], years: Record<Year, AnnualOut
   };
   // Per-BU: real Jan-Mar + engine proportion for Apr-Dec
   const costBUs = [
-    { code: '3.1', key: 'Custos Caas', engineFn: (d: MonthlyPnL) => d.cogsCaas },
-    { code: '3.2', key: 'Custos SaaS', engineFn: (d: MonthlyPnL) => d.cogsSaas },
-    { code: '3.3', key: 'Custos Education', engineFn: (d: MonthlyPnL) => d.cogsEdu },
-    { code: '3.4', key: 'Custos Customer Success', engineFn: (d: MonthlyPnL) => d.cogsCS },
-    { code: '3.5', key: 'Custos Expansão', engineFn: (d: MonthlyPnL) => d.cogsBaas },
-    { code: '3.6', key: 'Custos Tax', engineFn: (d: MonthlyPnL) => d.cogsTax },
+    { code: '3.1', key: 'Custos Caas', engineFn: (d: MonthlyPnL) => (d as any).cogsCaas ?? 0 },
+    { code: '3.2', key: 'Custos SaaS', engineFn: (d: MonthlyPnL) => (d as any).cogsSaas ?? 0 },
+    { code: '3.3', key: 'Custos Education', engineFn: (d: MonthlyPnL) => (d as any).cogsEdu ?? 0 },
+    { code: '3.4', key: 'Custos Customer Success', engineFn: (d: MonthlyPnL) => (d as any).cogsCS ?? 0 },
+    { code: '3.5', key: 'Custos Expansão', engineFn: (d: MonthlyPnL) => (d as any).cogsBaas ?? 0 },
+    { code: '3.6', key: 'Custos Tax', engineFn: (d: MonthlyPnL) => (d as any).cogsTax ?? 0 },
   ];
   // Check if engine monthly data has per-BU COGS; if not, use proportion
   const hasPerBuMonthly = 'cogsCaas' in (eng26[0] || {});
