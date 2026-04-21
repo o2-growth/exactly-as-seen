@@ -30,7 +30,7 @@ import { TAX_PREMISES, type TaxPremise } from '@/data/taxPremises';
 import { MONTHS, getMonthlyClients, getMonthlyHeadcount } from '@/lib/monthlyData';
 import { resolveAnnualMetric } from '@/lib/periodResolution';
 import { formatCurrency, formatCurrencyFull } from '@/lib/formatters';
-import { Lock, Unlock, Save, X, RotateCcw, Scale, Receipt, Landmark, Info, BadgePercent, UserCheck, Pencil, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Lock, Unlock, Save, X, RotateCcw, Scale, Receipt, Landmark, Info, BadgePercent, UserCheck, Pencil, ChevronDown, ChevronRight, Plus, History, RotateCw, Clock } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -251,7 +251,8 @@ function findNodeInTree(code: string, nodes: PnlNode[]): PnlNode | undefined {
 }
 
 export default function Assumptions() {
-  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow, dataReady } = useFinancialModel();
+  const { assumptions, setAssumptions, resetAssumptions, scenario, projections, model, filteredYears, saveNow, dataReady, snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog } = useFinancialModel();
+  const [showAuditLog, setShowAuditLog] = useState(false);
   const { saveVersion } = useVersionHistory();
   const { data: historicalData, loading: historicalLoading } = useHistoricalClients();
 
@@ -1232,6 +1233,44 @@ export default function Assumptions() {
           <p className="text-xs text-muted-foreground mt-1">Premissas da modelagem financeira. Os valores definidos aqui alimentam o P&L projetado, Cash Flow e demais demonstrações.</p>
         </div>
         <div className="flex items-center gap-2">
+          {snapshots.length >= 1 && (() => {
+            const activeSnap = snapshots.find(s => s.is_active);
+            return (
+              <div className="flex items-center gap-1.5">
+                {activeSnap && (
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={activeSnap.name}>
+                    Sessão: {activeSnap.name?.replace(/^Auto-save /, '')}
+                  </span>
+                )}
+                <select
+                  className="px-2 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary"
+                  defaultValue=""
+                  onChange={async (e) => {
+                    const id = e.target.value;
+                    if (!id) return;
+                    const loaded = await restoreSnapshot(id);
+                    if (loaded) setAssumptions(loaded);
+                    e.target.value = '';
+                  }}
+                >
+                  <option value="" disabled>Restaurar versão...</option>
+                  {snapshots.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {new Date(s.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {s.is_active ? ' (ativo)' : ''}
+                      {s.change_summary ? ` [${s.change_summary.count} alterações]` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
+          <button
+            onClick={() => { setShowAuditLog(!showAuditLog); if (!showAuditLog) loadAuditLog(); }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${showAuditLog ? 'border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground hover:text-foreground'}`}
+          >
+            <History className="h-3.5 w-3.5" /> Histórico
+          </button>
           <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-positive bg-positive/10 border border-positive/30 rounded-lg">
             <Save className="h-3.5 w-3.5" /> Auto-save ativo
           </div>
@@ -1240,6 +1279,56 @@ export default function Assumptions() {
           </button>
         </div>
       </div>
+
+      {/* Audit Log Panel */}
+      {showAuditLog && (
+        <div className="border border-border rounded-lg bg-card p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4 text-primary" /> Histórico de Alterações
+            </h3>
+            <button onClick={() => setShowAuditLog(false)} className="text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {auditLog.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nenhum registro de alteração encontrado.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {auditLog.map(entry => (
+                <div key={entry.id} className="flex items-start gap-3 p-2 rounded-md bg-muted/50 text-xs">
+                  <div className="flex-shrink-0 mt-0.5">
+                    {entry.action === 'restore' ? (
+                      <RotateCw className="h-3.5 w-3.5 text-amber-500" />
+                    ) : entry.action === 'create' ? (
+                      <Plus className="h-3.5 w-3.5 text-positive" />
+                    ) : (
+                      <Pencil className="h-3.5 w-3.5 text-blue-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{entry.user_email || 'Usuário desconhecido'}</span>
+                      <span className="text-muted-foreground">
+                        {entry.action === 'create' ? 'criou' : entry.action === 'restore' ? 'restaurou' : 'editou'}
+                      </span>
+                      <span className="text-muted-foreground ml-auto flex-shrink-0">
+                        {new Date(entry.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {entry.changed_fields && entry.changed_fields.length > 0 && (
+                      <div className="mt-1 text-muted-foreground">
+                        Campos: {entry.changed_fields.slice(0, 5).join(', ')}
+                        {entry.changed_fields.length > 5 && ` +${entry.changed_fields.length - 5}`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Year Selector */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -1367,13 +1456,23 @@ export default function Assumptions() {
         </div>
       </div>
 
+      {(() => {
+        // Check which tax tabs are hidden via sidebar config
+        const hiddenNav: string[] = (() => { try { const s = localStorage.getItem('o2_hidden_nav'); return s ? JSON.parse(s) : []; } catch { return []; } })();
+        const showTaxTab = !hiddenNav.includes('/premissas');
+        const allTabs = [
+          { value: 'revenue', label: 'Revenue', visible: true },
+          { value: 'tax', label: 'Tax Deductions', visible: showTaxTab },
+          { value: 'cos', label: 'COS', visible: true },
+          { value: 'sga', label: 'SG&A', visible: true },
+          { value: 'economic', label: 'Econ. & Fin.', visible: true },
+        ].filter(t => t.visible);
+        return (
       <Tabs defaultValue="revenue" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="tax">Tax Deductions</TabsTrigger>
-          <TabsTrigger value="cos">COS</TabsTrigger>
-          <TabsTrigger value="sga">SG&A</TabsTrigger>
-          <TabsTrigger value="economic">Econ. & Fin.</TabsTrigger>
+        <TabsList className={`grid w-full`} style={{ gridTemplateColumns: `repeat(${allTabs.length}, 1fr)` }}>
+          {allTabs.map(t => (
+            <TabsTrigger key={t.value} value={t.value}>{t.label}</TabsTrigger>
+          ))}
         </TabsList>
 
         {/* ─── BLOCO 1: REVENUE ─── */}
@@ -3316,10 +3415,10 @@ export default function Assumptions() {
                 + (data.subProductClients.caasEnterprise?.[y] ?? 0)
                 + (data.subProductClients.caasCorporate?.[y] ?? 0);
 
-              // 3.1 CaaS
-              const numPFD = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.pfdClientsPerOne)));
-              const numCFO = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.cfoClientsPerOne)));
-              const numFPA = Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.fpaClientsPerOne)));
+              // 3.1 CaaS (only if there are clients)
+              const numPFD = caasEnd > 0 ? Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.pfdClientsPerOne))) : 0;
+              const numCFO = caasEnd > 0 ? Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.cfoClientsPerOne))) : 0;
+              const numFPA = caasEnd > 0 ? Math.max(1, Math.ceil(caasEnd / Math.max(1, cos.fpaClientsPerOne))) : 0;
               const caasCost = (numPFD * cos.pfdSalary + numCFO * cos.cfoSalary + numFPA * cos.fpaSalary);
 
               // 3.2 SaaS assinatura
@@ -3551,8 +3650,7 @@ export default function Assumptions() {
                         <tr className="border-b border-border">
                           <th className="text-left px-2 py-2 text-muted-foreground font-medium">Ano</th>
                           <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.1 CaaS</th>
-                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.2 SaaS</th>
-                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.2 Setup</th>
+                          <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.2 SaaS+Setup</th>
                           <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.3 Education</th>
                           <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.4 CS</th>
                           <th className="text-right px-2 py-2 text-muted-foreground font-medium">3.5 Expansão</th>
@@ -3562,53 +3660,190 @@ export default function Assumptions() {
                         </tr>
                       </thead>
                       <tbody>
-                        {yearImpact.map(yi => (
-                          <tr key={yi.year} className={`border-b border-border/30 hover:bg-secondary/20 ${yi.year === selectedYear ? 'bg-primary/5' : ''}`}>
-                            <td className="px-2 py-2 font-medium">{yi.year}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">
-                              <div className="flex items-center justify-end gap-0.5">
-                                {formatCurrency(yi.caasCost * 12)}
-                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('caas', yi.year, data, model)} iconSize={10} />}
-                              </div>
-                            </td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.saasSubCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.setupCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">
-                              <div className="flex items-center justify-end gap-0.5">
-                                {formatCurrency(yi.eduCost)}
-                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('education', yi.year, data, model)} iconSize={10} />}
-                              </div>
-                            </td>
-                            <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(yi.csCost * 12)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">
-                              <div className="flex items-center justify-end gap-0.5">
-                                {formatCurrency(yi.expansaoCost)}
-                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('expansao', yi.year, data, model)} iconSize={10} />}
-                              </div>
-                            </td>
-                            <td className="text-right px-2 py-2 tabular-nums">
-                              <div className="flex items-center justify-end gap-0.5">
-                                {formatCurrency(yi.taxCost)}
-                                {yi.year === selectedYear && <FormulaExplainer explanation={explainCOS('tax', yi.year, data, model)} iconSize={10} />}
-                              </div>
-                            </td>
-                            <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(yi.grandTotal)}</td>
-                            <td className="text-right px-2 py-2 tabular-nums">
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
-                                yi.pctRev > 25 ? 'bg-destructive/15 text-destructive' :
-                                yi.pctRev > 15 ? 'bg-amber-500/15 text-amber-500' :
-                                'bg-emerald-500/15 text-emerald-500'
-                              }`}>{yi.pctRev.toFixed(1)}%</span>
-                            </td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          // Read COS from pnlTree (has real Oxy data for 2025, engine+context patch for 2026+)
+                          const findCosNode = (nodes: typeof model.pnlTree, code: string): typeof model.pnlTree[0] | null => {
+                            for (const n of nodes) {
+                              if (n.code === code) return n;
+                              if (n.children) { const f = findCosNode(n.children, code); if (f) return f; }
+                            }
+                            return null;
+                          };
+                          const cosVal = (code: string, y: Year) => findCosNode(model.pnlTree, code)?.annual[y] ?? 0;
+                          const grossRevVal = (y: Year) => findCosNode(model.pnlTree, '1')?.annual[y] ?? model.years[y].grossRevenue;
+
+                          return yearImpact.map(yi => {
+                            const y = yi.year;
+                            const caasV = cosVal('3.1', y);
+                            const saasV = cosVal('3.2', y);
+                            const eduV = cosVal('3.3', y);
+                            const csV = cosVal('3.4', y);
+                            const baasV = cosVal('3.5', y);
+                            const taxV = cosVal('3.6', y);
+                            const total = caasV + saasV + eduV + csV + baasV + taxV;
+                            const gr = grossRevVal(y);
+                            const pctRev = gr !== 0 ? (Math.abs(total) / Math.abs(gr) * 100) : 0;
+
+                            return (
+                            <tr key={y} className={`border-b border-border/30 hover:bg-secondary/20 ${y === selectedYear ? 'bg-primary/5' : ''}`}>
+                              <td className="px-2 py-2 font-medium">{y}</td>
+                              <td className="text-right px-2 py-2 tabular-nums">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  {formatCurrency(caasV * 1000)}
+                                  {y === selectedYear && <FormulaExplainer explanation={explainCOS('caas', y, data, model)} iconSize={10} />}
+                                </div>
+                              </td>
+                              <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(saasV * 1000)}</td>
+                              <td className="text-right px-2 py-2 tabular-nums">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  {formatCurrency(eduV * 1000)}
+                                  {y === selectedYear && <FormulaExplainer explanation={explainCOS('education', y, data, model)} iconSize={10} />}
+                                </div>
+                              </td>
+                              <td className="text-right px-2 py-2 tabular-nums">{formatCurrency(csV * 1000)}</td>
+                              <td className="text-right px-2 py-2 tabular-nums">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  {formatCurrency(baasV * 1000)}
+                                  {y === selectedYear && <FormulaExplainer explanation={explainCOS('expansao', y, data, model)} iconSize={10} />}
+                                </div>
+                              </td>
+                              <td className="text-right px-2 py-2 tabular-nums">
+                                <div className="flex items-center justify-end gap-0.5">
+                                  {formatCurrency(taxV * 1000)}
+                                  {y === selectedYear && <FormulaExplainer explanation={explainCOS('tax', y, data, model)} iconSize={10} />}
+                                </div>
+                              </td>
+                              <td className="text-right px-2 py-2 tabular-nums font-medium">{formatCurrency(total * 1000)}</td>
+                              <td className="text-right px-2 py-2 tabular-nums">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                                  pctRev > 25 ? 'bg-destructive/15 text-destructive' :
+                                  pctRev > 15 ? 'bg-amber-500/15 text-amber-500' :
+                                  'bg-emerald-500/15 text-emerald-500'
+                                }`}>{pctRev.toFixed(1)}%</span>
+                              </td>
+                            </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
                   <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
                     <Info className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span>Custos CaaS/SaaS/CS = headcount mensal × 12. Education/Expansão/Tax = % aplicado sobre receita bruta anual.</span>
+                    <span>Valores calculados pelo engine mês a mês (mesma fonte do P&L). CaaS/SaaS/CS = headcount. Education/Expansão/Tax = % sobre receita.</span>
                   </div>
+
+                  {/* Prova Real — Detalhamento do cálculo para o ano selecionado */}
+                  {(() => {
+                    const y = selectedYear;
+                    const yi = yearImpact.find(v => v.year === y);
+                    if (!yi) return null;
+
+                    const findPR = (nodes: typeof model.pnlTree, code: string): typeof model.pnlTree[0] | null => {
+                      for (const n of nodes) {
+                        if (n.code === code) return n;
+                        if (n.children) { const f = findPR(n.children, code); if (f) return f; }
+                      }
+                      return null;
+                    };
+                    const prVal = (code: string) => findPR(model.pnlTree, code)?.annual[y] ?? 0;
+
+                    // BU revenues from tree
+                    const eduRevTree = Math.abs(findPR(model.pnlTree, '1.3')?.annual[y] ?? 0);
+                    const expRevTree = Math.abs(findPR(model.pnlTree, '1.5')?.annual[y] ?? 0);
+                    const taxRevTree = Math.abs(findPR(model.pnlTree, '1.6')?.annual[y] ?? 0);
+
+                    const caasTree = prVal('3.1');
+                    const saasTree = prVal('3.2');
+                    const eduTree = prVal('3.3');
+                    const csTree = prVal('3.4');
+                    const expTree = prVal('3.5');
+                    const taxTree = prVal('3.6');
+
+                    // Manual proof: recompute from config
+                    const manualCaas = yi.caasCost * 12;
+                    const manualSaas = (yi.saasSubCost + yi.setupCost) * 12;
+                    const manualEdu = eduRevTree * cos.eduCostRate * 1000;
+                    const manualCS = yi.csCost * 12;
+                    const manualExp = expRevTree * cos.expansaoCostRate * 1000;
+                    const manualTax = taxRevTree * cos.taxCostRate * 1000;
+
+                    const rows = [
+                      {
+                        label: '3.1 CaaS',
+                        formula: `${yi.numPFD} PFD × R$${(cos.pfdSalary/1000).toFixed(0)}k + ${yi.numCFO} CFO × R$${(cos.cfoSalary/1000).toFixed(0)}k + ${yi.numFPA} FPA × R$${(cos.fpaSalary/1000).toFixed(0)}k × 12m`,
+                        manual: -manualCaas,
+                        engine: caasTree * 1000,
+                      },
+                      {
+                        label: '3.2 SaaS+Setup',
+                        formula: `${yi.numDevSr} DevSr × R$${(cos.devSrSalary/1000).toFixed(0)}k + ${yi.numCSSaaS} CS × R$${(cos.csSaaSalary/1000).toFixed(0)}k + ${yi.numSetupSquads} squads × 12m`,
+                        manual: -manualSaas,
+                        engine: saasTree * 1000,
+                      },
+                      {
+                        label: '3.3 Education',
+                        formula: `Receita Edu ${formatCurrency(eduRevTree * 1000)} × ${(cos.eduCostRate * 100).toFixed(0)}%`,
+                        manual: -manualEdu,
+                        engine: eduTree * 1000,
+                      },
+                      {
+                        label: '3.4 CS',
+                        formula: `${yi.numCX} CX × R$${(cos.cxAnalystSalary/1000).toFixed(0)}k × 12m`,
+                        manual: -manualCS,
+                        engine: csTree * 1000,
+                      },
+                      {
+                        label: '3.5 Expansão',
+                        formula: `Receita Exp ${formatCurrency(expRevTree * 1000)} × ${(cos.expansaoCostRate * 100).toFixed(0)}%`,
+                        manual: -manualExp,
+                        engine: expTree * 1000,
+                      },
+                      {
+                        label: '3.6 Tax',
+                        formula: `Receita Tax ${formatCurrency(taxRevTree * 1000)} × ${(cos.taxCostRate * 100).toFixed(0)}%`,
+                        manual: -manualTax,
+                        engine: taxTree * 1000,
+                      },
+                    ];
+
+                    return (
+                      <div className="mt-3 border border-border/50 rounded-lg p-3 bg-muted/20">
+                        <h4 className="text-xs font-semibold mb-2">Prova Real — {y} (cálculo detalhado)</h4>
+                        <table className="w-full text-[11px]">
+                          <thead>
+                            <tr className="border-b border-border/50">
+                              <th className="text-left px-2 py-1 text-muted-foreground">Item</th>
+                              <th className="text-left px-2 py-1 text-muted-foreground">Fórmula</th>
+                              <th className="text-right px-2 py-1 text-muted-foreground">Cálculo Manual</th>
+                              <th className="text-right px-2 py-1 text-muted-foreground">Engine (P&L)</th>
+                              <th className="text-right px-2 py-1 text-muted-foreground">Diff</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {rows.map(r => {
+                              const diff = Math.abs(r.manual - Math.abs(r.engine));
+                              const ok = diff < 1000; // tolerance < R$ 1k (rounding)
+                              return (
+                                <tr key={r.label} className="border-b border-border/20">
+                                  <td className="px-2 py-1 font-medium">{r.label}</td>
+                                  <td className="px-2 py-1 text-muted-foreground">{r.formula}</td>
+                                  <td className="text-right px-2 py-1 tabular-nums">{formatCurrency(r.manual)}</td>
+                                  <td className="text-right px-2 py-1 tabular-nums">{formatCurrency(Math.abs(r.engine))}</td>
+                                  <td className={`text-right px-2 py-1 tabular-nums ${ok ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {ok ? '✓' : formatCurrency(diff)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        <p className="text-[10px] text-muted-foreground mt-2">
+                          Cálculo manual usa clientes de fim de ano × 12. Engine calcula mês a mês (pode divergir em headcount por variação mensal de clientes).
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* ─── Squads Projetados por Ano ─── */}
@@ -3734,23 +3969,36 @@ export default function Assumptions() {
                         </tr>
                       </thead>
                       <tbody>
+                        {(() => {
+                          // Read from P&L tree (has real Oxy data for 2025, engine data for 2026+)
+                          // Recursive search — some nodes (e.g. '2' Deduções) are children of others
+                          const findTreeNode = (nodes: typeof model.pnlTree, code: string): typeof model.pnlTree[0] | null => {
+                            for (const n of nodes) {
+                              if (n.code === code) return n;
+                              if (n.children) { const f = findTreeNode(n.children, code); if (f) return f; }
+                            }
+                            return null;
+                          };
+                          const tv = (code: string, y: Year) => findTreeNode(model.pnlTree, code)?.annual[y] ?? 0;
+                          return <>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 font-medium flex items-center gap-1">Receita Bruta <FormulaExplainer explanation={explainResumoFinanceiro('grossRevenue', selectedYear, model)} iconSize={10} /></td>
-                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].grossRevenue)}</td>)}
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(tv('1', y) * 1000)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 text-destructive flex items-center gap-1">(-) Deduções / Impostos <FormulaExplainer explanation={explainResumoFinanceiro('deductions', selectedYear, model)} iconSize={10} /></td>
-                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].deductions)}</td>)}
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(tv('2', y) * 1000)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30 font-medium">
                           <td className="px-2 py-1.5 flex items-center gap-1">Receita Líquida <FormulaExplainer explanation={explainResumoFinanceiro('netRevenue', selectedYear, model)} iconSize={10} /></td>
-                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(model.years[y].netRevenue)}</td>)}
+                          {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{formatCurrency(tv('NR', y) * 1000)}</td>)}
                         </tr>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 text-destructive flex items-center gap-1">(-) COS Total <FormulaExplainer explanation={explainResumoFinanceiro('cogs', selectedYear, model)} iconSize={10} /></td>
-                          {activeYears.map(y => (
-                            <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(model.years[y].cogs)}</td>
-                          ))}
+                          {activeYears.map(y => {
+                            const cosTotal = tv('3.1', y) + tv('3.2', y) + tv('3.3', y) + tv('3.4', y) + tv('3.5', y) + tv('3.6', y);
+                            return <td key={y} className="text-right px-2 py-1.5 tabular-nums text-destructive">{formatCurrency(cosTotal * 1000)}</td>;
+                          })}
                         </tr>
                         <tr className="border-b border-border/30">
                           <td className="px-2 py-1.5 font-medium">Clientes Totais</td>
@@ -3767,15 +4015,16 @@ export default function Assumptions() {
                         <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
                           <td className="px-2 py-2 flex items-center gap-1">Lucro Bruto <FormulaExplainer explanation={explainResumoFinanceiro('grossProfit', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => {
-                            const gp = model.years[y].grossProfit;
-                            return <td key={y} className={`text-right px-2 py-2 tabular-nums ${gp < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{formatCurrency(gp)}</td>;
+                            const gp = tv('GP', y);
+                            return <td key={y} className={`text-right px-2 py-2 tabular-nums ${gp < 0 ? 'text-destructive' : 'text-emerald-500'}`}>{formatCurrency(gp * 1000)}</td>;
                           })}
                         </tr>
                         <tr className="bg-primary/5 font-bold">
                           <td className="px-2 py-2 flex items-center gap-1">Margem Bruta % <FormulaExplainer explanation={explainResumoFinanceiro('grossMargin', selectedYear, model)} iconSize={10} /></td>
                           {activeYears.map(y => {
-                            const nr = model.years[y].netRevenue;
-                            const margin = model.years[y].grossMarginPct;
+                            const nr = tv('NR', y);
+                            const gp = tv('GP', y);
+                            const margin = nr !== 0 ? (gp / nr) * 100 : 0;
                             return (
                               <td key={y} className="text-right px-2 py-2 tabular-nums">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
@@ -3787,6 +4036,8 @@ export default function Assumptions() {
                             );
                           })}
                         </tr>
+                          </>;
+                        })()}
                       </tbody>
                     </table>
                   </div>
@@ -4073,6 +4324,8 @@ export default function Assumptions() {
 
         </TabsContent>
       </Tabs>
+      );
+      })()}
 
     </div>
   );

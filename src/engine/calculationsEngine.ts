@@ -273,10 +273,10 @@ function calcCOSFromConfig(
 ): COSBreakdown {
   const cfg = assumptions.cosConfig ?? DEFAULT_COS_CONFIG;
 
-  // 3.1 CaaS: PFD + CFO + FP&A
-  const numPFD = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.pfdClientsPerOne)));
-  const numCFO = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.cfoClientsPerOne)));
-  const numFPA = Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.fpaClientsPerOne)));
+  // 3.1 CaaS: PFD + CFO + FP&A (only if there are clients)
+  const numPFD = caasClients > 0 ? Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.pfdClientsPerOne))) : 0;
+  const numCFO = caasClients > 0 ? Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.cfoClientsPerOne))) : 0;
+  const numFPA = caasClients > 0 ? Math.max(1, Math.ceil(caasClients / Math.max(1, cfg.fpaClientsPerOne))) : 0;
   const caasCost = -(numPFD * cfg.pfdSalary + numCFO * cfg.cfoSalary + numFPA * cfg.fpaSalary) / 1000;
 
   // 3.2 SaaS — Assinatura: Dev Sr + CS

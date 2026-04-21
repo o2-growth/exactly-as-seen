@@ -17,33 +17,78 @@ export type Database = {
       assumptions_snapshots: {
         Row: {
           assumptions: Json
+          change_summary: Json | null
           created_at: string
           id: string
           is_active: boolean
+          modified_by: string | null
           name: string
           scenario: string
+          scope: string
           updated_at: string
           user_id: string | null
         }
         Insert: {
           assumptions: Json
+          change_summary?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
+          modified_by?: string | null
           name?: string
           scenario?: string
+          scope?: string
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           assumptions?: Json
+          change_summary?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
+          modified_by?: string | null
           name?: string
           scenario?: string
+          scope?: string
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      assumptions_audit_log: {
+        Row: {
+          id: string
+          snapshot_id: string | null
+          user_id: string | null
+          user_email: string | null
+          action: string
+          changed_fields: Json | null
+          previous_values: Json | null
+          new_values: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          snapshot_id?: string | null
+          user_id?: string | null
+          user_email?: string | null
+          action: string
+          changed_fields?: Json | null
+          previous_values?: Json | null
+          new_values?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          snapshot_id?: string | null
+          user_id?: string | null
+          user_email?: string | null
+          action?: string
+          changed_fields?: Json | null
+          previous_values?: Json | null
+          new_values?: Json | null
+          created_at?: string
         }
         Relationships: []
       }

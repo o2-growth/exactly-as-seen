@@ -39,6 +39,11 @@ interface FinancialModelContextType {
   resetAssumptions: () => void;
   saveNow: (a: Assumptions) => void;
   dataReady: boolean;
+  snapshots: import('@/hooks/useAssumptionsPersistence').AssumptionsSnapshot[];
+  loadSnapshot: (id: string) => Promise<Assumptions | null>;
+  restoreSnapshot: (id: string) => Promise<Assumptions | null>;
+  auditLog: import('@/hooks/useAssumptionsPersistence').AuditLogEntry[];
+  loadAuditLog: (limit?: number) => Promise<void>;
 }
 
 const FinancialModelContext = createContext<FinancialModelContextType | null>(null);
@@ -52,7 +57,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Persistence: auto-load from Supabase/localStorage on mount, auto-save on change
-  const { saveAssumptions, loadSnapshots } = useAssumptionsPersistence();
+  const { saveAssumptions, loadSnapshots, snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog } = useAssumptionsPersistence();
   const loadStarted = useRef(false);
   const hasLoaded = useRef(false);
   const [assumptionsLoaded, setAssumptionsLoaded] = useState(false);
@@ -190,9 +195,18 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
         // receitasFinanceirasPercent, etc.) get default values when loading
         // old saved data that doesn't have them yet.
         setAssumptions({ ...DEFAULT_ASSUMPTIONS, ...fixed });
+        // Only enable auto-save if we successfully loaded saved data.
+        // This prevents defaults from overwriting user's saved assumptions.
+        hasLoaded.current = true;
+      } else {
+        // No saved data found — first time user. Enable auto-save for new data.
+        hasLoaded.current = true;
       }
-      // Mark as loaded AFTER state is set — prevents debounce from saving defaults
-      hasLoaded.current = true;
+      setAssumptionsLoaded(true);
+    }).catch(() => {
+      // Load failed (network, auth, etc.) — do NOT enable auto-save.
+      // hasLoaded stays false → auto-save blocked → defaults won't overwrite saved data.
+      console.warn('Failed to load assumptions from Supabase — auto-save DISABLED to protect saved data.');
       setAssumptionsLoaded(true);
     });
   }, [loadSnapshots]);
@@ -498,6 +512,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
       dateRange, filteredYears, focalYear, rangeDataSource, dataReady,
       setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions, saveNow,
+      snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog,
     }}>
       {children}
     </FinancialModelContext.Provider>
