@@ -197,7 +197,7 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
       children: revenueSubProducts('1.5', tree),
     },
     { code: 'E.5', label: 'Tax',
-      getValues: (y) => blend(y, () => 0, getAnnual('1.6', y, tree)),
+      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['Tax'] ?? {}, ps), getAnnual('1.6', y, tree)),
       children: revenueSubProducts('1.6', tree),
     },
     { code: 'E.6', label: 'Outras Receitas (OR)',
