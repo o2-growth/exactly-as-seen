@@ -19,6 +19,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PremissasPage from "./pages/PremissasPage";
 import SimuladorTributario from "./pages/SimuladorTributario";
+// FinanceCycle is now integrated into CashFlow page
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1 } },

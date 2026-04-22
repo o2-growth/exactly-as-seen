@@ -866,3 +866,48 @@ export function explainSquadsSetup(
     example: `${numSquads} squads × ${cos.dataAnalystPerSquad + cos.processAnalystPerSquad} + ${numHeadData} heads = ${people}`,
   };
 }
+
+// ─── CLIENTES TOTAIS (Resumo Financeiro) ───
+
+export function explainResumoClientes(
+  year: Year,
+  assumptions: Assumptions,
+  model: FullModelOutput,
+): FormulaExplanation {
+  const sp = assumptions.subProductClients;
+  const yr = model.years[year];
+
+  const caas = (sp.caasAssessoria?.[year] ?? 0) + (sp.caasEnterprise?.[year] ?? 0)
+    + (sp.caasCorporate?.[year] ?? 0) + (sp.caasSetup?.[year] ?? 0) + (sp.caasParceiros?.[year] ?? 0);
+  const saas = (sp.saasOxy?.[year] ?? 0) + (sp.saasOxyGenio?.[year] ?? 0)
+    + (sp.saasSetup?.[year] ?? 0) + (sp.saasParceiros?.[year] ?? 0) + (sp.saasOxyGenioEsp?.[year] ?? 0);
+  const edu = (sp.educationDonoCFO?.[year] ?? 0) + (sp.educationEN?.[year] ?? 0)
+    + (sp.educationFR?.[year] ?? 0) + (sp.educationFSP?.[year] ?? 0);
+  const exp = (sp.baas?.[year] ?? 0) + (sp.baasFranquia?.[year] ?? 0) + (sp.baasMasterFranquia?.[year] ?? 0);
+  const tax = (sp.taxAT?.[year] ?? 0) + (sp.taxGPT?.[year] ?? 0) + (sp.taxRCT?.[year] ?? 0)
+    + (sp.taxRT?.[year] ?? 0) + (sp.taxDTC?.[year] ?? 0);
+  const totalFromAssumptions = caas + saas + edu + exp + tax;
+
+  const engineTotal = yr.totalClients;
+  const isHistorical = year <= 2025;
+
+  const steps: FormulaStep[] = [
+    { label: 'CaaS', value: caas.toLocaleString('pt-BR'), source: `Assessoria ${sp.caasAssessoria?.[year] ?? 0} + Enterprise ${sp.caasEnterprise?.[year] ?? 0} + Corporate ${sp.caasCorporate?.[year] ?? 0} + Setup ${sp.caasSetup?.[year] ?? 0}` },
+    { label: 'SaaS', value: saas.toLocaleString('pt-BR'), source: `Oxy ${sp.saasOxy?.[year] ?? 0} + OxyGênio ${sp.saasOxyGenio?.[year] ?? 0} + Setup ${sp.saasSetup?.[year] ?? 0}` },
+    { label: 'Education', value: edu.toLocaleString('pt-BR'), source: `DonoCFO ${sp.educationDonoCFO?.[year] ?? 0}` },
+    { label: 'Expansão', value: exp.toLocaleString('pt-BR'), source: `Oxy Hacker ${sp.baas?.[year] ?? 0} + Franquia ${sp.baasFranquia?.[year] ?? 0} + Master ${sp.baasMasterFranquia?.[year] ?? 0}` },
+    { label: 'Tax', value: tax.toLocaleString('pt-BR'), source: `AT ${sp.taxAT?.[year] ?? 0} + GPT ${sp.taxGPT?.[year] ?? 0} + RCT ${sp.taxRCT?.[year] ?? 0} + RT ${sp.taxRT?.[year] ?? 0} + DTC ${sp.taxDTC?.[year] ?? 0}` },
+    { label: 'Σ Premissas (Dez)', value: totalFromAssumptions.toLocaleString('pt-BR'), source: 'Soma de todos os subprodutos' },
+    { label: 'Engine (Dez)', value: engineTotal.toLocaleString('pt-BR'), source: isHistorical ? 'Derivado da receita real Oxy ÷ ticket' : 'Calculado mês a mês pelo motor' },
+  ];
+
+  return {
+    title: `Clientes Totais — ${year}`,
+    formula: 'Σ clientes ativos (Dezembro) de todos os 13+ subprodutos',
+    steps,
+    result: engineTotal.toLocaleString('pt-BR'),
+    example: isHistorical
+      ? `${year}: clientes derivados da receita real do Oxy dividida pelo ticket médio de cada produto`
+      : `${caas} CaaS + ${saas} SaaS + ${edu} Edu + ${exp} Exp + ${tax} Tax = ${totalFromAssumptions} (premissas Dez)`,
+  };
+}

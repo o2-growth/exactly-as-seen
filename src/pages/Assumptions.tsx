@@ -46,7 +46,7 @@ import {
 } from 'recharts';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { FormulaExplainer } from '@/components/assumptions/FormulaExplainer';
-import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn, explainResumoFinanceiro, explainSGA, explainEconFin, explainSquadsCaaS, explainSquadsSaaS, explainSquadsSetup } from '@/lib/formulaExplainer';
+import { explainRevenue, explainClients, explainTaxEffective, explainCOS, explainKPI, explainTicket, explainChurn, explainNovosClientes, explainClientesAtivos, explainFaturamentoBase, explainIncremento, explainRevenueChurn, explainResumoFinanceiro, explainResumoClientes, explainSGA, explainEconFin, explainSquadsCaaS, explainSquadsSaaS, explainSquadsSetup } from '@/lib/formulaExplainer';
 
 type TicketKey = keyof AssumptionsType['tickets'];
 type SubProductKey = keyof SubProductClients;
@@ -4001,7 +4001,7 @@ export default function Assumptions() {
                           })}
                         </tr>
                         <tr className="border-b border-border/30">
-                          <td className="px-2 py-1.5 font-medium">Clientes Totais</td>
+                          <td className="px-2 py-1.5 font-medium flex items-center gap-1">Clientes Totais <FormulaExplainer explanation={explainResumoClientes(selectedYear, assumptions, model)} iconSize={10} /></td>
                           {activeYears.map(y => <td key={y} className="text-right px-2 py-1.5 tabular-nums">{model.years[y].totalClients.toLocaleString('pt-BR')}</td>)}
                         </tr>
                         <tr className="border-b border-border/30">
