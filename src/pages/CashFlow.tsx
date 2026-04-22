@@ -11,6 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, ReferenceLine, LineChart, Line,
 } from 'recharts';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DataSourceBadge } from '@/components/period/DataSourceBadge';
 import { getYearDataSource } from '@/lib/periodResolution';
 
@@ -262,7 +263,7 @@ function CashFlowExpandableRow({ row, depth, activeYears }: { row: CashFlowRow; 
             <span className={`text-sm ${row.isSummary ? 'text-foreground' : 'text-foreground/90'}`}>
               {row.label}
             </span>
-            {row.tooltip && <span title={row.tooltip} className="cursor-help"><Info className="h-3 w-3 text-primary/50" /></span>}
+            {row.tooltip && <Tooltip><TooltipTrigger asChild><span className="cursor-help inline-flex"><Info className="h-3 w-3 text-primary/50 hover:text-primary" /></span></TooltipTrigger><TooltipContent side="top" className="max-w-[260px] text-xs">{row.tooltip}</TooltipContent></Tooltip>}
           </div>
         </td>
         {activeYears.map(y => {
@@ -297,7 +298,7 @@ function SummaryRow({ label, getValue, activeYears, highlight, tooltip }: {
       <td className="p-3 sticky left-0 bg-card text-sm text-foreground">
         <div className="flex items-center gap-1.5">
           {label}
-          {tooltip && <span title={tooltip} className="cursor-help"><Info className="h-3 w-3 text-primary/50" /></span>}
+          {tooltip && <Tooltip><TooltipTrigger asChild><span className="cursor-help inline-flex"><Info className="h-3 w-3 text-primary/50 hover:text-primary" /></span></TooltipTrigger><TooltipContent side="top" className="max-w-[260px] text-xs">{tooltip}</TooltipContent></Tooltip>}
         </div>
       </td>
       {activeYears.map(y => {
@@ -636,9 +637,7 @@ export default function CashFlow() {
               <td className="p-3 sticky left-0 bg-card text-sm text-foreground">
                 <div className="flex items-center gap-1.5">
                   (9) SALDO FINAL
-                  <span title="Saldo Inicial + FCF − Amortização − CAPEX. Alimenta o Saldo Inicial do próximo período." className="cursor-help">
-                    <Info className="h-3 w-3 text-primary/50" />
-                  </span>
+                  <Tooltip><TooltipTrigger asChild><span className="cursor-help inline-flex"><Info className="h-3 w-3 text-primary/50 hover:text-primary" /></span></TooltipTrigger><TooltipContent side="top" className="max-w-[260px] text-xs">Saldo Inicial + FCF − Amortização − CAPEX. Alimenta o Saldo Inicial do próximo período.</TooltipContent></Tooltip>
                 </div>
               </td>
               {activeYears.map(y => {

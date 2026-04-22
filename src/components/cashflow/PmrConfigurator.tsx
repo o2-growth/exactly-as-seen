@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ProdutoPMR, DEFAULT_PMR_PRODUTOS, calcPMRDias } from '@/lib/financialData';
 import { Check, X, ChevronDown, ChevronRight, Plus, Minus, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
   produtos: ProdutoPMR[];
@@ -13,7 +14,20 @@ const GRUPO_LABELS: Record<string, string> = {
   CaaS: 'CaaS', SaaS: 'SaaS', Education: 'Education', Expansao: 'Expansão', Tax: 'Tax',
 };
 
-/** Compact parcelas display: "1x100%" or "3x (33/33/34)" */
+function InfoTip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help inline-flex"><Info className="h-3 w-3 text-primary/50 hover:text-primary" /></span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[250px] text-xs">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** Compact parcelas display */
 function parcelasLabel(parcelas: number[]): string {
   if (parcelas.length === 1) return `À vista (${parcelas[0]}%)`;
   return `${parcelas.length}x (${parcelas.join('/')})`;
@@ -41,19 +55,19 @@ export default function PmrConfigurator({ produtos, onSave, onCancel }: Props) {
             <tr className="border-b border-border">
               <th className="text-left px-3 py-2 text-muted-foreground font-medium w-[180px]">Produto</th>
               <th className="text-left px-3 py-2 text-muted-foreground font-medium w-[200px]">
-                <span className="flex items-center gap-1">Parcelas <Info className="h-3 w-3 text-muted-foreground/50" title="Distribuição % do recebimento por mês. Ex: [33,33,34] = 3 parcelas iguais. Deve somar 100%." /></span>
+                <span className="flex items-center gap-1">Parcelas <InfoTip text="Distribuição % do recebimento por mês. Ex: [33,33,34] = 3 parcelas iguais. Deve somar 100%." /></span>
               </th>
               <th className="text-center px-3 py-2 text-muted-foreground font-medium w-[75px]">
-                <span className="flex items-center justify-center gap-1">Antecipa? <Info className="h-3 w-3 text-muted-foreground/50" title="Se SIM, parcelas futuras são antecipadas com deságio (custo financeiro)." /></span>
+                <span className="flex items-center justify-center gap-1">Antecipa? <InfoTip text="Se SIM, parcelas futuras são antecipadas com deságio (custo financeiro). A primeira parcela não sofre deságio." /></span>
               </th>
               <th className="text-center px-3 py-2 text-muted-foreground font-medium w-[75px]">
-                <span className="flex items-center justify-center gap-1">Custo ant. <Info className="h-3 w-3 text-muted-foreground/50" title="% ao mês cobrado pela antecipação de recebíveis." /></span>
+                <span className="flex items-center justify-center gap-1">Custo ant. <InfoTip text="% ao mês cobrado pela antecipação de recebíveis. Aplicado nas parcelas futuras (2ª em diante)." /></span>
               </th>
               <th className="text-center px-3 py-2 text-muted-foreground font-medium w-[75px]">
-                <span className="flex items-center justify-center gap-1">Inadimp. <Info className="h-3 w-3 text-muted-foreground/50" title="% da receita bruta que não será recebida (provisão para devedores duvidosos)." /></span>
+                <span className="flex items-center justify-center gap-1">Inadimp. <InfoTip text="% da receita bruta que não será recebida. Alimenta a linha 4.26 (Provisão para Devedores Duvidosos)." /></span>
               </th>
               <th className="text-center px-3 py-2 text-muted-foreground font-medium w-[55px]">
-                <span className="flex items-center justify-center gap-1">PMR <Info className="h-3 w-3 text-muted-foreground/50" title="Prazo Médio de Recebimento em dias — calculado automaticamente das parcelas." /></span>
+                <span className="flex items-center justify-center gap-1">PMR <InfoTip text="Prazo Médio de Recebimento em dias. Calculado automaticamente: média ponderada das parcelas × 30 dias." /></span>
               </th>
             </tr>
           </thead>
