@@ -11,72 +11,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, ReferenceLine, LineChart, Line,
 } from 'recharts';
-import {
-  HISTORICAL_PERIODS,
-  historicalRevenue,
-  historicalDeductions,
-  historicalCosts,
-  historicalExpenses,
-  historicalFinancial,
-} from '@/data/historicalData';
 import { DataSourceBadge } from '@/components/period/DataSourceBadge';
 import { getYearDataSource } from '@/lib/periodResolution';
-
-// ─── Period helpers ───────────────────────────────────────────────────────────
-
-const HIST_2025 = HISTORICAL_PERIODS.filter(p => p.startsWith('2025'));
-const HIST_2026 = HISTORICAL_PERIODS.filter(p => p.startsWith('2026'));
-
-function sumFlat(data: Record<string, number>, periods: readonly string[]): number {
-  return periods.reduce((acc, p) => acc + (data[p] ?? 0), 0) / 1000;
-}
-
-function sumFinancialCat(catCode: string, periods: readonly string[]): number {
-  const cat = historicalFinancial[catCode];
-  if (!cat) return 0;
-  let total = 0;
-  for (const group of Object.values(cat)) {
-    for (const item of Object.values(group)) {
-      for (const p of periods) {
-        total += (item[p] ?? 0);
-      }
-    }
-  }
-  return total / 1000;
-}
-
-function sumFinancialItem(
-  catCode: string,
-  groupName: string,
-  itemName: string,
-  periods: readonly string[],
-): number {
-  const item = historicalFinancial[catCode]?.[groupName]?.[itemName];
-  if (!item) return 0;
-  return periods.reduce((acc, p) => acc + (item[p] ?? 0), 0) / 1000;
-}
-
-function sumDeductions(periods: readonly string[]): number {
-  let total = 0;
-  for (const item of Object.values(historicalDeductions)) {
-    total += periods.reduce((acc, p) => acc + (item[p] ?? 0), 0);
-  }
-  return total / 1000;
-}
-
-function sumCosts(periods: readonly string[]): number {
-  let total = 0;
-  for (const group of Object.values(historicalCosts)) {
-    total += periods.reduce((acc, p) => acc + (group[p] ?? 0), 0);
-  }
-  return total / 1000;
-}
-
-function sumExpenseGroup(groupName: string, periods: readonly string[]): number {
-  const group = historicalExpenses[groupName];
-  if (!group) return 0;
-  return periods.reduce((acc, p) => acc + (group[p] ?? 0), 0) / 1000;
-}
 
 // ─── Engine helpers ───────────────────────────────────────────────────────────
 
@@ -106,21 +42,6 @@ function childRows(parentCode: string, tree: PnlNode[]): CashFlowRow[] {
     label: child.label,
     getValues: (y: Year) => child.annual[y],
   }));
-}
-
-// ─── Blending logic ───────────────────────────────────────────────────────────
-
-/**
- * 2025 → full historical (real Oxy data);
- * 2026+ → pnlTree value (already patched by FinancialModelContext with correct blending)
- */
-function blend(
-  year: Year,
-  histFn: (periods: readonly string[]) => number,
-  treeVal: number,
-): number {
-  if (year === 2025) return histFn(HIST_2025);
-  return treeVal;
 }
 
 // ─── Cash flow row type ───────────────────────────────────────────────────────
@@ -154,52 +75,23 @@ function getPmpConfig(assumptions: any): PmpConfig {
   return assumptions.pmpConfig ?? DEFAULT_PMP;
 }
 
-// ─── PMR/PMP adjustment (annual approximation) ──────────────────────────────
-
-/** Shift an annual value by N days: positive delay reduces cash received this year */
-function adjustByDays(value: number, days: number): number {
-  if (days <= 0) return value;
-  // Approximate: (365-days)/365 of this period's value received this period
-  return value * (365 - days) / 365;
-}
-
 // ─── Tree builder ─────────────────────────────────────────────────────────────
 
-function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig): CashFlowRow[] {
+function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
+  // ALL data comes from pnlTree — the single source of truth.
+  // pnlTree already has: 2025 real Oxy data, 2026 blended, 2027+ engine projections.
+  // This guarantees CashFlow matches P&L and Assumptions for ALL years.
+
+  const t = (code: string, y: Year) => getAnnual(code, y, tree);
 
   // ── (2) ENTRADAS OPERACIONAIS ───────────────────────────────────────────────
-  const revenueSubProducts = (parentCode: string, tree: PnlNode[]): CashFlowRow[] => {
-    const parent = findNode(parentCode, tree);
-    if (!parent?.children) return [];
-    return parent.children.map(c => ({
-      code: c.code, label: c.label,
-      getValues: (y: Year) => c.annual[y],
-    }));
-  };
-
   const entradaGroups: CashFlowRow[] = [
-    { code: 'E.1', label: 'CaaS',
-      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['CaaS'] ?? {}, ps), getAnnual('1.1', y, tree)),
-      children: revenueSubProducts('1.1', tree),
-    },
-    { code: 'E.2', label: 'SaaS',
-      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['SaaS'] ?? {}, ps), getAnnual('1.2', y, tree)),
-      children: revenueSubProducts('1.2', tree),
-    },
-    { code: 'E.3', label: 'Education',
-      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['Education'] ?? {}, ps), getAnnual('1.3', y, tree)),
-      children: revenueSubProducts('1.3', tree),
-    },
-    { code: 'E.4', label: 'Expansão',
-      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['Expansão'] ?? {}, ps), getAnnual('1.5', y, tree)),
-      children: revenueSubProducts('1.5', tree),
-    },
-    { code: 'E.5', label: 'Tax',
-      getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['Tax'] ?? {}, ps), getAnnual('1.6', y, tree)),
-      children: revenueSubProducts('1.6', tree),
-    },
+    { code: 'E.1', label: 'CaaS', getValues: (y) => t('1.1', y), children: childRows('1.1', tree) },
+    { code: 'E.2', label: 'SaaS', getValues: (y) => t('1.2', y), children: childRows('1.2', tree) },
+    { code: 'E.3', label: 'Education', getValues: (y) => t('1.3', y), children: childRows('1.3', tree) },
+    { code: 'E.4', label: 'Expansão', getValues: (y) => t('1.5', y), children: childRows('1.5', tree) },
+    { code: 'E.5', label: 'Tax', getValues: (y) => t('1.6', y), children: childRows('1.6', tree) },
   ];
-
   const entradas: CashFlowRow = {
     code: '(2)', label: '(2) ENTRADAS OPERACIONAIS', isSummary: true,
     getValues: (y) => entradaGroups.reduce((s, r) => s + r.getValues(y), 0),
@@ -209,21 +101,20 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
   // ── (3) SAÍDAS OPERACIONAIS ─────────────────────────────────────────────────
 
   // 3A. Impostos sobre receita (grupo 2 do P&L)
-  const impostoItems = childRows('2', tree);
   const saida3A: CashFlowRow = {
-    code: '3A', label: '3A. Impostos sobre Receita', isSummary: false,
-    getValues: (y) => blend(y, (ps) => -sumDeductions(ps), getAnnual('2', y, tree)),
-    children: impostoItems,
+    code: '3A', label: '3A. Impostos sobre Receita',
+    getValues: (y) => t('2', y),
+    children: childRows('2', tree),
   };
 
   // 3B. Custos variáveis (grupo 3 do P&L)
   const custoItems: CashFlowRow[] = [
-    { code: '3B.1', label: 'Custos CaaS', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos Caas'] ?? {}, ps), getAnnual('3.1', y, tree)), children: childRows('3.1', tree) },
-    { code: '3B.2', label: 'Custos SaaS', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos SaaS'] ?? {}, ps), getAnnual('3.2', y, tree)), children: childRows('3.2', tree) },
-    { code: '3B.3', label: 'Custos Education', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos Education'] ?? {}, ps), getAnnual('3.3', y, tree)), children: childRows('3.3', tree) },
-    { code: '3B.4', label: 'Custos Customer Success', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos Customer Success'] ?? {}, ps), getAnnual('3.4', y, tree)), children: childRows('3.4', tree) },
-    { code: '3B.5', label: 'Custos Expansão', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos Expansão'] ?? {}, ps), getAnnual('3.5', y, tree)), children: childRows('3.5', tree) },
-    { code: '3B.6', label: 'Custos Tax', getValues: (y) => blend(y, (ps) => -sumFlat(historicalCosts['Custos Tax'] ?? {}, ps), getAnnual('3.6', y, tree)), children: childRows('3.6', tree) },
+    { code: '3B.1', label: 'Custos CaaS', getValues: (y) => t('3.1', y), children: childRows('3.1', tree) },
+    { code: '3B.2', label: 'Custos SaaS', getValues: (y) => t('3.2', y), children: childRows('3.2', tree) },
+    { code: '3B.3', label: 'Custos Education', getValues: (y) => t('3.3', y), children: childRows('3.3', tree) },
+    { code: '3B.4', label: 'Custos Customer Success', getValues: (y) => t('3.4', y), children: childRows('3.4', tree) },
+    { code: '3B.5', label: 'Custos Expansão', getValues: (y) => t('3.5', y), children: childRows('3.5', tree) },
+    { code: '3B.6', label: 'Custos Tax', getValues: (y) => t('3.6', y), children: childRows('3.6', tree) },
   ];
   const saida3B: CashFlowRow = {
     code: '3B', label: '3B. Custos Variáveis',
@@ -233,10 +124,10 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
 
   // 3C. Despesas fixas (grupos 4, 5, 6, 7 do P&L)
   const despesaItems: CashFlowRow[] = [
-    { code: '3C.1', label: 'Despesas Administrativas', getValues: (y) => blend(y, (ps) => -sumExpenseGroup('Despesas Administrativas', ps), getAnnual('4', y, tree)), children: childRows('4', tree) },
-    { code: '3C.2', label: 'Despesas com Pessoal', getValues: (y) => blend(y, (ps) => -sumExpenseGroup('Despesas com Pessoal', ps), getAnnual('5', y, tree)), children: childRows('5', tree) },
-    { code: '3C.3', label: 'Despesas Comerciais', getValues: (y) => blend(y, (ps) => -sumExpenseGroup('Despesas Comerciais', ps), getAnnual('6', y, tree)), children: childRows('6', tree) },
-    { code: '3C.4', label: 'Despesas de Marketing', getValues: (y) => blend(y, (ps) => -sumExpenseGroup('Despesas de Marketing', ps), getAnnual('7', y, tree)), children: childRows('7', tree) },
+    { code: '3C.1', label: 'Despesas Administrativas', getValues: (y) => t('4', y), children: childRows('4', tree) },
+    { code: '3C.2', label: 'Despesas com Pessoal', getValues: (y) => t('5', y), children: childRows('5', tree) },
+    { code: '3C.3', label: 'Despesas Comerciais', getValues: (y) => t('6', y), children: childRows('6', tree) },
+    { code: '3C.4', label: 'Despesas de Marketing', getValues: (y) => t('7', y), children: childRows('7', tree) },
   ];
   const saida3C: CashFlowRow = {
     code: '3C', label: '3C. Despesas Fixas',
@@ -247,7 +138,7 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
   // 3D. Provisão IRPJ/CSLL (grupo 10 do P&L)
   const saida3D: CashFlowRow = {
     code: '3D', label: '3D. Provisão IRPJ/CSLL',
-    getValues: (y) => blend(y, (ps) => -sumFinancialCat('PROV', ps), getAnnual('TAX', y, tree)),
+    getValues: (y) => t('TAX', y),
     children: childRows('TAX', tree),
   };
 
@@ -260,19 +151,10 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
 
   // ── (5) RESULTADO FINANCEIRO LÍQUIDO ────────────────────────────────────────
   const finItems: CashFlowRow[] = [
-    { code: '5.R', label: 'Receitas Financeiras',
-      getValues: (y) => blend(y, (ps) => sumFinancialCat('RF', ps), getAnnual('8R', y, tree)),
-    },
-    { code: '5.D', label: 'Despesas Financeiras',
-      getValues: (y) => blend(y, (ps) => -sumFinancialCat('DF', ps), getAnnual('8D', y, tree)),
-      children: childRows('8D', tree),
-    },
-    { code: '5.OR', label: 'Outras Receitas',
-      getValues: (y) => blend(y, (ps) => sumFinancialCat('RNO', ps), getAnnual('OR', y, tree)),
-    },
-    { code: '5.DNO', label: 'Despesas Não Operacionais',
-      getValues: (y) => blend(y, (ps) => -sumFinancialCat('DNO', ps), getAnnual('DNO', y, tree)),
-    },
+    { code: '5.R', label: 'Receitas Financeiras', getValues: (y) => t('8R', y) },
+    { code: '5.D', label: 'Despesas Financeiras', getValues: (y) => t('8D', y), children: childRows('8D', tree) },
+    { code: '5.OR', label: 'Outras Receitas', getValues: (y) => t('OR', y) },
+    { code: '5.DNO', label: 'Despesas Não Operacionais', getValues: (y) => t('DNO', y) },
   ];
   const resultadoFinanceiro: CashFlowRow = {
     code: '(5)', label: '(5) RESULTADO FINANCEIRO', isSummary: true,
@@ -281,27 +163,17 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
   };
 
   // ── (7) AMORTIZAÇÃO DE DÍVIDAS ──────────────────────────────────────────────
-  const amortItems = childRows('11', tree);
   const amortizacao: CashFlowRow = {
     code: '(7)', label: '(7) AMORTIZAÇÃO DE DÍVIDAS', isSummary: true,
-    getValues: (y) => blend(
-      y,
-      (ps) => -sumFinancialCat('AD', ps),
-      getAnnual('11', y, tree),
-    ),
-    children: amortItems,
+    getValues: (y) => t('11', y),
+    children: childRows('11', tree),
   };
 
   // ── (8) INVESTIMENTOS — CAPEX ───────────────────────────────────────────────
-  const capexItems = childRows('12', tree);
   const capex: CashFlowRow = {
     code: '(8)', label: '(8) INVESTIMENTOS — CAPEX', isSummary: true,
-    getValues: (y) => blend(
-      y,
-      (ps) => -sumFinancialCat('INV', ps),
-      getAnnual('12', y, tree),
-    ),
-    children: capexItems,
+    getValues: (y) => t('12', y),
+    children: childRows('12', tree),
   };
 
   return [entradas, totalSaidas, resultadoFinanceiro, amortizacao, capex];
@@ -407,7 +279,7 @@ export default function CashFlow() {
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
   const pmpConfig = getPmpConfig(assumptions);
-  const sections = buildCashFlowTree(pnlTree, assumptions.pmrConfig, pmpConfig);
+  const sections = buildCashFlowTree(pnlTree);
 
   // sections: [0]=Entradas, [1]=Saídas, [2]=ResultadoFinanceiro, [3]=Amortização, [4]=Capex
   const getEntradas = (y: Year) => sections[0].getValues(y);
@@ -769,13 +641,13 @@ export default function CashFlow() {
         let prevRec = 0, prevPay = 0;
 
         for (const y of YEARS) {
-          // Use blend() for revenue so 2025 uses historical data (same as CashFlow Entradas)
-          const caasRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['CaaS'] ?? {}, ps), getAnnual('1.1', y, pnlTree)));
-          const saasRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['SaaS'] ?? {}, ps), getAnnual('1.2', y, pnlTree)));
-          const eduRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Education'] ?? {}, ps), getAnnual('1.3', y, pnlTree)));
-          const expRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Expansão'] ?? {}, ps), getAnnual('1.5', y, pnlTree)));
-          const taxRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Tax'] ?? {}, ps), getAnnual('1.6', y, pnlTree)));
-          const grossRevenue = caasRev + saasRev + eduRev + expRev + taxRev;
+          // All data from pnlTree — single source of truth for all years
+          const caasRev = Math.abs(getAnnual('1.1', y, pnlTree));
+          const saasRev = Math.abs(getAnnual('1.2', y, pnlTree));
+          const eduRev = Math.abs(getAnnual('1.3', y, pnlTree));
+          const expRev = Math.abs(getAnnual('1.5', y, pnlTree));
+          const taxRev = Math.abs(getAnnual('1.6', y, pnlTree));
+          const grossRevenue = Math.abs(getAnnual('1', y, pnlTree));
 
           const totalRevForPmr = caasRev + saasRev + eduRev + expRev + taxRev;
           const dso = totalRevForPmr > 0
