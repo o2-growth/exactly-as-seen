@@ -51,6 +51,7 @@ interface CashFlowRow {
   label: string;
   isSummary?: boolean;
   isHighlight?: boolean;
+  tooltip?: string;
   getValues: (year: Year) => number;
   children?: CashFlowRow[];
 }
@@ -127,15 +128,15 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
 
   // ── (2) ENTRADAS OPERACIONAIS ───────────────────────────────────────────────
   const entradaGroups: CashFlowRow[] = [
-    { code: 'E.1', label: 'CaaS', getValues: (y) => t('1.1', y), children: childRows('1.1', tree) },
-    { code: 'E.2', label: 'SaaS', getValues: (y) => t('1.2', y), children: childRows('1.2', tree) },
-    { code: 'E.3', label: 'Education', getValues: (y) => t('1.3', y), children: childRows('1.3', tree) },
-    { code: 'E.4', label: 'Expansão', getValues: (y) => t('1.5', y), children: childRows('1.5', tree) },
-    { code: 'E.5', label: 'Tax', getValues: (y) => t('1.6', y), children: childRows('1.6', tree) },
+    { code: 'E.1', label: 'CaaS', tooltip: 'Receita de Serviços Especializados, Enterprise, Corporate, Parceiros, BPO', getValues: (y) => t('1.1', y), children: childRows('1.1', tree) },
+    { code: 'E.2', label: 'SaaS', tooltip: 'Receita de Oxy, Oxy+Gênio, Setup, Parceiros, Especialista', getValues: (y) => t('1.2', y), children: childRows('1.2', tree) },
+    { code: 'E.3', label: 'Education', tooltip: 'Receita de Dono CFO, Eng. Negócios, Financeiro Raiz, FSP', getValues: (y) => t('1.3', y), children: childRows('1.3', tree) },
+    { code: 'E.4', label: 'Expansão', tooltip: 'Receita de Oxy Hacker, Franquia, Master Franquia', getValues: (y) => t('1.5', y), children: childRows('1.5', tree) },
+    { code: 'E.5', label: 'Tax', tooltip: 'Receita de Assessoria, Gestão Passivo, Recuperação Crédito, Reforma, Diagnóstico', getValues: (y) => t('1.6', y), children: childRows('1.6', tree) },
   ];
   const entradas: CashFlowRow = {
     code: '(2)', label: '(2) ENTRADAS OPERACIONAIS', isSummary: true,
-    // Use node '1' (Receita Bruta) directly — it has historical overrides for 2025
+    tooltip: 'Receita Bruta total — soma de todas as BUs. Mesma fonte do P&L (nó 1).',
     getValues: (y) => t('1', y),
     children: entradaGroups,
   };
@@ -145,6 +146,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   // 3A. Impostos sobre receita (grupo 2 do P&L)
   const saida3A: CashFlowRow = {
     code: '3A', label: '3A. Impostos sobre Receita',
+    tooltip: 'PIS, COFINS, ISS, CSLL retido, IRRF retido, ICMS, devoluções — deduções sobre faturamento',
     getValues: (y) => t('2', y),
     children: childRows('2', tree),
   };
@@ -160,6 +162,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   ];
   const saida3B: CashFlowRow = {
     code: '3B', label: '3B. Custos Variáveis',
+    tooltip: 'COS — Custos dos Serviços por BU: headcount (CaaS/SaaS/CS) + % receita (Education/Expansão/Tax)',
     getValues: (y) => custoItems.reduce((s, r) => s + r.getValues(y), 0),
     children: custoItems,
   };
@@ -173,6 +176,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   ];
   const saida3C: CashFlowRow = {
     code: '3C', label: '3C. Despesas Fixas',
+    tooltip: 'SG&A — Administrativas, Pessoal, Comerciais e Marketing. Calculadas como % da Receita Bruta.',
     getValues: (y) => despesaItems.reduce((s, r) => s + r.getValues(y), 0),
     children: despesaItems,
   };
@@ -180,6 +184,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   // 3D. Provisão IRPJ/CSLL (grupo 10 do P&L)
   const saida3D: CashFlowRow = {
     code: '3D', label: '3D. Provisão IRPJ/CSLL',
+    tooltip: 'Impostos sobre lucro presumido: IRPJ + Adicional IRPJ + CSLL',
     getValues: (y) => t('TAX', y),
     children: childRows('TAX', tree),
   };
@@ -187,19 +192,21 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   const saidaGroups = [saida3A, saida3B, saida3C, saida3D];
   const totalSaidas: CashFlowRow = {
     code: '(3)', label: '(3) SAÍDAS OPERACIONAIS', isSummary: true,
+    tooltip: 'Impostos + Custos Variáveis + Despesas Fixas + Provisão IRPJ/CSLL. Tudo que sai do caixa pela operação.',
     getValues: (y) => saidaGroups.reduce((s, r) => s + r.getValues(y), 0),
     children: saidaGroups,
   };
 
   // ── (5) RESULTADO FINANCEIRO LÍQUIDO ────────────────────────────────────────
   const finItems: CashFlowRow[] = [
-    { code: '5.R', label: 'Receitas Financeiras', getValues: (y) => t('8R', y) },
-    { code: '5.D', label: 'Despesas Financeiras', getValues: (y) => t('8D', y), children: childRows('8D', tree) },
-    { code: '5.OR', label: 'Outras Receitas', getValues: (y) => t('OR', y) },
-    { code: '5.DNO', label: 'Despesas Não Operacionais', getValues: (y) => t('DNO', y) },
+    { code: '5.R', label: 'Receitas Financeiras', tooltip: 'Rendimentos de aplicações, juros recebidos', getValues: (y) => t('8R', y) },
+    { code: '5.D', label: 'Despesas Financeiras', tooltip: 'Juros, tarifas bancárias, IOF, taxas de antecipação, descontos concedidos', getValues: (y) => t('8D', y), children: childRows('8D', tree) },
+    { code: '5.OR', label: 'Outras Receitas', tooltip: 'Receitas não operacionais (ex: venda de ativos, recuperação de créditos)', getValues: (y) => t('OR', y) },
+    { code: '5.DNO', label: 'Despesas Não Operacionais', tooltip: 'Despesas fora da operação principal', getValues: (y) => t('DNO', y) },
   ];
   const resultadoFinanceiro: CashFlowRow = {
     code: '(5)', label: '(5) RESULTADO FINANCEIRO', isSummary: true,
+    tooltip: 'Receitas Financeiras − Despesas Financeiras + Outras Receitas − Despesas Não Operacionais',
     getValues: (y) => finItems.reduce((s, r) => s + r.getValues(y), 0),
     children: finItems,
   };
@@ -207,6 +214,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   // ── (7) AMORTIZAÇÃO DE DÍVIDAS ──────────────────────────────────────────────
   const amortizacao: CashFlowRow = {
     code: '(7)', label: '(7) AMORTIZAÇÃO DE DÍVIDAS', isSummary: true,
+    tooltip: 'Pagamento de empréstimos, tributos parcelados, dívida com fornecedores. Reduz caixa mas reduz dívida.',
     getValues: (y) => t('11', y),
     children: childRows('11', tree),
   };
@@ -214,6 +222,7 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   // ── (8) INVESTIMENTOS — CAPEX ───────────────────────────────────────────────
   const capex: CashFlowRow = {
     code: '(8)', label: '(8) INVESTIMENTOS — CAPEX', isSummary: true,
+    tooltip: 'Investimentos em ativos: Software, Equipamentos, Imóveis, Veículos. Gasto para crescer.',
     getValues: (y) => t('12', y),
     children: childRows('12', tree),
   };
@@ -253,6 +262,7 @@ function CashFlowExpandableRow({ row, depth, activeYears }: { row: CashFlowRow; 
             <span className={`text-sm ${row.isSummary ? 'text-foreground' : 'text-foreground/90'}`}>
               {row.label}
             </span>
+            {row.tooltip && <span title={row.tooltip} className="cursor-help"><Info className="h-3 w-3 text-primary/50" /></span>}
           </div>
         </td>
         {activeYears.map(y => {
