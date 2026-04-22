@@ -110,19 +110,17 @@ function childRows(parentCode: string, tree: PnlNode[]): CashFlowRow[] {
 
 // ─── Blending logic ───────────────────────────────────────────────────────────
 
-/** 2025 → full historical; 2026 → 3 months real + 9/12 engine; 2027+ → engine */
+/**
+ * 2025 → full historical (real Oxy data);
+ * 2026+ → pnlTree value (already patched by FinancialModelContext with correct blending)
+ */
 function blend(
   year: Year,
   histFn: (periods: readonly string[]) => number,
-  engineVal: number,
+  treeVal: number,
 ): number {
   if (year === 2025) return histFn(HIST_2025);
-  if (year === 2026) {
-    const hist3m = histFn(HIST_2026);
-    const engine9m = engineVal * (9 / 12);
-    return hist3m + engine9m;
-  }
-  return engineVal;
+  return treeVal;
 }
 
 // ─── Cash flow row type ───────────────────────────────────────────────────────
