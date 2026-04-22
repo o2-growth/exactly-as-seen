@@ -75,6 +75,47 @@ function getPmpConfig(assumptions: any): PmpConfig {
   return assumptions.pmpConfig ?? DEFAULT_PMP;
 }
 
+// ─── Projeção grupo colapsável ─────────────────────────────────────────────────
+
+function ProjecaoGrupo({ label, grupoMonthly, grupoTotal, items, recebimentos }: {
+  label: string;
+  grupoMonthly: number[];
+  grupoTotal: number;
+  items: { id: string; nome: string; recebido: number }[];
+  recebimentos: Record<string, number[]>;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <tr className="bg-secondary/20 border-b border-border/30 cursor-pointer hover:bg-secondary/30" onClick={() => setOpen(o => !o)}>
+        <td className="px-2 py-1.5 font-semibold sticky left-0 bg-secondary/20">
+          <div className="flex items-center gap-1">
+            {open ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
+            {label}
+          </div>
+        </td>
+        {grupoMonthly.map((v, i) => (
+          <td key={i} className="text-right px-2 py-1.5 tabular-nums font-medium">
+            {Math.abs(v) < 0.01 ? '—' : formatCurrency(v * 1000)}
+          </td>
+        ))}
+        <td className="text-right px-2 py-1.5 tabular-nums font-bold">{formatCurrency(grupoTotal * 1000)}</td>
+      </tr>
+      {open && items.map(p => (
+        <tr key={p.id} className="border-b border-border/10 hover:bg-secondary/10">
+          <td className="px-2 py-1 pl-7 sticky left-0 bg-card text-muted-foreground">{p.nome}</td>
+          {(recebimentos[p.id] ?? []).map((v, i) => (
+            <td key={i} className="text-right px-2 py-1 tabular-nums text-muted-foreground">
+              {Math.abs(v) < 0.01 ? '—' : formatCurrency(v * 1000)}
+            </td>
+          ))}
+          <td className="text-right px-2 py-1 tabular-nums font-medium text-muted-foreground">{formatCurrency(p.recebido * 1000)}</td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 // ─── Tree builder ─────────────────────────────────────────────────────────────
 
 function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
@@ -234,15 +275,21 @@ function CashFlowExpandableRow({ row, depth, activeYears }: { row: CashFlowRow; 
 
 // ─── Summary row (non-expandable, highlighted) ────────────────────────────────
 
-function SummaryRow({ label, getValue, activeYears, highlight }: {
+function SummaryRow({ label, getValue, activeYears, highlight, tooltip }: {
   label: string;
   getValue: (y: Year) => number;
   activeYears: Year[];
   highlight?: boolean;
+  tooltip?: string;
 }) {
   return (
     <tr className={`border-b border-border/30 font-bold ${highlight ? 'bg-primary/10' : 'bg-primary/5'}`}>
-      <td className="p-3 sticky left-0 bg-card text-sm text-foreground">{label}</td>
+      <td className="p-3 sticky left-0 bg-card text-sm text-foreground">
+        <div className="flex items-center gap-1.5">
+          {label}
+          {tooltip && <span title={tooltip} className="cursor-help"><Info className="h-3 w-3 text-primary/50" /></span>}
+        </div>
+      </td>
       {activeYears.map(y => {
         const val = getValue(y);
         return (
@@ -339,9 +386,8 @@ export default function CashFlow() {
         <DataSourceBadge source={rangeDataSource} />
       </div>
 
-      {/* PMR + PMP Panels */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* PMR Panel — Granular por produto */}
+      {/* PMR Panel — Full width */}
+      <div className="space-y-4">
         <div className="gradient-card">
           <button className="w-full flex items-center justify-between p-5 text-left" onClick={() => setPmrOpen(o => !o)}>
             <div>
@@ -436,23 +482,22 @@ export default function CashFlow() {
                             <tbody>
                               {GRUPO_ORDER.map(grupo => {
                                 const items = proj.produtoResumo.filter(p => p.grupo === grupo);
-                                if (items.every(p => p.faturado < 0.01 && p.recebido < 0.01)) return null;
-                                return [
-                                  <tr key={`g-${grupo}`} className="bg-secondary/20 border-b border-border/30">
-                                    <td colSpan={14} className="px-2 py-1 font-semibold text-muted-foreground">{GRUPO_LABELS[grupo] ?? grupo}</td>
-                                  </tr>,
-                                  ...items.filter(p => p.faturado > 0.01 || p.recebido > 0.01).map(p => (
-                                    <tr key={p.id} className="border-b border-border/10 hover:bg-secondary/10">
-                                      <td className="px-2 py-1 pl-5 sticky left-0 bg-card">{p.nome}</td>
-                                      {(proj.recebimentos[p.id] ?? []).map((v, i) => (
-                                        <td key={i} className="text-right px-2 py-1 tabular-nums">
-                                          {Math.abs(v) < 0.01 ? '—' : formatCurrency(v * 1000)}
-                                        </td>
-                                      ))}
-                                      <td className="text-right px-2 py-1 tabular-nums font-medium">{formatCurrency(p.recebido * 1000)}</td>
-                                    </tr>
-                                  )),
-                                ];
+                                const activeItems = items.filter(p => p.faturado > 0.01 || p.recebido > 0.01);
+                                if (activeItems.length === 0) return null;
+                                const grupoTotal = activeItems.reduce((s, p) => s + p.recebido, 0);
+                                const grupoMonthly = new Array(12).fill(0);
+                                activeItems.forEach(p => (proj.recebimentos[p.id] ?? []).forEach((v, i) => { grupoMonthly[i] += v; }));
+
+                                return (
+                                  <ProjecaoGrupo
+                                    key={grupo}
+                                    label={GRUPO_LABELS[grupo] ?? grupo}
+                                    grupoMonthly={grupoMonthly}
+                                    grupoTotal={grupoTotal}
+                                    items={activeItems}
+                                    recebimentos={proj.recebimentos}
+                                  />
+                                );
                               })}
                               {/* Totals */}
                               <tr className="border-t-2 border-primary/30 bg-primary/5 font-bold">
@@ -482,7 +527,7 @@ export default function CashFlow() {
           )}
         </div>
 
-        {/* PMP Panel */}
+        {/* PMP Panel — Full width */}
         <div className="gradient-card">
           <button className="w-full flex items-center justify-between p-5 text-left" onClick={() => setPmpOpen(o => !o)}>
             <div>
@@ -547,7 +592,7 @@ export default function CashFlow() {
           </thead>
           <tbody>
             {/* (1) SALDO INICIAL */}
-            <SummaryRow label="(1) SALDO INICIAL" getValue={(y) => balances[y].opening} activeYears={activeYears} />
+            <SummaryRow label="(1) SALDO INICIAL" tooltip="Caixa disponível no início do período. Primeiro ano = valor das Assumptions. Demais = Saldo Final anterior." getValue={(y) => balances[y].opening} activeYears={activeYears} />
 
             {/* (2) ENTRADAS OPERACIONAIS */}
             <CashFlowExpandableRow row={sections[0]} depth={0} activeYears={activeYears} />
@@ -556,7 +601,7 @@ export default function CashFlow() {
             <CashFlowExpandableRow row={sections[1]} depth={0} activeYears={activeYears} />
 
             {/* (4) FCO */}
-            <SummaryRow label="(4) FCO — FLUXO DE CAIXA OPERACIONAL" getValue={(y) => balances[y].fco} activeYears={activeYears} highlight />
+            <SummaryRow label="(4) FCO — FLUXO DE CAIXA OPERACIONAL" tooltip="Entradas + Saídas. Indica quanto a operação gera de caixa, sem considerar resultado financeiro." getValue={(y) => balances[y].fco} activeYears={activeYears} highlight />
 
             {/* Separator */}
             <tr><td colSpan={activeYears.length + 1} className="py-1 border-b border-border/10" /></tr>
@@ -565,7 +610,7 @@ export default function CashFlow() {
             <CashFlowExpandableRow row={sections[2]} depth={0} activeYears={activeYears} />
 
             {/* (6) FCF */}
-            <SummaryRow label="(6) FCF — FLUXO DE CAIXA DO PERÍODO" getValue={(y) => balances[y].fcf} activeYears={activeYears} highlight />
+            <SummaryRow label="(6) FCF — FLUXO DE CAIXA DO PERÍODO" tooltip="FCO + Resultado Financeiro. Quanto sobra depois da operação e dos custos financeiros." getValue={(y) => balances[y].fcf} activeYears={activeYears} highlight />
 
             {/* Separator */}
             <tr><td colSpan={activeYears.length + 1} className="py-1 border-b border-border/10" /></tr>
@@ -578,7 +623,14 @@ export default function CashFlow() {
 
             {/* (9) SALDO FINAL */}
             <tr className="border-b border-border bg-primary/10 font-bold">
-              <td className="p-3 sticky left-0 bg-card text-sm text-foreground">(9) SALDO FINAL</td>
+              <td className="p-3 sticky left-0 bg-card text-sm text-foreground">
+                <div className="flex items-center gap-1.5">
+                  (9) SALDO FINAL
+                  <span title="Saldo Inicial + FCF − Amortização − CAPEX. Alimenta o Saldo Inicial do próximo período." className="cursor-help">
+                    <Info className="h-3 w-3 text-primary/50" />
+                  </span>
+                </div>
+              </td>
               {activeYears.map(y => {
                 const val = balances[y].closing;
                 return (
