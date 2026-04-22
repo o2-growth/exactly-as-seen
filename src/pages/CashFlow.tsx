@@ -94,7 +94,8 @@ function buildCashFlowTree(tree: PnlNode[]): CashFlowRow[] {
   ];
   const entradas: CashFlowRow = {
     code: '(2)', label: '(2) ENTRADAS OPERACIONAIS', isSummary: true,
-    getValues: (y) => entradaGroups.reduce((s, r) => s + r.getValues(y), 0),
+    // Use node '1' (Receita Bruta) directly — it has historical overrides for 2025
+    getValues: (y) => t('1', y),
     children: entradaGroups,
   };
 
