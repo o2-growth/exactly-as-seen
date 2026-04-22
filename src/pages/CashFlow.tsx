@@ -289,12 +289,12 @@ export default function CashFlow() {
   const getAmortizacao = (y: Year) => sections[3].getValues(y);
   const getCapex = (y: Year) => sections[4].getValues(y);
 
-  // (4) FCO = Saldo Inicial + Entradas + Saídas
-  const getFCO = (y: Year, saldoInicial: number) => saldoInicial + getEntradas(y) + getSaidas(y);
+  // (4) FCO = Entradas + Saídas (operacional puro, SEM saldo inicial)
+  const getFCO = (y: Year) => getEntradas(y) + getSaidas(y);
   // (6) FCF = FCO + Resultado Financeiro
-  const getFCF = (y: Year, saldoInicial: number) => getFCO(y, saldoInicial) + getResultadoFin(y);
-  // (9) Saldo Final = FCF + Amortização + Capex (amortização e capex já são negativos)
-  const getSaldoFinal = (y: Year, saldoInicial: number) => getFCF(y, saldoInicial) + getAmortizacao(y) + getCapex(y);
+  const getFCF = (y: Year) => getFCO(y) + getResultadoFin(y);
+  // (9) Saldo Final = Saldo Inicial + FCF + Amortização + Capex
+  const getSaldoFinal = (y: Year, saldoInicial: number) => saldoInicial + getFCF(y) + getAmortizacao(y) + getCapex(y);
 
   // Compute balances chain
   const initialCash = (assumptions as any).initialCashBalance ?? 0;
@@ -302,8 +302,8 @@ export default function CashFlow() {
   const balances: Record<Year, { opening: number; fco: number; fcf: number; closing: number }> = {} as any;
   for (const y of YEARS) {
     const opening = runningBalance;
-    const fco = getFCO(y, opening);
-    const fcf = getFCF(y, opening);
+    const fco = getFCO(y);
+    const fcf = getFCF(y);
     const closing = getSaldoFinal(y, opening);
     balances[y] = { opening, fco, fcf, closing };
     runningBalance = closing;
@@ -314,7 +314,7 @@ export default function CashFlow() {
     year: y.toString(),
     Entradas: getEntradas(y),
     Saídas: getSaidas(y),
-    FCO: balances[y].fco - balances[y].opening,
+    FCO: balances[y].fco,
     'Resultado Financeiro': getResultadoFin(y),
     'Saldo Final': balances[y].closing,
   }));
