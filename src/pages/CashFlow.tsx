@@ -200,9 +200,6 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
       getValues: (y) => blend(y, (ps) => sumFlat(historicalRevenue['Tax'] ?? {}, ps), getAnnual('1.6', y, tree)),
       children: revenueSubProducts('1.6', tree),
     },
-    { code: 'E.6', label: 'Outras Receitas (OR)',
-      getValues: (y) => getAnnual('OR', y, tree),
-    },
   ];
 
   const entradas: CashFlowRow = {
@@ -271,6 +268,12 @@ function buildCashFlowTree(tree: PnlNode[], pmrConfig: any, pmpConfig: PmpConfig
     { code: '5.D', label: 'Despesas Financeiras',
       getValues: (y) => blend(y, (ps) => -sumFinancialCat('DF', ps), getAnnual('8D', y, tree)),
       children: childRows('8D', tree),
+    },
+    { code: '5.OR', label: 'Outras Receitas',
+      getValues: (y) => blend(y, (ps) => sumFinancialCat('RNO', ps), getAnnual('OR', y, tree)),
+    },
+    { code: '5.DNO', label: 'Despesas Não Operacionais',
+      getValues: (y) => blend(y, (ps) => -sumFinancialCat('DNO', ps), getAnnual('DNO', y, tree)),
     },
   ];
   const resultadoFinanceiro: CashFlowRow = {
@@ -768,12 +771,13 @@ export default function CashFlow() {
         let prevRec = 0, prevPay = 0;
 
         for (const y of YEARS) {
-          const grossRevenue = Math.abs(getAnnual('1', y, pnlTree));
-          const caasRev = Math.abs(getAnnual('1.1', y, pnlTree));
-          const saasRev = Math.abs(getAnnual('1.2', y, pnlTree));
-          const eduRev = Math.abs(getAnnual('1.3', y, pnlTree));
-          const expRev = Math.abs(getAnnual('1.5', y, pnlTree));
-          const taxRev = Math.abs(getAnnual('1.6', y, pnlTree));
+          // Use blend() for revenue so 2025 uses historical data (same as CashFlow Entradas)
+          const caasRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['CaaS'] ?? {}, ps), getAnnual('1.1', y, pnlTree)));
+          const saasRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['SaaS'] ?? {}, ps), getAnnual('1.2', y, pnlTree)));
+          const eduRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Education'] ?? {}, ps), getAnnual('1.3', y, pnlTree)));
+          const expRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Expansão'] ?? {}, ps), getAnnual('1.5', y, pnlTree)));
+          const taxRev = Math.abs(blend(y, (ps) => sumFlat(historicalRevenue['Tax'] ?? {}, ps), getAnnual('1.6', y, pnlTree)));
+          const grossRevenue = caasRev + saasRev + eduRev + expRev + taxRev;
 
           const totalRevForPmr = caasRev + saasRev + eduRev + expRev + taxRev;
           const dso = totalRevForPmr > 0
