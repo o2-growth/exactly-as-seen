@@ -148,6 +148,16 @@ export function computeAssumptionsDiff(
     }
   }
 
+  // --- PMR Produtos ---
+  if (JSON.stringify(oldA.pmrProdutos) !== JSON.stringify(newA.pmrProdutos)) {
+    changes.push({ field: 'PMR Produtos', path: 'pmrProdutos', oldValue: 'alterado', newValue: 'alterado' });
+  }
+
+  // --- PMP Config ---
+  if (JSON.stringify((oldA as any).pmpConfig) !== JSON.stringify((newA as any).pmpConfig)) {
+    changes.push({ field: 'PMP Config', path: 'pmpConfig', oldValue: 'alterado', newValue: 'alterado' });
+  }
+
   // --- Valuation ---
   if (oldA.valuationConfig && newA.valuationConfig) {
     const vc = oldA.valuationConfig;
