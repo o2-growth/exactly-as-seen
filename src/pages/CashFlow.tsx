@@ -384,7 +384,9 @@ export default function CashFlow() {
   };
 
   const savePmp = () => {
-    setAssumptions({ ...assumptions, pmpConfig: pmpDraft } as any);
+    const updated = { ...assumptions, pmpConfig: pmpDraft };
+    setAssumptions(updated as any);
+    saveNow(updated as any);
     setEditingPmp(false);
   };
 
@@ -697,23 +699,33 @@ export default function CashFlow() {
           receivablesChange: number; payablesChange: number; netWorkingCapitalChange: number;
         }
 
-        const pmr = assumptions.pmrConfig;
+        // Compute weighted PMR per BU group from pmrProdutos
+        const grupoPmrMap: Record<string, number> = {};
+        const GRUPO_BU_MAP: Record<string, string> = { CaaS: '1.1', SaaS: '1.2', Education: '1.3', Expansao: '1.5', Tax: '1.6' };
+        for (const g of ['CaaS', 'SaaS', 'Education', 'Expansao', 'Tax']) {
+          const prods = pmrProdutos.filter(p => p.grupo === g);
+          grupoPmrMap[g] = prods.length > 0
+            ? prods.reduce((s, p) => s + calcPMRDias(p.parcelas), 0) / prods.length
+            : 0;
+        }
+
         const pmp = pmpConfig;
         const cycleMetrics: CycleMetrics[] = [];
         let prevRec = 0, prevPay = 0;
 
         for (const y of YEARS) {
           // All data from pnlTree — single source of truth for all years
-          const caasRev = Math.abs(getAnnual('1.1', y, pnlTree));
-          const saasRev = Math.abs(getAnnual('1.2', y, pnlTree));
-          const eduRev = Math.abs(getAnnual('1.3', y, pnlTree));
-          const expRev = Math.abs(getAnnual('1.5', y, pnlTree));
-          const taxRev = Math.abs(getAnnual('1.6', y, pnlTree));
+          const buRevs: Record<string, number> = {};
+          let totalRevForPmr = 0;
+          for (const [g, code] of Object.entries(GRUPO_BU_MAP)) {
+            buRevs[g] = Math.abs(getAnnual(code, y, pnlTree));
+            totalRevForPmr += buRevs[g];
+          }
           const grossRevenue = Math.abs(getAnnual('1', y, pnlTree));
 
-          const totalRevForPmr = caasRev + saasRev + eduRev + expRev + taxRev;
+          // DSO = weighted average of per-grupo PMR (from pmrProdutos), weighted by revenue
           const dso = totalRevForPmr > 0
-            ? Math.round((caasRev * pmr.caas + saasRev * pmr.saas + eduRev * pmr.education + (expRev + taxRev) * pmr.baas) / totalRevForPmr * 10) / 10
+            ? Math.round(Object.entries(buRevs).reduce((s, [g, rev]) => s + rev * (grupoPmrMap[g] ?? 0), 0) / totalRevForPmr * 10) / 10
             : 0;
 
           const totalCogs = Math.abs(
