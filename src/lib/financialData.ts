@@ -595,6 +595,53 @@ export const DEFAULT_COS_CONFIG: CosConfig = {
   taxCostRate: 0.15,
 };
 
+// ─── PMR Granular por Produto (must be before DEFAULT_ASSUMPTIONS) ───────────
+
+export interface ProdutoPMR {
+  id: string;
+  grupo: 'CaaS' | 'SaaS' | 'Education' | 'Expansao' | 'Tax';
+  nome: string;
+  parcelas: number[];      // array de %, deve somar 100
+  antecipa: boolean;
+  custoAntecipacao: number; // % a.m.
+  inadimplencia: number;    // %
+}
+
+/** PMR calculado em dias a partir do array de parcelas */
+export function calcPMRDias(parcelas: number[]): number {
+  return Math.round(parcelas.reduce((acc, pct, i) => acc + (pct / 100) * (i + 1) * 30, 0));
+}
+
+export const DEFAULT_PMR_PRODUTOS: ProdutoPMR[] = [
+  // CaaS
+  { id: 'caasAssessoria', grupo: 'CaaS', nome: 'Serviços Especializados', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'caasEnterprise', grupo: 'CaaS', nome: 'Enterprise', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
+  { id: 'caasCorporate', grupo: 'CaaS', nome: 'Corporate', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'caasParceiros', grupo: 'CaaS', nome: 'Parceiros', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
+  { id: 'caasSetup', grupo: 'CaaS', nome: 'BPO Financeiro', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  // SaaS
+  { id: 'saasOxy', grupo: 'SaaS', nome: 'Oxy', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
+  { id: 'saasOxyGenio', grupo: 'SaaS', nome: 'Oxy + Gênio', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
+  { id: 'saasSetup', grupo: 'SaaS', nome: 'Setup', parcelas: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12], antecipa: true, custoAntecipacao: 2.5, inadimplencia: 0 },
+  { id: 'saasParceiros', grupo: 'SaaS', nome: 'Parceiros', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'saasOxyGenioEsp', grupo: 'SaaS', nome: 'Oxy + Gênio + Especialista', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
+  // Education
+  { id: 'educationDonoCFO', grupo: 'Education', nome: 'Dono CFO', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
+  { id: 'educationEN', grupo: 'Education', nome: 'Engenheiro de Negócios', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
+  { id: 'educationFR', grupo: 'Education', nome: 'Financeiro Raiz', parcelas: [50, 50], antecipa: false, custoAntecipacao: 0, inadimplencia: 4 },
+  { id: 'educationFSP', grupo: 'Education', nome: 'Finance Sales Program', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
+  // Expansão
+  { id: 'baas', grupo: 'Expansao', nome: 'Oxy Hacker - Micro Franqueado', parcelas: [50, 50], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'baasFranquia', grupo: 'Expansao', nome: 'Franquia', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
+  { id: 'baasMasterFranquia', grupo: 'Expansao', nome: 'Master Franquia', parcelas: [25, 25, 25, 25], antecipa: true, custoAntecipacao: 1.5, inadimplencia: 0 },
+  // Tax
+  { id: 'taxAT', grupo: 'Tax', nome: 'Assessoria Tributária', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'taxGPT', grupo: 'Tax', nome: 'Gestão Passivo Tributário', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'taxRCT', grupo: 'Tax', nome: 'Recuperação Crédito Tributário', parcelas: [20, 20, 20, 20, 20], antecipa: false, custoAntecipacao: 0, inadimplencia: 5 },
+  { id: 'taxRT', grupo: 'Tax', nome: 'Reforma Tributária', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
+  { id: 'taxDTC', grupo: 'Tax', nome: 'Diagnóstico Tributário & Compliance', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
+];
+
 export const DEFAULT_ASSUMPTIONS: Assumptions = {
   caasClients: { 2025: 167, 2026: 272, 2027: 768, 2028: 2136, 2029: 4171, 2030: 6472 },
   saasClients: { 2025: 226, 2026: 631, 2027: 2293, 2028: 7992, 2029: 19471, 2030: 37918 },
@@ -790,53 +837,6 @@ export const DEFAULT_PMR: PmrConfig = {
   education: 30,
   baas: 0,
 };
-
-// ─── PMR Granular por Produto ───────────────────────────────────────────────
-
-export interface ProdutoPMR {
-  id: string;
-  grupo: 'CaaS' | 'SaaS' | 'Education' | 'Expansao' | 'Tax';
-  nome: string;
-  parcelas: number[];      // array de %, deve somar 100
-  antecipa: boolean;
-  custoAntecipacao: number; // % a.m.
-  inadimplencia: number;    // %
-}
-
-/** PMR calculado em dias a partir do array de parcelas */
-export function calcPMRDias(parcelas: number[]): number {
-  return Math.round(parcelas.reduce((acc, pct, i) => acc + (pct / 100) * (i + 1) * 30, 0));
-}
-
-export const DEFAULT_PMR_PRODUTOS: ProdutoPMR[] = [
-  // CaaS
-  { id: 'caasAssessoria', grupo: 'CaaS', nome: 'Serviços Especializados', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'caasEnterprise', grupo: 'CaaS', nome: 'Enterprise', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
-  { id: 'caasCorporate', grupo: 'CaaS', nome: 'Corporate', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'caasParceiros', grupo: 'CaaS', nome: 'Parceiros', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
-  { id: 'caasSetup', grupo: 'CaaS', nome: 'BPO Financeiro', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  // SaaS
-  { id: 'saasOxy', grupo: 'SaaS', nome: 'Oxy', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
-  { id: 'saasOxyGenio', grupo: 'SaaS', nome: 'Oxy + Gênio', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
-  { id: 'saasSetup', grupo: 'SaaS', nome: 'Setup', parcelas: [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 12], antecipa: true, custoAntecipacao: 2.5, inadimplencia: 0 },
-  { id: 'saasParceiros', grupo: 'SaaS', nome: 'Parceiros', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'saasOxyGenioEsp', grupo: 'SaaS', nome: 'Oxy + Gênio + Especialista', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
-  // Education
-  { id: 'educationDonoCFO', grupo: 'Education', nome: 'Dono CFO', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
-  { id: 'educationEN', grupo: 'Education', nome: 'Engenheiro de Negócios', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
-  { id: 'educationFR', grupo: 'Education', nome: 'Financeiro Raiz', parcelas: [50, 50], antecipa: false, custoAntecipacao: 0, inadimplencia: 4 },
-  { id: 'educationFSP', grupo: 'Education', nome: 'Finance Sales Program', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
-  // Expansão
-  { id: 'baas', grupo: 'Expansao', nome: 'Oxy Hacker - Micro Franqueado', parcelas: [50, 50], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'baasFranquia', grupo: 'Expansao', nome: 'Franquia', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 1 },
-  { id: 'baasMasterFranquia', grupo: 'Expansao', nome: 'Master Franquia', parcelas: [25, 25, 25, 25], antecipa: true, custoAntecipacao: 1.5, inadimplencia: 0 },
-  // Tax
-  { id: 'taxAT', grupo: 'Tax', nome: 'Assessoria Tributária', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'taxGPT', grupo: 'Tax', nome: 'Gestão Passivo Tributário', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'taxRCT', grupo: 'Tax', nome: 'Recuperação Crédito Tributário', parcelas: [20, 20, 20, 20, 20], antecipa: false, custoAntecipacao: 0, inadimplencia: 5 },
-  { id: 'taxRT', grupo: 'Tax', nome: 'Reforma Tributária', parcelas: [100], antecipa: false, custoAntecipacao: 0, inadimplencia: 2 },
-  { id: 'taxDTC', grupo: 'Tax', nome: 'Diagnóstico Tributário & Compliance', parcelas: [33, 33, 34], antecipa: false, custoAntecipacao: 0, inadimplencia: 3 },
-];
 
 export const SCENARIO_MULTIPLIERS: Record<Scenario, number> = {
   BASE: 1.0,
