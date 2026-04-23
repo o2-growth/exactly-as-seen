@@ -158,7 +158,7 @@ export interface Assumptions {
   };
 
   // ─── PMR Granular por Produto ───
-  pmrProdutos?: ProdutoPMR[];
+  pmrProdutos: ProdutoPMR[];
 
   // ─── Financial Result categories (% of Receita Bruta) ───
   receitasFinanceirasPercent: Record<Year, number>;       // % positive
@@ -653,6 +653,7 @@ export const DEFAULT_ASSUMPTIONS: Assumptions = {
   churnSaas: 5,
   churnBaas: 0,
   pmrConfig: { caas: 30, saas: 15, education: 30, baas: 0 },
+  pmrProdutos: DEFAULT_PMR_PRODUTOS,
   sgaPercent: { 2025: 10.4, 2026: 10.4, 2027: 10.4, 2028: 10.4, 2029: 10.4, 2030: 10.4 },
   marketingPercent: { 2025: 15.5, 2026: 15.5, 2027: 15.5, 2028: 15.5, 2029: 15.5, 2030: 15.5 },
   commercialPercent: { 2025: 2.3, 2026: 2.3, 2027: 2.3, 2028: 2.3, 2029: 2.3, 2030: 2.3 },

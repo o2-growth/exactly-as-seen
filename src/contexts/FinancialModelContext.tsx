@@ -3,7 +3,7 @@ import {
   Assumptions, DEFAULT_ASSUMPTIONS, Scenario, Year, YEARS,
   ProjectionData, PeriodPreset, DataSource, DateRange, getFilteredYears,
   CAAS_KEYS, SAAS_KEYS, EDUCATION_KEYS, EXPANSAO_KEYS, TAX_KEYS, ALL_SUBPRODUCT_KEYS,
-  TicketKey, DEFAULT_COS_CONFIG,
+  TicketKey, DEFAULT_COS_CONFIG, DEFAULT_PMR_PRODUTOS,
 } from '@/lib/financialData';
 import { salesDeductionsByYear } from '@/data/modelData';
 import { PnlNode } from '@/lib/pnlData';
@@ -161,6 +161,11 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
             ...DEFAULT_ASSUMPTIONS.cacPerProduct,
             ...fixed.cacPerProduct,
           };
+        }
+
+        // Ensure pmrProdutos exists (old snapshots don't have it)
+        if (!fixed.pmrProdutos || !Array.isArray(fixed.pmrProdutos) || fixed.pmrProdutos.length === 0) {
+          fixed.pmrProdutos = DEFAULT_PMR_PRODUTOS;
         }
 
         // Migrate legacy cap table from separate localStorage keys

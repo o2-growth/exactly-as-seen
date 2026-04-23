@@ -324,7 +324,7 @@ const formatAxis = (v: number) => {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CashFlow() {
-  const { scenario, pnlTree, assumptions, setAssumptions, filteredYears, rangeDataSource } = useFinancialModel();
+  const { scenario, pnlTree, assumptions, setAssumptions, saveNow, filteredYears, rangeDataSource } = useFinancialModel();
   const [pmrOpen, setPmrOpen] = useState(false);
   const [pmrSubTab, setPmrSubTab] = useState<'config' | 'projecao'>('config');
   const [pmpOpen, setPmpOpen] = useState(false);
@@ -378,8 +378,9 @@ export default function CashFlow() {
   }));
 
   const savePmrProdutos = (produtos: ProdutoPMR[]) => {
-    setAssumptions({ ...assumptions, pmrProdutos: produtos });
-    setPmrSubTab('config');
+    const updated = { ...assumptions, pmrProdutos: produtos };
+    setAssumptions(updated);
+    saveNow(updated); // Save to Supabase immediately (no 2s debounce)
   };
 
   const savePmp = () => {
