@@ -8,7 +8,7 @@ import { ProdutoPMR, DEFAULT_PMR_PRODUTOS, calcPMRDias } from '@/lib/financialDa
 import PmrConfigurator from '@/components/cashflow/PmrConfigurator';
 import { projectRecebimentos, annualTotals } from '@/lib/pmrProjection';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   Legend, ReferenceLine, LineChart, Line,
 } from 'recharts';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -661,7 +661,7 @@ export default function CashFlow() {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
             <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
             <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={formatAxis} />
-            <Tooltip
+            <RechartsTooltip
               contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }}
               labelStyle={{ color: 'hsl(210 40% 98%)', fontWeight: 700 }}
               formatter={(v: number, name: string) => [formatCurrency(v * 1000), name]}
@@ -791,7 +791,7 @@ export default function CashFlow() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
                   <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
                   <YAxis stroke="hsl(215 20% 55%)" fontSize={13} unit="d" />
-                  <Tooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }} formatter={(v: number) => [`${v.toFixed(1)} dias`]} />
+                  <RechartsTooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }} formatter={(v: number) => [`${v.toFixed(1)} dias`]} />
                   <ReferenceLine y={0} stroke="hsl(215 20% 55%)" strokeDasharray="3 3" />
                   <Line type="monotone" dataKey="DSO" stroke="hsl(221 83% 53%)" strokeWidth={2} dot={{ r: 4 }} />
                   <Line type="monotone" dataKey="DPO" stroke="hsl(45 93% 47%)" strokeWidth={2} dot={{ r: 4 }} />
@@ -809,7 +809,7 @@ export default function CashFlow() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(215 25% 22% / 0.5)" />
                   <XAxis dataKey="year" stroke="hsl(215 20% 55%)" fontSize={13} />
                   <YAxis stroke="hsl(215 20% 55%)" fontSize={13} tickFormatter={formatAxis} />
-                  <Tooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }} formatter={(v: number, name: string) => [formatCurrency(Math.abs(v) * 1000), name]} />
+                  <RechartsTooltip contentStyle={{ background: 'hsl(217 33% 17%)', border: '1px solid hsl(215 25% 27%)', borderRadius: 8, fontSize: 13 }} formatter={(v: number, name: string) => [formatCurrency(Math.abs(v) * 1000), name]} />
                   <ReferenceLine y={0} stroke="hsl(215 20% 55%)" strokeDasharray="3 3" />
                   <Bar dataKey="Contas a Receber" fill="hsl(221 83% 53%)" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Contas a Pagar" fill="hsl(0 72% 51%)" radius={[4, 4, 0, 0]} />
