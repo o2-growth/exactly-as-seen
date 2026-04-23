@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { ProdutoPMR, DEFAULT_PMR_PRODUTOS, calcPMRDias } from '@/lib/financialData';
-import { Check, X, ChevronDown, ChevronRight, Plus, Minus, Info } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Plus, Minus, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
   produtos: ProdutoPMR[];
   onSave: (produtos: ProdutoPMR[]) => void;
-  onCancel: () => void;
 }
 
 const GRUPOS = ['CaaS', 'SaaS', 'Education', 'Expansao', 'Tax'] as const;
@@ -33,17 +32,16 @@ function parcelasLabel(parcelas: number[]): string {
   return `${parcelas.length}x (${parcelas.join('/')})`;
 }
 
-export default function PmrConfigurator({ produtos, onSave, onCancel }: Props) {
-  const [draft, setDraft] = useState<ProdutoPMR[]>(() => JSON.parse(JSON.stringify(produtos)));
+export default function PmrConfigurator({ produtos, onSave }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedGrupos, setExpandedGrupos] = useState<Record<string, boolean>>({ CaaS: true, SaaS: true, Education: true, Expansao: true, Tax: true });
 
+  // Auto-save: update produto and persist immediately
   const updateProduto = (id: string, updates: Partial<ProdutoPMR>) => {
-    setDraft(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    const next = produtos.map(p => p.id === id ? { ...p, ...updates } : p);
+    const allValid = next.every(p => p.parcelas.reduce((s, v) => s + v, 0) === 100);
+    if (allValid) onSave(next);
   };
-
-  const hasChanges = JSON.stringify(draft) !== JSON.stringify(produtos);
-  const allValid = draft.every(p => p.parcelas.reduce((s, v) => s + v, 0) === 100);
 
   const toggleGrupo = (g: string) => setExpandedGrupos(prev => ({ ...prev, [g]: !prev[g] }));
 
@@ -73,7 +71,7 @@ export default function PmrConfigurator({ produtos, onSave, onCancel }: Props) {
           </thead>
           <tbody>
             {GRUPOS.map(grupo => {
-              const items = draft.filter(p => p.grupo === grupo);
+              const items = produtos.filter(p => p.grupo === grupo);
               const isOpen = expandedGrupos[grupo];
               const avgPmr = items.length > 0 ? Math.round(items.reduce((s, p) => s + calcPMRDias(p.parcelas), 0) / items.length) : 0;
 
@@ -183,24 +181,8 @@ export default function PmrConfigurator({ produtos, onSave, onCancel }: Props) {
         </table>
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => allValid && onSave(draft)}
-          disabled={!allValid}
-          className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition-colors ${
-            allValid ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-muted text-muted-foreground cursor-not-allowed'
-          }`}
-        >
-          <Check className="h-3.5 w-3.5" /> Salvar configuração
-        </button>
-        <button
-          onClick={onCancel}
-          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <X className="h-3.5 w-3.5" /> Cancelar
-        </button>
-        {!allValid && <span className="text-[10px] text-destructive">Todas as parcelas devem somar 100%</span>}
-        {hasChanges && allValid && <span className="text-[10px] text-amber-400">Alterações não salvas</span>}
+      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+        <Check className="h-3 w-3 text-positive" /> Auto-save ativo — alterações são salvas automaticamente quando parcelas somam 100%.
       </div>
     </div>
   );

@@ -435,7 +435,6 @@ export default function CashFlow() {
                   <PmrConfigurator
                     produtos={pmrProdutos}
                     onSave={savePmrProdutos}
-                    onCancel={() => setPmrOpen(false)}
                   />
                 ) : (
                   (() => {
