@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { hasBackendConfig, getBackendClientSafe } from '@/lib/supabase-safe';
+import { getBackendClientSafe } from '@/lib/supabase-safe';
 import { Assumptions, DEFAULT_ASSUMPTIONS, Scenario } from '@/lib/financialData';
 import { computeAssumptionsDiff, buildChangeSummary, buildAuditValues } from '@/lib/assumptionsDiff';
 
@@ -28,6 +28,20 @@ export interface AuditLogEntry {
   created_at: string;
 }
 
+/**
+ * Persistence hook — USER-SCOPED model.
+ *
+ * Each user has their own private workspace (scope='user', user_id=current).
+ * On first login, when there's no user-scoped active snapshot yet, we BOOTSTRAP from
+ * the most recent shared snapshot (the "master") so the user sees the latest team baseline.
+ *
+ * Daily flow: each user edits independently. No conflicts, no Realtime, no optimistic locking
+ * — because the only writer to `(scope='user', user_id=X)` is user X themselves.
+ *
+ * Master sync: shared snapshots remain as a read-only reference. Pedro (or admin) can update
+ * the master through the UI restore flow (which now writes user-scoped). To "publish" a
+ * version as the new master, run an INSERT manually with scope='shared' (admin tool, not in UI).
+ */
 export function useAssumptionsPersistence() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,43 +49,38 @@ export function useAssumptionsPersistence() {
   const [snapshots, setSnapshots] = useState<AssumptionsSnapshot[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
 
-  // Keep reference to last-saved assumptions for diff computation
+  // Last-saved reference for diff + skip-noop guard.
+  // Always stored as the MERGED state ({...DEFAULT, ...loaded}) so byte-comparison with
+  // React state is valid (FinancialModelContext applies the same merge on setAssumptions).
   const lastSavedAssumptions = useRef<Assumptions | null>(null);
-
-  // Optimistic locking: track the created_at of the active snapshot we last loaded.
-  // Before saving, we check if the server's active snapshot is newer (someone else saved).
-  // If so, we abort to prevent overwriting their work with stale state.
-  const lastKnownActiveCreatedAt = useRef<string | null>(null);
 
   const loadSnapshots = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const supabase = getBackendClientSafe();
-      // Without Supabase config OR without auth, the app cannot reconcile shared state.
-      // Falling back to localStorage as source-of-truth caused divergent saves overwriting
-      // the shared snapshot with stale local state. Enforce Supabase as the single source.
       if (!supabase) {
-        setError('Supabase indisponível. Configure VITE_SUPABASE_URL e tente de novo.');
+        setError('Supabase indisponível.');
         return null;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('Sessão não autenticada. Faça login para acessar os dados compartilhados.');
+        setError('Sessão sem auth — faça login.');
         return null;
       }
 
-      // Load ALL snapshots the user can see (shared + own)
+      // Load: user's own snapshots + shared snapshots (for restore browsing + master bootstrap)
       const { data, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('*')
-        .order('updated_at', { ascending: false })
+        .or(`user_id.eq.${user.id},scope.eq.shared`)
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (fetchError) throw fetchError;
 
-      const mapped = (data || []).map((row: any) => ({
+      const mapped: AssumptionsSnapshot[] = (data || []).map((row: any) => ({
         id: row.id,
         name: row.name,
         scenario: row.scenario as Scenario,
@@ -85,27 +94,24 @@ export function useAssumptionsPersistence() {
       }));
       setSnapshots(mapped);
 
-      // Priority: active shared → most recent shared. localStorage is NOT a fallback —
-      // it caused stale-state writes overwriting shared data. If Supabase has nothing,
-      // surface that explicitly so the caller can show the right UI.
-      const activeShared = mapped.find(s => s.scope === 'shared' && s.is_active);
-      const anyShared = mapped.find(s => s.scope === 'shared');
-      const active = activeShared ?? anyShared ?? mapped[0];
+      // Priority:
+      //  1) the user's own ACTIVE workspace
+      //  2) the user's most recent snapshot (any state)
+      //  3) the most recent SHARED snapshot (master) — bootstrap for new users
+      const activeUserOwn = mapped.find(s => s.scope === 'user' && s.modified_by === user.id && s.is_active);
+      const anyUserOwn = mapped.find(s => s.scope === 'user' && s.modified_by === user.id);
+      const latestShared = mapped.find(s => s.scope === 'shared');
+      const active = activeUserOwn ?? anyUserOwn ?? latestShared;
+
       if (active?.assumptions) {
-        // Store the MERGED state (defaults + loaded) so it stays byte-equal to what
-        // FinancialModelContext puts into React state via setAssumptions({...DEFAULT, ...loaded}).
-        // Without this, lastSaved is a strict subset of localState, the JSON.stringify
-        // comparison always returns "different", and hasPendingEdits is always true —
-        // freezing the Realtime sync because the listener thinks the user is mid-edit.
         const merged = { ...DEFAULT_ASSUMPTIONS, ...active.assumptions };
         lastSavedAssumptions.current = merged;
-        lastKnownActiveCreatedAt.current = active.created_at;
         return active.assumptions;
       }
       return null;
     } catch (err: any) {
       console.error('Error loading assumptions:', err);
-      setError(`Erro ao carregar do Supabase: ${err.message}. Edits ficarão bloqueados até reconectar.`);
+      setError(`Erro ao carregar: ${err.message}`);
       return null;
     } finally {
       setLoading(false);
@@ -122,68 +128,44 @@ export function useAssumptionsPersistence() {
     try {
       const supabase = getBackendClientSafe();
       if (!supabase) {
-        setError('Supabase indisponível — edição não foi gravada. Reconecte e tente de novo.');
+        setError('Supabase indisponível — edição não foi gravada.');
         return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setError('Sessão sem auth — edição não foi gravada. Faça login.');
+        setError('Sessão sem auth — edição não foi gravada.');
         return;
       }
 
-      // Compute diff against last saved state (used for audit log + skip-noop)
+      // Skip-noop: byte-equal local vs lastSaved → nothing to write.
+      if (
+        lastSavedAssumptions.current &&
+        JSON.stringify(lastSavedAssumptions.current) === JSON.stringify(assumptions)
+      ) {
+        return;
+      }
+
       const diff = lastSavedAssumptions.current
         ? computeAssumptionsDiff(lastSavedAssumptions.current, assumptions)
         : null;
-
-      // Skip only if local state is provably identical to last save (catch-all guard).
-      // Cannot rely on diff.changes.length alone — diff is field-by-field and may miss future fields.
-      if (lastSavedAssumptions.current && JSON.stringify(lastSavedAssumptions.current) === JSON.stringify(assumptions)) {
-        return;
-      }
-
       const changeSummary = diff ? buildChangeSummary(diff) : null;
       const auditValues = diff ? buildAuditValues(diff) : null;
 
-      // Find existing active shared snapshot — fetch created_at for optimistic-lock check
-      const { data: existing } = await (supabase as any)
+      // Deactivate this user's previous active workspace (only their own — never touch others')
+      await (supabase as any)
         .from('assumptions_snapshots')
-        .select('id, created_at')
-        .eq('scope', 'shared')
-        .eq('is_active', true)
-        .limit(1)
-        .single();
+        .update({ is_active: false })
+        .eq('scope', 'user')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
 
-      // OPTIMISTIC LOCKING: if the server's active snapshot is newer than what we loaded,
-      // another session/user wrote first. Abort to prevent overwriting their work with stale state.
-      if (
-        existing?.created_at &&
-        lastKnownActiveCreatedAt.current &&
-        existing.created_at > lastKnownActiveCreatedAt.current
-      ) {
-        console.warn(
-          '[saveAssumptions] Concurrent write detected — server has newer snapshot.',
-          { localKnownAt: lastKnownActiveCreatedAt.current, serverActiveAt: existing.created_at },
-        );
-        setError('Outra sessão salvou primeiro. Recarregue para ver a versão mais nova.');
-        return; // Do not overwrite — caller should reload via loadSnapshots()
-      }
-
-      if (existing?.id) {
-        // Deactivate current active snapshot
-        await (supabase as any)
-          .from('assumptions_snapshots')
-          .update({ is_active: false })
-          .eq('id', existing.id);
-      }
-
-      // INSERT new snapshot (never UPDATE — preserves full history)
+      // INSERT new user-scoped active snapshot (history preserved — never UPDATE)
       const { data: newSnapshot, error: insertError } = await (supabase as any)
         .from('assumptions_snapshots')
         .insert({
           user_id: user.id,
-          scope: 'shared',
+          scope: 'user',
           scenario,
           name: name || `Auto-save ${new Date().toLocaleString('pt-BR')}`,
           assumptions: assumptions as any,
@@ -191,12 +173,12 @@ export function useAssumptionsPersistence() {
           modified_by: user.id,
           change_summary: changeSummary,
         })
-        .select('id, created_at')
+        .select('id')
         .single();
 
       if (insertError) throw insertError;
 
-      // Insert audit log entry
+      // Audit log
       if (newSnapshot?.id && diff && diff.changes.length > 0) {
         await (supabase as any)
           .from('assumptions_audit_log')
@@ -212,9 +194,6 @@ export function useAssumptionsPersistence() {
       }
 
       lastSavedAssumptions.current = assumptions;
-      if (newSnapshot?.created_at) {
-        lastKnownActiveCreatedAt.current = newSnapshot.created_at;
-      }
     } catch (err: any) {
       console.error('Error saving assumptions:', err);
       setError(err.message);
@@ -236,7 +215,9 @@ export function useAssumptionsPersistence() {
 
       if (fetchError) throw fetchError;
       const loaded = (data as any)?.assumptions ?? null;
-      if (loaded) lastSavedAssumptions.current = loaded;
+      if (loaded) {
+        lastSavedAssumptions.current = { ...DEFAULT_ASSUMPTIONS, ...loaded };
+      }
       return loaded;
     } catch (err: any) {
       console.error('Error loading snapshot:', err);
@@ -252,7 +233,7 @@ export function useAssumptionsPersistence() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
-      // Load the snapshot to restore
+      // Load the snapshot to restore (can be user-scoped or shared — both readable)
       const { data: snapshotData, error: fetchError } = await (supabase as any)
         .from('assumptions_snapshots')
         .select('*')
@@ -264,23 +245,24 @@ export function useAssumptionsPersistence() {
 
       const restoredAssumptions = snapshotData.assumptions as Assumptions;
 
-      // Deactivate current active
+      // Deactivate this user's current workspace
       await (supabase as any)
         .from('assumptions_snapshots')
         .update({ is_active: false })
-        .eq('scope', 'shared')
+        .eq('scope', 'user')
+        .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Create new snapshot as a copy (never overwrite history)
       const diff = lastSavedAssumptions.current
         ? computeAssumptionsDiff(lastSavedAssumptions.current, restoredAssumptions)
         : null;
 
+      // INSERT new user-scoped active snapshot as a copy of the restored content
       const { data: newSnapshot, error: insertError } = await (supabase as any)
         .from('assumptions_snapshots')
         .insert({
           user_id: user.id,
-          scope: 'shared',
+          scope: 'user',
           scenario: snapshotData.scenario,
           name: `Restaurado de ${snapshotData.name || new Date(snapshotData.created_at).toLocaleDateString('pt-BR')}`,
           assumptions: restoredAssumptions as any,
@@ -288,12 +270,11 @@ export function useAssumptionsPersistence() {
           modified_by: user.id,
           change_summary: diff ? buildChangeSummary(diff) : null,
         })
-        .select('id, created_at')
+        .select('id')
         .single();
 
       if (insertError) throw insertError;
 
-      // Audit log for restore
       if (newSnapshot?.id) {
         await (supabase as any)
           .from('assumptions_audit_log')
@@ -308,14 +289,69 @@ export function useAssumptionsPersistence() {
           });
       }
 
-      // Same merge as in loadSnapshots — keep lastSaved byte-equal to React state
       lastSavedAssumptions.current = { ...DEFAULT_ASSUMPTIONS, ...restoredAssumptions };
-      if (newSnapshot?.created_at) {
-        lastKnownActiveCreatedAt.current = newSnapshot.created_at;
-      }
       return restoredAssumptions;
     } catch (err: any) {
       console.error('Error restoring snapshot:', err);
+      setError(err.message);
+      return null;
+    }
+  }, []);
+
+  /**
+   * Pull the latest "master" (most recent shared snapshot) into this user's workspace.
+   * Use this when you want to refresh from the team baseline (overwrites the user's local edits).
+   * Returns the loaded assumptions on success, null otherwise.
+   */
+  const syncFromMaster = useCallback(async (): Promise<Assumptions | null> => {
+    try {
+      const supabase = getBackendClientSafe();
+      if (!supabase) return null;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+
+      const { data: master } = await (supabase as any)
+        .from('assumptions_snapshots')
+        .select('*')
+        .eq('scope', 'shared')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!master?.assumptions) {
+        setError('Nenhum snapshot master disponível.');
+        return null;
+      }
+
+      // Deactivate user's current workspace
+      await (supabase as any)
+        .from('assumptions_snapshots')
+        .update({ is_active: false })
+        .eq('scope', 'user')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+
+      // Create a user-scoped copy of the master
+      const { error: insertError } = await (supabase as any)
+        .from('assumptions_snapshots')
+        .insert({
+          user_id: user.id,
+          scope: 'user',
+          scenario: master.scenario,
+          name: `Sync do master ${new Date().toLocaleString('pt-BR')}`,
+          assumptions: master.assumptions,
+          is_active: true,
+          modified_by: user.id,
+          change_summary: { fields_changed: [], count: 0, summary: 'Sincronizado com master' },
+        });
+
+      if (insertError) throw insertError;
+
+      lastSavedAssumptions.current = { ...DEFAULT_ASSUMPTIONS, ...master.assumptions };
+      return master.assumptions as Assumptions;
+    } catch (err: any) {
+      console.error('Error syncing from master:', err);
       setError(err.message);
       return null;
     }
@@ -350,8 +386,6 @@ export function useAssumptionsPersistence() {
     }
   }, []);
 
-  // Expose last-saved snapshot reference reader so other hooks (e.g. Realtime listener)
-  // can decide whether the local state has pending unsaved edits before applying remote changes.
   const getLastSaved = useCallback(() => lastSavedAssumptions.current, []);
 
   return {
@@ -364,6 +398,7 @@ export function useAssumptionsPersistence() {
     saveAssumptions,
     loadSnapshot,
     restoreSnapshot,
+    syncFromMaster,
     loadAuditLog,
     getLastSaved,
   };

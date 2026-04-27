@@ -15,7 +15,6 @@ import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodRe
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { isProductMrr } from '@/lib/financialData';
-import { getBackendClientSafe } from '@/lib/supabase-safe';
 
 interface FinancialModelContextType {
   assumptions: Assumptions;
@@ -43,6 +42,7 @@ interface FinancialModelContextType {
   snapshots: import('@/hooks/useAssumptionsPersistence').AssumptionsSnapshot[];
   loadSnapshot: (id: string) => Promise<Assumptions | null>;
   restoreSnapshot: (id: string) => Promise<Assumptions | null>;
+  syncFromMaster: () => Promise<Assumptions | null>;
   auditLog: import('@/hooks/useAssumptionsPersistence').AuditLogEntry[];
   loadAuditLog: (limit?: number) => Promise<void>;
   historicalData: ReturnType<typeof useHistoricalClients>['data'];
@@ -59,7 +59,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Persistence: auto-load from Supabase/localStorage on mount, auto-save on change
-  const { saveAssumptions, loadSnapshots, snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog, getLastSaved } = useAssumptionsPersistence();
+  const { saveAssumptions, loadSnapshots, snapshots, loadSnapshot, restoreSnapshot, syncFromMaster, auditLog, loadAuditLog } = useAssumptionsPersistence();
   const loadStarted = useRef(false);
   const hasLoaded = useRef(false);
   const [assumptionsLoaded, setAssumptionsLoaded] = useState(false);
@@ -234,76 +234,9 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     return () => clearTimeout(saveTimer.current);
   }, [assumptions, scenario, saveAssumptions]);
 
-  // Supabase Realtime — listen for shared snapshot inserts from OTHER sessions and reload.
-  // Without this, two users editing in parallel diverge: each holds an in-memory state and
-  // their auto-saves overwrite each other. With this, when User B writes a new active
-  // snapshot, User A's app receives the row push within ~500ms and refreshes.
-  useEffect(() => {
-    if (!hasLoaded.current) return;
-    const supabase = getBackendClientSafe();
-    if (!supabase) return;
-
-    let cancelled = false;
-    const channel = (supabase as any)
-      .channel('assumptions_snapshots_realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'assumptions_snapshots' },
-        async (payload: any) => {
-          if (cancelled) return;
-          const row = payload?.new;
-          if (!row || row.scope !== 'shared' || !row.is_active) return;
-          // NOTE: we used to filter out events where row.modified_by === user.id to avoid
-          // feedback loops on the saving session. That filter was wrong: users with the
-          // SAME account on different tabs/devices have identical user.id, and that
-          // filter blocked them from syncing with each other. We rely on:
-          //   1) `hasPendingEdits` to avoid wiping in-flight typing
-          //   2) the save-side `JSON.stringify(lastSaved) === JSON.stringify(assumptions)`
-          //      guard to avoid re-saving identical state.
-          const lastSaved = getLastSaved();
-          const localState = latestAssumptions.current;
-          const incomingState = row.assumptions ?? null;
-
-          // If the incoming state is byte-identical to what we already have locally,
-          // it's likely our own save echoing back. Ignore silently to keep the console clean.
-          if (incomingState && JSON.stringify(localState) === JSON.stringify(incomingState)) {
-            return;
-          }
-
-          const hasPendingEdits = lastSaved
-            ? JSON.stringify(lastSaved) !== JSON.stringify(localState)
-            : false;
-
-          if (hasPendingEdits) {
-            console.warn('[Realtime] Outra sessão gravou, mas você tem edits pendentes. Atualização adiada — finalize seu save antes de recarregar.');
-            return;
-          }
-
-          console.info('[Realtime] Outra sessão atualizou assumptions — recarregando.');
-          loadSnapshots().then(loaded => {
-            if (!loaded) {
-              console.warn('[Realtime] loadSnapshots retornou null/undefined — NÃO foi possível recarregar.');
-              return;
-            }
-            if (cancelled) {
-              console.warn('[Realtime] Listener foi cancelado antes do reload.');
-              return;
-            }
-            console.info('[Realtime] Aplicando state novo. Sample:', {
-              firstKeys: Object.keys(loaded).slice(0, 5),
-              caasAssessoria2026: (loaded as any)?.subProductClients?.caasAssessoria?.[2026],
-              caasEnterpriseTicket: (loaded as any)?.tickets?.caasEnterprise,
-            });
-            setAssumptions(() => ({ ...DEFAULT_ASSUMPTIONS, ...loaded }));
-          });
-        },
-      )
-      .subscribe();
-    return () => {
-      cancelled = true;
-      try { (supabase as any).removeChannel(channel); } catch {}
-    };
-  }, [loadSnapshots, assumptionsLoaded]);
+  // No Realtime listener anymore — each user has their own workspace (scope='user') so there's
+  // no cross-session conflict to sync. If a user wants to refresh from the team master, they
+  // call syncFromMaster() explicitly via the UI.
 
   // beforeunload — Supabase is the only source of truth now. localStorage isn't a
   // fallback anymore (it caused stale-state writes overwriting shared data on next load).
@@ -592,7 +525,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       assumptions, scenario, selectedYear, selectedPeriod, dataSource, projections, model, pnlTree,
       dateRange, filteredYears, focalYear, rangeDataSource, dataReady,
       setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions, saveNow,
-      snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog,
+      snapshots, loadSnapshot, restoreSnapshot, syncFromMaster, auditLog, loadAuditLog,
       historicalData,
     }}>
       {children}
