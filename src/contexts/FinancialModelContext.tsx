@@ -253,14 +253,23 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           if (cancelled) return;
           const row = payload?.new;
           if (!row || row.scope !== 'shared' || !row.is_active) return;
-          // Don't react to our own inserts (avoid feedback loop)
-          const { data: { user } } = await (supabase as any).auth.getUser();
-          if (user && row.modified_by === user.id) return;
-          // Another session pushed a new shared+active snapshot.
-          // If THIS session has unsaved edits in flight, do NOT auto-overwrite — that would
-          // wipe the user's typing. Show a warning instead and let them decide.
+          // NOTE: we used to filter out events where row.modified_by === user.id to avoid
+          // feedback loops on the saving session. That filter was wrong: users with the
+          // SAME account on different tabs/devices have identical user.id, and that
+          // filter blocked them from syncing with each other. We rely on:
+          //   1) `hasPendingEdits` to avoid wiping in-flight typing
+          //   2) the save-side `JSON.stringify(lastSaved) === JSON.stringify(assumptions)`
+          //      guard to avoid re-saving identical state.
           const lastSaved = getLastSaved();
           const localState = latestAssumptions.current;
+          const incomingState = row.assumptions ?? null;
+
+          // If the incoming state is byte-identical to what we already have locally,
+          // it's likely our own save echoing back. Ignore silently to keep the console clean.
+          if (incomingState && JSON.stringify(localState) === JSON.stringify(incomingState)) {
+            return;
+          }
+
           const hasPendingEdits = lastSaved
             ? JSON.stringify(lastSaved) !== JSON.stringify(localState)
             : false;
