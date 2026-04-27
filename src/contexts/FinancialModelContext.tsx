@@ -15,6 +15,7 @@ import { getFocalYear, getRangeDataSource, YearDataSource } from '@/lib/periodRe
 import { useAssumptionsPersistence } from '@/hooks/useAssumptionsPersistence';
 import { useHistoricalClients } from '@/hooks/useHistoricalClients';
 import { isProductMrr } from '@/lib/financialData';
+import { getBackendClientSafe } from '@/lib/supabase-safe';
 
 interface FinancialModelContextType {
   assumptions: Assumptions;
@@ -233,13 +234,53 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
     return () => clearTimeout(saveTimer.current);
   }, [assumptions, scenario, saveAssumptions]);
 
-  // Save immediately when user closes/leaves the page (prevents data loss)
+  // Supabase Realtime — listen for shared snapshot inserts from OTHER sessions and reload.
+  // Without this, two users editing in parallel diverge: each holds an in-memory state and
+  // their auto-saves overwrite each other. With this, when User B writes a new active
+  // snapshot, User A's app receives the row push within ~500ms and refreshes.
+  useEffect(() => {
+    if (!hasLoaded.current) return;
+    const supabase = getBackendClientSafe();
+    if (!supabase) return;
+
+    let cancelled = false;
+    const channel = (supabase as any)
+      .channel('assumptions_snapshots_realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'assumptions_snapshots' },
+        async (payload: any) => {
+          if (cancelled) return;
+          const row = payload?.new;
+          if (!row || row.scope !== 'shared' || !row.is_active) return;
+          // Don't react to our own inserts (avoid feedback loop)
+          const { data: { user } } = await (supabase as any).auth.getUser();
+          if (user && row.modified_by === user.id) return;
+          // Another session pushed a new shared+active snapshot. Pull it.
+          console.info('[Realtime] Outra sessão atualizou assumptions — recarregando.');
+          loadSnapshots().then(loaded => {
+            if (loaded && !cancelled) {
+              setAssumptions(prev => ({ ...DEFAULT_ASSUMPTIONS, ...loaded }));
+            }
+          });
+        },
+      )
+      .subscribe();
+    return () => {
+      cancelled = true;
+      try { (supabase as any).removeChannel(channel); } catch {}
+    };
+  }, [loadSnapshots, assumptionsLoaded]);
+
+  // beforeunload — Supabase is the only source of truth now. localStorage isn't a
+  // fallback anymore (it caused stale-state writes overwriting shared data on next load).
+  // If a user navigates away mid-edit before the 2s debounce flushes, that edit is lost
+  // by design. The right answer is a saveNow on the actual edit handlers, not a localStorage
+  // safety net that diverges from Supabase.
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (hasLoaded.current) {
-        // Synchronous localStorage save (Supabase can't be awaited here)
-        try { localStorage.setItem('o2_assumptions', JSON.stringify(latestAssumptions.current)); } catch {}
-      }
+      // intentionally empty — kept here only to allow a future hook for "warn before close
+      // if there are pending unsaved changes" UX. Do not write localStorage here.
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);

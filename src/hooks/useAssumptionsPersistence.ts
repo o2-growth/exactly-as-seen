@@ -48,48 +48,17 @@ export function useAssumptionsPersistence() {
     setError(null);
     try {
       const supabase = getBackendClientSafe();
+      // Without Supabase config OR without auth, the app cannot reconcile shared state.
+      // Falling back to localStorage as source-of-truth caused divergent saves overwriting
+      // the shared snapshot with stale local state. Enforce Supabase as the single source.
       if (!supabase) {
-        const stored = localStorage.getItem('o2_assumptions');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          lastSavedAssumptions.current = parsed;
-          setSnapshots([{
-            id: 'local',
-            name: 'Local Save',
-            scenario: 'BASE',
-            assumptions: parsed,
-            is_active: true,
-            scope: 'user',
-            modified_by: null,
-            change_summary: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }]);
-          return parsed;
-        }
+        setError('Supabase indisponível. Configure VITE_SUPABASE_URL e tente de novo.');
         return null;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        const stored = localStorage.getItem('o2_assumptions');
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          lastSavedAssumptions.current = parsed;
-          setSnapshots([{
-            id: 'local',
-            name: 'Local Save',
-            scenario: 'BASE',
-            assumptions: parsed,
-            is_active: true,
-            scope: 'user',
-            modified_by: null,
-            change_summary: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }]);
-          return parsed;
-        }
+        setError('Sessão não autenticada. Faça login para acessar os dados compartilhados.');
         return null;
       }
 
@@ -116,32 +85,21 @@ export function useAssumptionsPersistence() {
       }));
       setSnapshots(mapped);
 
-      // Priority: active shared → active user → most recent → localStorage
+      // Priority: active shared → most recent shared. localStorage is NOT a fallback —
+      // it caused stale-state writes overwriting shared data. If Supabase has nothing,
+      // surface that explicitly so the caller can show the right UI.
       const activeShared = mapped.find(s => s.scope === 'shared' && s.is_active);
-      const activeUser = mapped.find(s => s.is_active);
-      const active = activeShared ?? activeUser ?? mapped[0];
+      const anyShared = mapped.find(s => s.scope === 'shared');
+      const active = activeShared ?? anyShared ?? mapped[0];
       if (active?.assumptions) {
         lastSavedAssumptions.current = active.assumptions;
         lastKnownActiveCreatedAt.current = active.created_at;
         return active.assumptions;
       }
-
-      const stored = localStorage.getItem('o2_assumptions');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        lastSavedAssumptions.current = parsed;
-        return parsed;
-      }
       return null;
     } catch (err: any) {
       console.error('Error loading assumptions:', err);
-      setError(err.message);
-      const stored = localStorage.getItem('o2_assumptions');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        lastSavedAssumptions.current = parsed;
-        return parsed;
-      }
+      setError(`Erro ao carregar do Supabase: ${err.message}. Edits ficarão bloqueados até reconectar.`);
       return null;
     } finally {
       setLoading(false);
@@ -156,14 +114,17 @@ export function useAssumptionsPersistence() {
     setSaving(true);
     setError(null);
     try {
-      // Always save to localStorage first (instant, reliable)
-      localStorage.setItem('o2_assumptions', JSON.stringify(assumptions));
-
       const supabase = getBackendClientSafe();
-      if (!supabase) return;
+      if (!supabase) {
+        setError('Supabase indisponível — edição não foi gravada. Reconecte e tente de novo.');
+        return;
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setError('Sessão sem auth — edição não foi gravada. Faça login.');
+        return;
+      }
 
       // Compute diff against last saved state (used for audit log + skip-noop)
       const diff = lastSavedAssumptions.current
@@ -257,11 +218,6 @@ export function useAssumptionsPersistence() {
   }, []);
 
   const loadSnapshot = useCallback(async (snapshotId: string): Promise<Assumptions | null> => {
-    if (snapshotId === 'local') {
-      const stored = localStorage.getItem('o2_assumptions');
-      return stored ? JSON.parse(stored) : null;
-    }
-
     try {
       const supabase = getBackendClientSafe();
       if (!supabase) return null;
@@ -350,7 +306,6 @@ export function useAssumptionsPersistence() {
       if (newSnapshot?.created_at) {
         lastKnownActiveCreatedAt.current = newSnapshot.created_at;
       }
-      localStorage.setItem('o2_assumptions', JSON.stringify(restoredAssumptions));
       return restoredAssumptions;
     } catch (err: any) {
       console.error('Error restoring snapshot:', err);
