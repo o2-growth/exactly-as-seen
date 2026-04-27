@@ -67,6 +67,31 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (loadStarted.current) return;
     loadStarted.current = true;
+
+    // ── ONE-SHOT CLEANUP: remove localStorage keys legados que NÃO devem ser fonte
+    //    de verdade após a migração user-scoped (commit 722469f + 61d5aad).
+    //    Sem isso, navegadores que tinham cache de versões anteriores continuariam
+    //    lendo valores stale e poluindo o workspace user-scoped no auto-save.
+    //    A flag 'o2_ls_cleanup_v2' garante que rode só uma vez por navegador.
+    try {
+      if (!localStorage.getItem('o2_ls_cleanup_v2')) {
+        const legacyKeys = [
+          'o2_assumptions',          // assumptions JSONB legacy (agora 100% Supabase)
+          'o2-cap-table',            // cap table legacy (agora em assumptions.capTable)
+          'o2-total-shares',         // total shares legacy (idem)
+          'o2-cap-table-saved-at',   // timestamp display (irrelevante)
+          'o2_coa_labels',           // P&L labels legacy (vai migrar futuro)
+          'o2_coa_hidden',           // P&L hidden legacy
+          'o2-premissas-overrides-v1', // premissas legacy (já migrado)
+        ];
+        for (const k of legacyKeys) {
+          try { localStorage.removeItem(k); } catch {}
+        }
+        localStorage.setItem('o2_ls_cleanup_v2', '1');
+        console.info('[Cleanup] localStorage legado limpo');
+      }
+    } catch {}
+
     loadSnapshots().then(saved => {
       if (saved) {
         // One-time fix: restore accidentally changed caasAssessoria values
