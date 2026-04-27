@@ -324,7 +324,7 @@ const formatAxis = (v: number) => {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CashFlow() {
-  const { scenario, pnlTree, assumptions, setAssumptions, saveNow, filteredYears, rangeDataSource } = useFinancialModel();
+  const { scenario, pnlTree, assumptions, setAssumptions, saveNow, filteredYears, rangeDataSource, historicalData } = useFinancialModel();
   const [pmrOpen, setPmrOpen] = useState(false);
   const [pmrSubTab, setPmrSubTab] = useState<'config' | 'projecao'>('config');
   const [pmpOpen, setPmpOpen] = useState(false);
@@ -441,7 +441,7 @@ export default function CashFlow() {
                   />
                 ) : (
                   (() => {
-                    const proj = projectRecebimentos(projecaoYear, pmrProdutos, pnlTree);
+                    const proj = projectRecebimentos(projecaoYear, pmrProdutos, assumptions, historicalData);
                     const totals = annualTotals(proj);
                     const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
                     const GRUPO_ORDER = ['CaaS','SaaS','Education','Expansao','Tax'];

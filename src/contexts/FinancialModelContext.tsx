@@ -44,6 +44,7 @@ interface FinancialModelContextType {
   restoreSnapshot: (id: string) => Promise<Assumptions | null>;
   auditLog: import('@/hooks/useAssumptionsPersistence').AuditLogEntry[];
   loadAuditLog: (limit?: number) => Promise<void>;
+  historicalData: ReturnType<typeof useHistoricalClients>['data'];
 }
 
 const FinancialModelContext = createContext<FinancialModelContextType | null>(null);
@@ -518,6 +519,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
       dateRange, filteredYears, focalYear, rangeDataSource, dataReady,
       setAssumptions, updateAssumption, setScenario, setSelectedYear, setSelectedPeriod, setDataSource, setDateRange, resetAssumptions, saveNow,
       snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog,
+      historicalData,
     }}>
       {children}
     </FinancialModelContext.Provider>

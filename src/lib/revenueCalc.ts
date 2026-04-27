@@ -55,15 +55,15 @@ function getChurnForMonth(key: string, data: Assumptions, year: Year, monthIndex
 }
 
 /**
- * Compute annual revenue for a single sub-product.
- * This is the SINGLE SOURCE OF TRUTH for revenue — used by both Assumptions and P&L.
+ * Compute monthly revenue array (12 values) for a single sub-product.
+ * This is the SINGLE SOURCE OF TRUTH for revenue — used by P&L (annual sum) and PMR projection (monthly distribution).
  */
-export function computeProductAnnualRevenue(
+export function computeProductMonthlyRevenue(
   key: SubProductKey,
   year: Year,
   assumptions: Assumptions,
   historicalData: HistoricalDataMap,
-): number {
+): number[] {
   const monthly = getMonthlyClients(
     key as any, year,
     assumptions.subProductClients,
@@ -158,5 +158,18 @@ export function computeProductAnnualRevenue(
     }
   }
 
-  return faturamentoTotal.reduce((s, v) => s + v, 0);
+  return faturamentoTotal;
+}
+
+/**
+ * Compute annual revenue for a single sub-product.
+ * Sums the 12 monthly values from computeProductMonthlyRevenue.
+ */
+export function computeProductAnnualRevenue(
+  key: SubProductKey,
+  year: Year,
+  assumptions: Assumptions,
+  historicalData: HistoricalDataMap,
+): number {
+  return computeProductMonthlyRevenue(key, year, assumptions, historicalData).reduce((s, v) => s + v, 0);
 }
