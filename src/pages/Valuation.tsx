@@ -28,43 +28,14 @@ const DONUT_COLORS = [
   'hsl(280 60% 55%)', 'hsl(30 80% 55%)',
 ];
 
-const STORAGE_KEY = 'o2-cap-table';
-const TOTAL_SHARES_KEY = 'o2-total-shares';
-const LAST_SAVED_KEY = 'o2-cap-table-saved-at';
-
-function loadCapTable(): Shareholder[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // backward compat: convert old shares-based model to pct-based
-      if (parsed.length > 0 && parsed[0].shares !== undefined && parsed[0].ownershipPct === undefined) {
-        const total = parsed.reduce((s: number, sh: any) => s + (sh.shares || 0), 0);
-        return parsed.map((sh: any) => ({
-          id: sh.id,
-          name: sh.name,
-          type: sh.type,
-          ownershipPct: total > 0 ? Math.round(((sh.shares / total) * 100) * 10) / 10 : 0,
-          entryDate: sh.entryDate || '',
-        }));
-      }
-      return parsed;
-    }
-  } catch {}
-  return [
-    { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryDate: '2017-08' },
-    { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryDate: '2024-01' },
-    { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryDate: '' },
-  ];
-}
-
-function loadTotalShares(): number {
-  try {
-    const raw = localStorage.getItem(TOTAL_SHARES_KEY);
-    if (raw) return Number(raw) || 1_000_000;
-  } catch {}
-  return 1_000_000;
-}
+// Default cap table when assumptions has no entry yet (only used for brand-new users
+// that haven't bootstrapped from master yet — their workspace gets seeded with this).
+const DEFAULT_SHAREHOLDERS: Shareholder[] = [
+  { id: '1', name: 'Pedro Albite', type: 'Founder', ownershipPct: 70.0, entryDate: '2017-08' },
+  { id: '2', name: 'Tiago Pisoni', type: 'Founder', ownershipPct: 30.0, entryDate: '2024-01' },
+  { id: '3', name: 'Rafael Fleck', type: 'Investor', ownershipPct: 0.0, entryDate: '' },
+];
+const DEFAULT_TOTAL_SHARES = 1_000_000;
 
 function formatSharesInput(value: number): string {
   if (!value) return '';
@@ -77,21 +48,22 @@ export default function Valuation() {
   // Use filteredYears for tables/charts; fall back to all YEARS if empty
   const activeYears: Year[] = filteredYears.length > 0 ? filteredYears : [...YEARS];
 
-  // Load from assumptions first, fallback to legacy localStorage
-  const [shareholders, setShareholders] = useState<Shareholder[]>(() => {
-    if (assumptions.capTable?.shareholders?.length) return assumptions.capTable.shareholders as Shareholder[];
-    return loadCapTable();
-  });
-  const [totalSharesPool, setTotalSharesPool] = useState(() => {
-    if (assumptions.capTable?.totalShares) return assumptions.capTable.totalShares;
-    return loadTotalShares();
-  });
+  // Cap Table state — single source of truth is assumptions.capTable (Supabase user-scoped).
+  // No localStorage fallback: if assumptions doesn't have it yet (very fresh user), seed
+  // with defaults; first save will persist to Supabase.
+  const [shareholders, setShareholders] = useState<Shareholder[]>(() =>
+    (assumptions.capTable?.shareholders as Shareholder[] | undefined)?.length
+      ? (assumptions.capTable!.shareholders as Shareholder[])
+      : DEFAULT_SHAREHOLDERS,
+  );
+  const [totalSharesPool, setTotalSharesPool] = useState(() =>
+    assumptions.capTable?.totalShares ?? DEFAULT_TOTAL_SHARES,
+  );
   const [ebitdaMultiple, setEbitdaMultiple] = useState(() => assumptions.valuationConfig?.ebitdaMultiple ?? 10);
   const [arrMultiple, setArrMultiple] = useState(() => assumptions.valuationConfig?.arrMultiple ?? 5);
   const [raiseAmount, setRaiseAmount] = useState(() => assumptions.valuationConfig?.raiseAmount ?? 0);
   const [raiseValuation, setRaiseValuation] = useState(() => assumptions.valuationConfig?.raiseValuation ?? 0);
   const [dirty, setDirty] = useState(false);
-  const [lastSaved, setLastSaved] = useState<string | null>(() => localStorage.getItem(LAST_SAVED_KEY));
   const [justSaved, setJustSaved] = useState(false);
 
   // Sync from assumptions when context finishes loading from storage
@@ -126,15 +98,10 @@ export default function Valuation() {
   };
 
   const saveCapTable = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(shareholders));
-    localStorage.setItem(TOTAL_SHARES_KEY, String(totalSharesPool));
-    const now = new Date().toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    localStorage.setItem(LAST_SAVED_KEY, now);
-    setLastSaved(now);
     setDirty(false);
     setJustSaved(true);
     setTimeout(() => setJustSaved(false), 2000);
-    // Also persist to assumptions for Supabase backup
+    // Persist to assumptions — auto-save in FinancialModelContext sends to Supabase user-scoped.
     setAssumptions(prev => ({
       ...prev,
       capTable: { shareholders, totalShares: totalSharesPool },
@@ -267,11 +234,6 @@ export default function Valuation() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-semibold text-foreground">Cap Table</h3>
-            {lastSaved && (
-              <span className="text-[10px] text-muted-foreground">
-                Salvo em {lastSaved}
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">

@@ -1,21 +1,21 @@
 // src/pages/PremissasPage.tsx
 //
-// ABA "PREMISSAS" v2 — EDITÁVEL com persistência localStorage
+// ABA "PREMISSAS" v2 — EDITÁVEL com persistência Supabase user-scoped
 //
 // Diferenças vs v1:
 //   - Cada alíquota (PIS, COFINS, ISS, ICMS, % Pres. IRPJ/CSLL) é editável inline
-//   - Mudanças persistem em localStorage (chave: "o2-premissas-overrides-v1")
+//   - Mudanças persistem em Supabase via assumptions.subProductTaxRates (scope='user')
 //   - Botão "Resetar para padrão" volta tudo aos valores do taxPremises.tsx
 //   - Botão "Exportar JSON" gera backup das premissas atuais
 //   - Indicador visual de "modificado" em células alteradas vs padrão
 //   - IRPJ efetivo, CSLL efetivo e Total efetivo recalculam em tempo real
 //
 // IMPORTANTE — duas camadas de fonte da verdade:
-//   1. taxPremises.tsx        = padrão (defaults imutáveis no código)
-//   2. localStorage overrides = customizações do usuário (podem ser resetadas)
+//   1. taxPremises.tsx                            = padrão (defaults imutáveis no código)
+//   2. assumptions.subProductTaxRates (Supabase)  = customizações do usuário
 //
 // O hook useEditablePremises mescla as duas. Outras partes do app que precisem
-// das premissas editadas podem importar e usar o hook diretamente.
+// das premissas editadas leem direto de assumptions.subProductTaxRates.
 //
 // Drop-in: importe e adicione como rota/aba no seu app Lovable.
 //   import PremissasPage from '@/pages/PremissasPage';
@@ -46,8 +46,6 @@ import {
   addMixTaxSlice,
   removeMixTaxSlice,
 } from '@/lib/financialData';
-
-const STORAGE_KEY = 'o2-premissas-overrides-v1';
 
 // Mapping: TAX_PREMISES key → TicketKey (engine)
 const PREMISE_TO_TICKET: Record<string, TicketKey> = {
@@ -635,7 +633,7 @@ export default function PremissasPage() {
         }}>
           O2 Inc. — Premissas Tributárias | Customizações salvas em{' '}
           <code style={{ background: '#F2F2F2', padding: '1px 4px', borderRadius: 2 }}>
-            localStorage["{STORAGE_KEY}"]
+            Supabase · assumptions.subProductTaxRates
           </code>
         </footer>
       </div>
