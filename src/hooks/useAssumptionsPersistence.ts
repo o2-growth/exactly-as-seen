@@ -92,7 +92,13 @@ export function useAssumptionsPersistence() {
       const anyShared = mapped.find(s => s.scope === 'shared');
       const active = activeShared ?? anyShared ?? mapped[0];
       if (active?.assumptions) {
-        lastSavedAssumptions.current = active.assumptions;
+        // Store the MERGED state (defaults + loaded) so it stays byte-equal to what
+        // FinancialModelContext puts into React state via setAssumptions({...DEFAULT, ...loaded}).
+        // Without this, lastSaved is a strict subset of localState, the JSON.stringify
+        // comparison always returns "different", and hasPendingEdits is always true —
+        // freezing the Realtime sync because the listener thinks the user is mid-edit.
+        const merged = { ...DEFAULT_ASSUMPTIONS, ...active.assumptions };
+        lastSavedAssumptions.current = merged;
         lastKnownActiveCreatedAt.current = active.created_at;
         return active.assumptions;
       }
@@ -302,7 +308,8 @@ export function useAssumptionsPersistence() {
           });
       }
 
-      lastSavedAssumptions.current = restoredAssumptions;
+      // Same merge as in loadSnapshots — keep lastSaved byte-equal to React state
+      lastSavedAssumptions.current = { ...DEFAULT_ASSUMPTIONS, ...restoredAssumptions };
       if (newSnapshot?.created_at) {
         lastKnownActiveCreatedAt.current = newSnapshot.created_at;
       }
