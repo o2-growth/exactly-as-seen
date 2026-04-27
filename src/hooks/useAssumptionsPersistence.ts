@@ -38,6 +38,11 @@ export function useAssumptionsPersistence() {
   // Keep reference to last-saved assumptions for diff computation
   const lastSavedAssumptions = useRef<Assumptions | null>(null);
 
+  // Optimistic locking: track the created_at of the active snapshot we last loaded.
+  // Before saving, we check if the server's active snapshot is newer (someone else saved).
+  // If so, we abort to prevent overwriting their work with stale state.
+  const lastKnownActiveCreatedAt = useRef<string | null>(null);
+
   const loadSnapshots = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -117,6 +122,7 @@ export function useAssumptionsPersistence() {
       const active = activeShared ?? activeUser ?? mapped[0];
       if (active?.assumptions) {
         lastSavedAssumptions.current = active.assumptions;
+        lastKnownActiveCreatedAt.current = active.created_at;
         return active.assumptions;
       }
 
@@ -159,27 +165,43 @@ export function useAssumptionsPersistence() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Compute diff against last saved state
+      // Compute diff against last saved state (used for audit log + skip-noop)
       const diff = lastSavedAssumptions.current
         ? computeAssumptionsDiff(lastSavedAssumptions.current, assumptions)
         : null;
 
-      // Skip save if nothing changed
-      if (diff && diff.changes.length === 0) {
+      // Skip only if local state is provably identical to last save (catch-all guard).
+      // Cannot rely on diff.changes.length alone — diff is field-by-field and may miss future fields.
+      if (lastSavedAssumptions.current && JSON.stringify(lastSavedAssumptions.current) === JSON.stringify(assumptions)) {
         return;
       }
 
       const changeSummary = diff ? buildChangeSummary(diff) : null;
       const auditValues = diff ? buildAuditValues(diff) : null;
 
-      // Find existing active shared snapshot
+      // Find existing active shared snapshot — fetch created_at for optimistic-lock check
       const { data: existing } = await (supabase as any)
         .from('assumptions_snapshots')
-        .select('id')
+        .select('id, created_at')
         .eq('scope', 'shared')
         .eq('is_active', true)
         .limit(1)
         .single();
+
+      // OPTIMISTIC LOCKING: if the server's active snapshot is newer than what we loaded,
+      // another session/user wrote first. Abort to prevent overwriting their work with stale state.
+      if (
+        existing?.created_at &&
+        lastKnownActiveCreatedAt.current &&
+        existing.created_at > lastKnownActiveCreatedAt.current
+      ) {
+        console.warn(
+          '[saveAssumptions] Concurrent write detected — server has newer snapshot.',
+          { localKnownAt: lastKnownActiveCreatedAt.current, serverActiveAt: existing.created_at },
+        );
+        setError('Outra sessão salvou primeiro. Recarregue para ver a versão mais nova.');
+        return; // Do not overwrite — caller should reload via loadSnapshots()
+      }
 
       if (existing?.id) {
         // Deactivate current active snapshot
@@ -202,7 +224,7 @@ export function useAssumptionsPersistence() {
           modified_by: user.id,
           change_summary: changeSummary,
         })
-        .select('id')
+        .select('id, created_at')
         .single();
 
       if (insertError) throw insertError;
@@ -223,6 +245,9 @@ export function useAssumptionsPersistence() {
       }
 
       lastSavedAssumptions.current = assumptions;
+      if (newSnapshot?.created_at) {
+        lastKnownActiveCreatedAt.current = newSnapshot.created_at;
+      }
     } catch (err: any) {
       console.error('Error saving assumptions:', err);
       setError(err.message);
@@ -301,7 +326,7 @@ export function useAssumptionsPersistence() {
           modified_by: user.id,
           change_summary: diff ? buildChangeSummary(diff) : null,
         })
-        .select('id')
+        .select('id, created_at')
         .single();
 
       if (insertError) throw insertError;
@@ -322,6 +347,9 @@ export function useAssumptionsPersistence() {
       }
 
       lastSavedAssumptions.current = restoredAssumptions;
+      if (newSnapshot?.created_at) {
+        lastKnownActiveCreatedAt.current = newSnapshot.created_at;
+      }
       localStorage.setItem('o2_assumptions', JSON.stringify(restoredAssumptions));
       return restoredAssumptions;
     } catch (err: any) {

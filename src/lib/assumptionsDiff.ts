@@ -80,7 +80,30 @@ export function computeAssumptionsDiff(
   // --- Churn ---
   compareScalar('Churn CaaS', 'churnCaas', oldA.churnCaas, newA.churnCaas, changes);
   compareScalar('Churn SaaS', 'churnSaas', oldA.churnSaas, newA.churnSaas, changes);
-  compareScalar('Churn BaaS', 'churnBaas', newA.churnBaas, newA.churnBaas, changes);
+  compareScalar('Churn BaaS', 'churnBaas', oldA.churnBaas, newA.churnBaas, changes);
+
+  // --- Monthly per-product overrides (CRITICAL: missing comparison was silently dropping saves) ---
+  if (JSON.stringify(oldA.monthlyChurnRates) !== JSON.stringify(newA.monthlyChurnRates)) {
+    changes.push({ field: 'Churn mensal', path: 'monthlyChurnRates', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).monthlyClientOverrides) !== JSON.stringify((newA as any).monthlyClientOverrides)) {
+    changes.push({ field: 'Clientes mensais (override)', path: 'monthlyClientOverrides', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).monthlyNewClientOverrides) !== JSON.stringify((newA as any).monthlyNewClientOverrides)) {
+    changes.push({ field: 'Novos clientes mensais (override)', path: 'monthlyNewClientOverrides', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).monthlyTickets) !== JSON.stringify((newA as any).monthlyTickets)) {
+    changes.push({ field: 'Tickets mensais', path: 'monthlyTickets', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).churnNotApplicable) !== JSON.stringify((newA as any).churnNotApplicable)) {
+    changes.push({ field: 'Churn não aplicável', path: 'churnNotApplicable', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).pmrConfig) !== JSON.stringify((newA as any).pmrConfig)) {
+    changes.push({ field: 'PMR Config', path: 'pmrConfig', oldValue: 'alterado', newValue: 'alterado' });
+  }
+  if (JSON.stringify((oldA as any).cosConfig) !== JSON.stringify((newA as any).cosConfig)) {
+    changes.push({ field: 'COS Config', path: 'cosConfig', oldValue: 'alterado', newValue: 'alterado' });
+  }
 
   // --- Expense percentages ---
   compareYearRecord('SG&A %', 'sgaPercent', oldA.sgaPercent, newA.sgaPercent, changes);
