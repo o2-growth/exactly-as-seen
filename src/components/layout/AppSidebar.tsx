@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X, Receipt, Calculator, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X, Receipt, Calculator, Eye, EyeOff, LogOut, User } from 'lucide-react';
 import o2Logo from '@/assets/O2_Inc_Logo.png';
+import { getBackendClientSafe } from '@/lib/supabase-safe';
 
 const HIDDEN_NAV_KEY = 'o2_hidden_nav';
 
@@ -31,8 +32,29 @@ interface AppSidebarProps {
 
 export default function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [hiddenRoutes, setHiddenRoutes] = useState<string[]>(getHiddenNav);
   const [editMode, setEditMode] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = getBackendClientSafe();
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data?.user?.email ?? null);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = getBackendClientSafe();
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    navigate('/auth', { replace: true });
+  };
 
   const toggleRoute = (to: string) => {
     setHiddenRoutes(prev => {
@@ -105,8 +127,28 @@ export default function AppSidebar({ mobileOpen, onMobileClose }: AppSidebarProp
         )}
       </nav>
 
-      <div className="mt-auto px-2 py-4 border-t border-sidebar-border">
-        <p className="text-[10px] text-muted-foreground leading-relaxed">
+      <div className="mt-auto px-2 py-3 border-t border-sidebar-border space-y-3">
+        {userEmail && (
+          <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-sidebar-accent/30 group">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary shrink-0">
+              <User className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-medium text-sidebar-foreground truncate" title={userEmail}>
+                {userEmail}
+              </p>
+              <p className="text-[9px] text-muted-foreground">conectado</p>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="p-1.5 rounded-md text-muted-foreground opacity-60 hover:opacity-100 hover:text-foreground hover:bg-sidebar-accent transition-all"
+              title="Sair"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+        <p className="text-[10px] text-muted-foreground leading-relaxed px-2">
           Valores em R$ mil (000's)<br />
           Projeções estimadas · Modelo v7
         </p>
