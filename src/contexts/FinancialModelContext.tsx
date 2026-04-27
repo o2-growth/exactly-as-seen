@@ -281,9 +281,20 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
 
           console.info('[Realtime] Outra sessão atualizou assumptions — recarregando.');
           loadSnapshots().then(loaded => {
-            if (loaded && !cancelled) {
-              setAssumptions(prev => ({ ...DEFAULT_ASSUMPTIONS, ...loaded }));
+            if (!loaded) {
+              console.warn('[Realtime] loadSnapshots retornou null/undefined — NÃO foi possível recarregar.');
+              return;
             }
+            if (cancelled) {
+              console.warn('[Realtime] Listener foi cancelado antes do reload.');
+              return;
+            }
+            console.info('[Realtime] Aplicando state novo. Sample:', {
+              firstKeys: Object.keys(loaded).slice(0, 5),
+              caasAssessoria2026: (loaded as any)?.subProductClients?.caasAssessoria?.[2026],
+              caasEnterpriseTicket: (loaded as any)?.tickets?.caasEnterprise,
+            });
+            setAssumptions(() => ({ ...DEFAULT_ASSUMPTIONS, ...loaded }));
           });
         },
       )
