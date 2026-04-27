@@ -59,7 +59,7 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
 
   // Persistence: auto-load from Supabase/localStorage on mount, auto-save on change
-  const { saveAssumptions, loadSnapshots, snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog } = useAssumptionsPersistence();
+  const { saveAssumptions, loadSnapshots, snapshots, loadSnapshot, restoreSnapshot, auditLog, loadAuditLog, getLastSaved } = useAssumptionsPersistence();
   const loadStarted = useRef(false);
   const hasLoaded = useRef(false);
   const [assumptionsLoaded, setAssumptionsLoaded] = useState(false);
@@ -256,7 +256,20 @@ export function FinancialModelProvider({ children }: { children: React.ReactNode
           // Don't react to our own inserts (avoid feedback loop)
           const { data: { user } } = await (supabase as any).auth.getUser();
           if (user && row.modified_by === user.id) return;
-          // Another session pushed a new shared+active snapshot. Pull it.
+          // Another session pushed a new shared+active snapshot.
+          // If THIS session has unsaved edits in flight, do NOT auto-overwrite — that would
+          // wipe the user's typing. Show a warning instead and let them decide.
+          const lastSaved = getLastSaved();
+          const localState = latestAssumptions.current;
+          const hasPendingEdits = lastSaved
+            ? JSON.stringify(lastSaved) !== JSON.stringify(localState)
+            : false;
+
+          if (hasPendingEdits) {
+            console.warn('[Realtime] Outra sessão gravou, mas você tem edits pendentes. Atualização adiada — finalize seu save antes de recarregar.');
+            return;
+          }
+
           console.info('[Realtime] Outra sessão atualizou assumptions — recarregando.');
           loadSnapshots().then(loaded => {
             if (loaded && !cancelled) {

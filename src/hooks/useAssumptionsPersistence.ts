@@ -343,6 +343,10 @@ export function useAssumptionsPersistence() {
     }
   }, []);
 
+  // Expose last-saved snapshot reference reader so other hooks (e.g. Realtime listener)
+  // can decide whether the local state has pending unsaved edits before applying remote changes.
+  const getLastSaved = useCallback(() => lastSavedAssumptions.current, []);
+
   return {
     saving,
     loading,
@@ -354,5 +358,6 @@ export function useAssumptionsPersistence() {
     loadSnapshot,
     restoreSnapshot,
     loadAuditLog,
+    getLastSaved,
   };
 }
