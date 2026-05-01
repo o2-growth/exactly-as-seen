@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      assumptions_audit_log: {
+        Row: {
+          action: string
+          changed_fields: Json | null
+          created_at: string
+          id: string
+          new_values: Json | null
+          previous_values: Json | null
+          snapshot_id: string | null
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_fields?: Json | null
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          snapshot_id?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_fields?: Json | null
+          created_at?: string
+          id?: string
+          new_values?: Json | null
+          previous_values?: Json | null
+          snapshot_id?: string | null
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assumptions_audit_log_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "assumptions_snapshots"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assumptions_snapshots: {
         Row: {
           assumptions: Json
@@ -53,42 +97,6 @@ export type Database = {
           scope?: string
           updated_at?: string
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      assumptions_audit_log: {
-        Row: {
-          id: string
-          snapshot_id: string | null
-          user_id: string | null
-          user_email: string | null
-          action: string
-          changed_fields: Json | null
-          previous_values: Json | null
-          new_values: Json | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          snapshot_id?: string | null
-          user_id?: string | null
-          user_email?: string | null
-          action: string
-          changed_fields?: Json | null
-          previous_values?: Json | null
-          new_values?: Json | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          snapshot_id?: string | null
-          user_id?: string | null
-          user_email?: string | null
-          action?: string
-          changed_fields?: Json | null
-          previous_values?: Json | null
-          new_values?: Json | null
-          created_at?: string
         }
         Relationships: []
       }
