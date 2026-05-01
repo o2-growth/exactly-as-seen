@@ -100,6 +100,123 @@ export type Database = {
         }
         Relationships: []
       }
+      debt_payment_schedule: {
+        Row: {
+          cef_pronampe: number
+          created_at: string
+          guardian: number
+          id: string
+          karen_debentures: number
+          month: string
+          municipal_total: number
+          paulo_edi: number
+          pgfn_total: number
+          santander: number
+          total_month: number
+        }
+        Insert: {
+          cef_pronampe?: number
+          created_at?: string
+          guardian?: number
+          id?: string
+          karen_debentures?: number
+          month: string
+          municipal_total?: number
+          paulo_edi?: number
+          pgfn_total?: number
+          santander?: number
+          total_month?: number
+        }
+        Update: {
+          cef_pronampe?: number
+          created_at?: string
+          guardian?: number
+          id?: string
+          karen_debentures?: number
+          month?: string
+          municipal_total?: number
+          paulo_edi?: number
+          pgfn_total?: number
+          santander?: number
+          total_month?: number
+        }
+        Relationships: []
+      }
+      financial_debts: {
+        Row: {
+          category: string
+          created_at: string
+          creditor: string | null
+          id: string
+          interest_rate: number | null
+          last_payment_date: string | null
+          monthly_payment: number | null
+          name: string
+          next_due_date: string | null
+          notes: string | null
+          original_amount: number
+          outstanding: number
+          overdue_amount: number | null
+          overdue_installments: number | null
+          paid_installments: number | null
+          remaining_installments: number | null
+          sort_order: number | null
+          start_date: string | null
+          status: string | null
+          total_installments: number | null
+          total_paid: number
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          creditor?: string | null
+          id?: string
+          interest_rate?: number | null
+          last_payment_date?: string | null
+          monthly_payment?: number | null
+          name: string
+          next_due_date?: string | null
+          notes?: string | null
+          original_amount?: number
+          outstanding?: number
+          overdue_amount?: number | null
+          overdue_installments?: number | null
+          paid_installments?: number | null
+          remaining_installments?: number | null
+          sort_order?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_installments?: number | null
+          total_paid?: number
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          creditor?: string | null
+          id?: string
+          interest_rate?: number | null
+          last_payment_date?: string | null
+          monthly_payment?: number | null
+          name?: string
+          next_due_date?: string | null
+          notes?: string | null
+          original_amount?: number
+          outstanding?: number
+          overdue_amount?: number | null
+          overdue_installments?: number | null
+          paid_installments?: number | null
+          remaining_installments?: number | null
+          sort_order?: number | null
+          start_date?: string | null
+          status?: string | null
+          total_installments?: number | null
+          total_paid?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       historical_clients: {
         Row: {
           assumption_key: string
@@ -142,6 +259,54 @@ export type Database = {
           is_mrr?: boolean
           period?: string
           total_revenue?: number
+        }
+        Relationships: []
+      }
+      tax_debts: {
+        Row: {
+          adhesion_date: string | null
+          category: string
+          created_at: string
+          detail: string | null
+          id: string
+          items_count: number | null
+          monthly_payment: number | null
+          note: string | null
+          outstanding: number
+          sort_order: number | null
+          status: string | null
+          subcategory: string
+          updated_at: string
+        }
+        Insert: {
+          adhesion_date?: string | null
+          category: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          items_count?: number | null
+          monthly_payment?: number | null
+          note?: string | null
+          outstanding?: number
+          sort_order?: number | null
+          status?: string | null
+          subcategory: string
+          updated_at?: string
+        }
+        Update: {
+          adhesion_date?: string | null
+          category?: string
+          created_at?: string
+          detail?: string | null
+          id?: string
+          items_count?: number | null
+          monthly_payment?: number | null
+          note?: string | null
+          outstanding?: number
+          sort_order?: number | null
+          status?: string | null
+          subcategory?: string
+          updated_at?: string
         }
         Relationships: []
       }
