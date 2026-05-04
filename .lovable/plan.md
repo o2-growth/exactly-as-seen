@@ -1,152 +1,147 @@
-## Plano: Reformulação completa da página /debt + persistência editável no banco
+Achei o motivo real da tela branca.
 
-### Objetivo
-Substituir os dados estáticos hard-coded em `src/data/modelData.ts` (`debtSchedule`, `taxDebtItems`) por tabelas editáveis no Lovable Cloud, espelhando exatamente o dashboard do XLSX `Endividamento_O2_Inc_2026.xlsx` (posição 26/04/2026), e usar o cronograma mensal real para o gráfico de amortização.
+O problema não é o P&L, nem o cálculo de dívida, nem autenticação. O app está quebrando antes de renderizar qualquer tela porque um cliente de backend está sendo criado com URL e chave `undefined`.
 
----
+O erro exato:
 
-### 1. Schema do banco (3 tabelas novas)
-
-#### `financial_debts` — dívidas financeiras (5 itens)
-```
-id uuid pk
-name text             -- "Banco Santander - Contrato 251183310"
-category text         -- 'debenture' | 'bank' | 'securitizadora'
-creditor text         -- "Santander", "Karen Lopes", etc
-original_amount numeric
-total_paid numeric
-outstanding numeric
-total_installments int
-paid_installments int
-remaining_installments int
-overdue_installments int default 0
-overdue_amount numeric default 0
-monthly_payment numeric
-interest_rate numeric default 0
-start_date date
-last_payment_date date
-next_due_date date
-status text           -- 'em_dia' | 'atraso'
-notes text
-sort_order int
-created_at, updated_at
+```text
+Uncaught Error: supabaseUrl is required.
+at AH (...)
+at new TH (...)
+at EI (...)
 ```
 
-#### `tax_debts` — dívidas tributárias (9 itens)
-```
-id uuid pk
-category text         -- 'sief_matriz' | 'empresas_vinculadas' | 'pgfn' | 'municipal'
-subcategory text      -- "PGFN 13396849", "Mun. Curitiba (CWB)", etc
-detail text           -- "Múltiplas inscrições IRPJ/CONTRIB/COFINS/PIS - 60 parc."
-outstanding numeric
-items_count int       -- 60 parcelas, 29 itens, etc
-status text           -- 'a_regularizar' | 'em_parcelamento' | 'a_pagar'
-monthly_payment numeric default 0    -- só PGFN/municipal
-adhesion_date date    -- para PGFN
-note text             -- "Adesão 01/08/2025 - Parcela R$ 5,309.72"
-sort_order int
-created_at, updated_at
+significa: o código chamou `createClient(undefined, undefined, ...)`. A biblioteca interrompe imediatamente a execução do JavaScript. Como isso acontece no carregamento inicial do bundle, o React nem chega a montar a interface, então a tela fica branca.
+
+E eu confirmei isso no bundle publicado. O JavaScript publicado contém este padrão minificado:
+
+```text
+const U5e = void 0,
+      z5e = void 0,
+      Qi = EI(U5e, z5e, { auth: ... })
 ```
 
-#### `debt_payment_schedule` — cronograma mensal consolidado (aba "Cronograma De Pagamentos" do XLSX, ~50 linhas mês a mês fev/2025–jan/2030)
-```
-id uuid pk
-month date                       -- 2026-04-01
-karen_debentures numeric default 0
-paulo_edi numeric default 0
-santander numeric default 0
-cef_pronampe numeric default 0
-guardian numeric default 0
-pgfn_total numeric default 0
-municipal_total numeric default 0
-total_month numeric              -- soma das 7 colunas acima
-created_at
+Ou seja: no bundle que está no ar, a URL e a chave foram compiladas como `undefined`.
+
+Por que isso começou agora
+
+A alteração de Debt & Finance adicionou 3 hooks novos:
+
+```text
+src/hooks/useFinancialDebts.ts
+src/hooks/useTaxDebts.ts
+src/hooks/useDebtSchedule.ts
 ```
 
-Esta tabela serve para o **gráfico de amortização real** (substitui o cálculo simplificado atual) e alimenta o Cash Flow com `parcela mensal PGFN R$ 12.415` e parcelas bancárias mês a mês.
+Esses 3 arquivos importam diretamente:
 
-### 2. RLS
-Como o app é interno (login restrito), todas as 3 tabelas usam o padrão já existente em `historical_clients`:
-- `SELECT`: qualquer usuário autenticado
-- `INSERT/UPDATE/DELETE`: qualquer usuário autenticado
+```ts
+import { supabase } from '@/integrations/supabase/client';
+```
 
-### 3. Migration + seed
-A migration cria as 3 tabelas e faz **seed inicial** com os 14 itens de dívida + ~50 linhas do cronograma mensal extraídos do XLSX. Um script Node lê `/tmp/divida.xlsx` localmente e gera o arquivo de migration com os `INSERT INTO ... VALUES (...)` prontos.
+Esse arquivo `src/integrations/supabase/client.ts` é auto-gerado e faz isto no topo do módulo:
 
-### 4. Frontend — `src/pages/DebtFinance.tsx` reescrita
+```ts
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-Layout novo espelhando o XLSX:
+export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, ...);
+```
 
-**Bloco 1 — KPIs (4 cards)**
-- Dívida Total: R$ 1.888.786
-- Financeiro: R$ 443.552 (23,5%)
-- Tributário: R$ 1.445.234 (76,5%)
-- Em Atraso (financeiro): R$ 92.824 ⚠️ badge vermelho
+Quando essas variáveis não chegam no build/publicação, ele quebra na hora.
 
-**Bloco 2 — Composição por Categoria**
-Tabela 6 colunas: Categoria | Subcategoria | Saldo | % Total | Status (badge) | Detalhe
+Por que quebra até abrindo a página inicial `/`, e não só `/debt`
 
-**Bloco 3 — Dívidas Financeiras (detalhe)**
-Tabela editável (botão "Editar" → modo edição com inputs):
-Dívida | Tipo (badge) | Valor Original | Pago | Saldo | % Pago (barra de progresso) | Parc. Restantes | Próx. Vcto | Status
+Porque `src/App.tsx` importa a página DebtFinance de forma estática:
 
-**Bloco 4 — Dívidas Tributárias (detalhe)**
-Subdividida em 3 sub-blocos com sub-headers:
-- 4a) SIEF/Empresas Vinculadas (a regularizar) — R$ 604.241
-- 4b) PGFN — 4 parcelamentos — R$ 721.413, parcela mensal total R$ 12.415
-- 4c) Municipais — R$ 119.579
+```ts
+import DebtFinance from './pages/DebtFinance';
+```
 
-**Bloco 5 — Gráfico de Amortização Mensal Real**
-`BarChart` empilhado lendo `debt_payment_schedule`:
-- 7 séries empilhadas (Karen, Paulo, Santander, CEF, Guardian, PGFN, Municipais)
-- Eixo X: meses (fev/2025 → jan/2030)
-- Eixo Y: R$ por mês
-- Tooltip mostra detalhamento por dívida + total
+E `DebtFinance` importa os 3 hooks acima. Então o navegador carrega essa cadeia inteira logo na abertura do app:
 
-**Bloco 6 — Pizza Financeiro vs Tributário** (já existe variação, ajustar)
+```text
+App.tsx
+  -> DebtFinance.tsx
+     -> useFinancialDebts.ts
+        -> integrations/supabase/client.ts
+           -> createClient(undefined, undefined)
+           -> crash geral
+```
 
-**Bloco 7 — Timeline Finance Cycle** (mantém atual)
+Mesmo que você esteja na home `/`, o import já foi avaliado. Por isso a tela branca aparece antes de qualquer rota, login ou dashboard.
 
-### 5. Edição no banco (CRUD)
-- Botão "Editar" em cada bloco abre inputs inline + botão "Salvar"
-- `useFinancialDebts()` hook com React Query: `select`, `update`, `insert`, `delete`
-- Após salvar, refresh dos KPIs (recalculados client-side)
-- Toast de confirmação
+Por que o fallback existente não salvou o app
 
-### 6. Limpar dados antigos
-- Remover `taxDebtItems` de `src/data/modelData.ts` (não é mais usado em lugar nenhum após a refatoração)
-- Manter `debtSchedule` apenas se outros lugares usarem (verificar com grep) — caso contrário, remover
-- `DebtFinance.tsx` deixa de importar de `modelData` e passa a usar os hooks do banco
+O projeto já tem um arquivo seguro:
 
-### 7. Integração com Cash Flow (opcional, fora deste escopo se preferir)
-A `debt_payment_schedule.total_month` pode ser somada ao output de saída de caixa do mês correspondente em `useOxyCashFlow` — fica como pergunta no final.
+```text
+src/lib/supabase-safe.ts
+```
 
----
+Esse arquivo tem fallback e inicialização protegida. Outras partes do app já usam ele corretamente, por exemplo:
 
-### Detalhes técnicos
+```text
+Auth.tsx
+ResetPassword.tsx
+ProtectedRoute.tsx
+useAssumptionsPersistence.ts
+useDreData.ts
+AppSidebar.tsx
+```
 
-| Arquivo | Mudança |
-|---|---|
-| `supabase/migrations/<ts>_debt_tables.sql` | CREATE TABLE financial_debts, tax_debts, debt_payment_schedule + RLS + seed completo |
-| `src/hooks/useFinancialDebts.ts` (novo) | React Query: list, update, insert, delete |
-| `src/hooks/useTaxDebts.ts` (novo) | idem |
-| `src/hooks/useDebtSchedule.ts` (novo) | apenas SELECT do cronograma mensal |
-| `src/pages/DebtFinance.tsx` | Reescrita completa (~400 linhas) com 7 blocos |
-| `src/components/debt/EditableDebtRow.tsx` (novo) | Linha editável reutilizável |
-| `src/components/debt/AmortizationChart.tsx` (novo) | Extrai gráfico mensal para componente |
-| `src/data/modelData.ts` | Remover `taxDebtItems` e `debtSchedule` se não usados em outro lugar |
+Mas os 3 hooks novos de dívida não usam esse arquivo seguro; eles usam o cliente auto-gerado direto. Então eles desviaram da proteção que já existia no projeto.
 
-### Dados a inserir no seed (resumo)
+Por que não sai da tela branca ao atualizar
 
-**14 dívidas financeiras + tributárias:**
-- 5 financeiras: Karen, Paulo, Santander, CEF, Guardian
-- 2 tributárias a regularizar: SIEF Matriz (R$ 567k), Empresas Vinculadas (R$ 37k)
-- 4 PGFN: 12996693, 13396849, 15516190, 15574311
-- 3 municipais: CWB, FLN, POA
+Porque o bundle publicado ainda é o mesmo arquivo quebrado:
 
-**~50 meses de cronograma** (fev/2025 a jan/2030) com 7 colunas cada.
+```text
+/assets/index-Dqy8wN9-.js
+```
 
----
+Enquanto esse bundle continuar contendo `createClient(undefined, undefined)`, todo reload vai executar o mesmo erro antes do React renderizar. Limpar cache ou recarregar não resolve se o código publicado continua com esse trecho.
 
-### Pergunta final antes de implementar
-A integração do cronograma com o Cash Flow (somar a parcela mensal de dívida ao output de caixa do mês) entra agora ou fica para depois? Sugiro **deixar para depois** — primeiro validamos a página /debt isolada.
+Plano de correção
+
+1. Trocar os 3 hooks de dívida para usar o cliente seguro
+   - `useFinancialDebts.ts`
+   - `useTaxDebts.ts`
+   - `useDebtSchedule.ts`
+
+   Em vez de importar `supabase` direto de `@/integrations/supabase/client`, usar `getBackendClientSafe()` de `@/lib/supabase-safe`.
+
+2. Tratar backend indisponível sem crash
+   - Nas queries, se o cliente não existir, retornar `[]` ou lançar um erro controlado pelo React Query.
+   - Nas mutations, se o cliente não existir, mostrar toast amigável em português em vez de derrubar o app.
+
+3. Não editar arquivos auto-gerados
+   - Não mexer em:
+     ```text
+     src/integrations/supabase/client.ts
+     src/integrations/supabase/types.ts
+     ```
+   - O conserto deve ficar nos hooks e seguir o padrão já usado no resto do projeto.
+
+4. Republicar o frontend depois da correção
+   - A correção só entra no site publicado quando o frontend for publicado/atualizado novamente.
+   - Backend/tabelas já existem; o problema atual é o JavaScript publicado quebrando na inicialização.
+
+5. Conferência pós-correção
+   - Confirmar que não existe mais import direto de `@/integrations/supabase/client` nos hooks novos.
+   - Confirmar que o app renderiza a rota `/` sem tela branca.
+   - Confirmar que a rota `/debt` carrega dados ou mostra estado vazio/erro controlado, sem crash global.
+
+Resumo direto
+
+A tela branca persiste porque a última publicação colocou no ar um bundle onde os hooks novos de Debt & Finance inicializam o cliente de backend diretamente com variáveis ausentes. Isso gera `supabaseUrl is required` no carregamento do JavaScript e derruba o app inteiro antes da primeira renderização.
+
+A correção real é remover essas 3 importações diretas e fazer esses hooks usarem o wrapper seguro que o projeto já tem.
+
+<lov-actions>
+  <lov-open-history>View History</lov-open-history>
+</lov-actions>
+
+<lov-actions>
+<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
+</lov-actions>

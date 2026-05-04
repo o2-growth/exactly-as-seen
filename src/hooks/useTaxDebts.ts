@@ -1,15 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { getBackendClientSafe } from '@/lib/supabase-safe';
 import { toast } from 'sonner';
 
 export interface TaxDebt {
   id: string;
-  category: string; // sief_matriz | empresas_vinculadas | pgfn | municipal
+  category: string;
   subcategory: string;
   detail: string | null;
   outstanding: number;
   items_count: number;
-  status: string; // a_regularizar | em_parcelamento | a_pagar
+  status: string;
   monthly_payment: number;
   adhesion_date: string | null;
   note: string | null;
@@ -18,11 +18,19 @@ export interface TaxDebt {
 
 const KEY = ['tax_debts'];
 
+function requireClient() {
+  const supabase = getBackendClientSafe();
+  if (!supabase) throw new Error('Backend indisponível');
+  return supabase as any;
+}
+
 export function useTaxDebts() {
   return useQuery<TaxDebt[]>({
     queryKey: KEY,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const supabase = getBackendClientSafe();
+      if (!supabase) return [];
+      const { data, error } = await (supabase as any)
         .from('tax_debts')
         .select('*')
         .order('sort_order', { ascending: true });
@@ -36,6 +44,7 @@ export function useUpdateTaxDebt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Partial<TaxDebt> & { id: string }) => {
+      const supabase = requireClient();
       const { id, ...rest } = payload;
       const { error } = await supabase.from('tax_debts').update(rest).eq('id', id);
       if (error) throw error;
@@ -52,6 +61,7 @@ export function useDeleteTaxDebt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
+      const supabase = requireClient();
       const { error } = await supabase.from('tax_debts').delete().eq('id', id);
       if (error) throw error;
     },
@@ -67,6 +77,7 @@ export function useInsertTaxDebt() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: Omit<Partial<TaxDebt>, 'id'> & { category: string; subcategory: string }) => {
+      const supabase = requireClient();
       const { error } = await supabase.from('tax_debts').insert(payload as any);
       if (error) throw error;
     },
