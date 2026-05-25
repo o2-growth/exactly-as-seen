@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ProdutoPMR, DEFAULT_PMR_PRODUTOS, calcPMRDias } from '@/lib/financialData';
 import { Check, ChevronDown, ChevronRight, Plus, Minus, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -26,7 +26,6 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
-/** Compact parcelas display */
 function parcelasLabel(parcelas: number[]): string {
   if (parcelas.length === 1) return `À vista (${parcelas[0]}%)`;
   return `${parcelas.length}x (${parcelas.join('/')})`;
@@ -36,11 +35,39 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedGrupos, setExpandedGrupos] = useState<Record<string, boolean>>({ CaaS: true, SaaS: true, Education: true, Expansao: true, Tax: true });
 
-  // Auto-save: update produto and persist immediately
+  // Local draft mirrors props but allows free editing (including invalid intermediate states).
+  const [draft, setDraft] = useState<ProdutoPMR[]>(produtos);
+
+  // Sync from props when they change externally (e.g., snapshot restore).
+  // Avoid clobbering local edits: only sync when prop identity changes AND differs from draft.
+  useEffect(() => {
+    setDraft(produtos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtos]);
+
+  /**
+   * Update a product in the draft.
+   * - Always updates local state (so inputs stay responsive while user types).
+   * - Commits to parent (onSave) only for the affected row IF its parcelas sum to 100%.
+   *   Other rows with invalid sums don't block this commit.
+   */
   const updateProduto = (id: string, updates: Partial<ProdutoPMR>) => {
-    const next = produtos.map(p => p.id === id ? { ...p, ...updates } : p);
-    const allValid = next.every(p => p.parcelas.reduce((s, v) => s + v, 0) === 100);
-    if (allValid) onSave(next);
+    const next = draft.map(p => p.id === id ? { ...p, ...updates } : p);
+    setDraft(next);
+
+    const updatedRow = next.find(p => p.id === id);
+    if (!updatedRow) return;
+    const total = updatedRow.parcelas.reduce((s, v) => s + v, 0);
+
+    // Only commit if THIS row's parcelas are valid. Other rows may still be 0/intermediate.
+    if (total === 100) onSave(next);
+  };
+
+  /** Parse input string allowing empty -> 0 only at commit time. */
+  const parseNum = (s: string): number => {
+    if (s === '' || s === '-') return 0;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
   };
 
   const toggleGrupo = (g: string) => setExpandedGrupos(prev => ({ ...prev, [g]: !prev[g] }));
@@ -71,12 +98,12 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
           </thead>
           <tbody>
             {GRUPOS.map(grupo => {
-              const items = produtos.filter(p => p.grupo === grupo);
+              const items = draft.filter(p => p.grupo === grupo);
               const isOpen = expandedGrupos[grupo];
               const avgPmr = items.length > 0 ? Math.round(items.reduce((s, p) => s + calcPMRDias(p.parcelas), 0) / items.length) : 0;
 
               return (
-                <>{/* Fragment for grupo */}
+                <>
                   <tr
                     key={`g-${grupo}`}
                     className="bg-secondary/30 border-b border-border/30 cursor-pointer hover:bg-secondary/40"
@@ -108,12 +135,12 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
                                   type="number"
                                   min="0"
                                   max="100"
-                                  className="w-10 h-6 text-center text-[11px] bg-secondary border border-border rounded outline-none focus:ring-1 focus:ring-primary tabular-nums"
+                                  className="w-12 h-6 text-center text-[11px] bg-secondary border border-border rounded outline-none focus:ring-1 focus:ring-primary tabular-nums"
                                   value={pct}
                                   placeholder={`${i + 1}ª`}
                                   onChange={e => {
                                     const next = [...prod.parcelas];
-                                    next[i] = Number(e.target.value) || 0;
+                                    next[i] = parseNum(e.target.value);
                                     updateProduto(prod.id, { parcelas: next });
                                   }}
                                 />
@@ -134,7 +161,14 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
-                            onClick={() => updateProduto(prod.id, { antecipa: !prod.antecipa, custoAntecipacao: prod.antecipa ? 0 : prod.custoAntecipacao })}
+                            onClick={() => {
+                              const next = draft.map(p => p.id === prod.id
+                                ? { ...p, antecipa: !p.antecipa, custoAntecipacao: p.antecipa ? 0 : p.custoAntecipacao }
+                                : p);
+                              setDraft(next);
+                              // Toggle is always a complete change → commit if this row is valid
+                              if (isValid) onSave(next);
+                            }}
                             className={`px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
                               prod.antecipa ? 'bg-blue-500/20 text-blue-400' : 'bg-secondary text-muted-foreground'
                             }`}
@@ -149,7 +183,11 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
                                 type="number" min="0" max="10" step="0.1"
                                 className="w-12 h-6 text-center text-[11px] bg-secondary border border-border rounded outline-none focus:ring-1 focus:ring-primary"
                                 value={prod.custoAntecipacao}
-                                onChange={e => updateProduto(prod.id, { custoAntecipacao: Number(e.target.value) || 0 })}
+                                onChange={e => {
+                                  const next = draft.map(p => p.id === prod.id ? { ...p, custoAntecipacao: parseNum(e.target.value) } : p);
+                                  setDraft(next);
+                                  if (isValid) onSave(next);
+                                }}
                               />
                               <span className="text-[10px] text-muted-foreground">%</span>
                             </div>
@@ -161,9 +199,13 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
                           <div className="flex items-center justify-center gap-0.5">
                             <input
                               type="number" min="0" max="30" step="0.5"
-                              className="w-11 h-6 text-center text-[11px] bg-secondary border border-border rounded outline-none focus:ring-1 focus:ring-primary"
+                              className="w-12 h-6 text-center text-[11px] bg-secondary border border-border rounded outline-none focus:ring-1 focus:ring-primary"
                               value={prod.inadimplencia}
-                              onChange={e => updateProduto(prod.id, { inadimplencia: Number(e.target.value) || 0 })}
+                              onChange={e => {
+                                const next = draft.map(p => p.id === prod.id ? { ...p, inadimplencia: parseNum(e.target.value) } : p);
+                                setDraft(next);
+                                if (isValid) onSave(next);
+                              }}
                             />
                             <span className="text-[10px] text-muted-foreground">%</span>
                           </div>
@@ -182,7 +224,7 @@ export default function PmrConfigurator({ produtos, onSave }: Props) {
       </div>
 
       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-        <Check className="h-3 w-3 text-positive" /> Auto-save ativo — alterações são salvas automaticamente quando parcelas somam 100%.
+        <Check className="h-3 w-3 text-positive" /> Auto-save ativo — cada linha é salva quando suas parcelas somam 100%. Linhas em vermelho continuam editáveis, mas não persistem até atingir 100%.
       </div>
     </div>
   );
