@@ -69,8 +69,11 @@ function computePageHeights(
 ): number[] {
   const minPageH = Math.max(200, maxPageH * 0.4);
   const gap = 8;
+  const usableBlocks = blocks.filter((b) => b.bottom - b.top <= maxPageH - gap * 2);
   const heights: number[] = [];
   let cursor = 0;
+
+  const insideBlock = (y: number) => usableBlocks.some((b) => b.top < y - 0.5 && b.bottom > y + 0.5);
 
   while (cursor < totalHeight) {
     const remaining = totalHeight - cursor;
@@ -82,17 +85,25 @@ function computePageHeights(
     let cut = cursor + maxPageH;
 
     // Procurar blocos que estão sendo cortados por `cut`
-    const conflicting = blocks.filter((b) => b.top < cut - 0.5 && b.bottom > cut + 0.5);
+    const conflicting = usableBlocks.filter((b) => b.top < cut - 0.5 && b.bottom > cut + 0.5);
 
     if (conflicting.length > 0) {
-      // Pegar o bloco mais "cortado" — usar o que tem o menor top entre os conflitantes
-      // (recuar para o topo do primeiro bloco cortado)
-      const topMost = conflicting.reduce((acc, b) => (b.top < acc.top ? b : acc), conflicting[0]);
-      const candidate = topMost.top - gap;
-      if (candidate > cursor + minPageH) {
-        cut = candidate;
+      // Recuar para o topo viável mais próximo do corte, evitando páginas minúsculas.
+      const viable = conflicting
+        .map((b) => b.top - gap)
+        .filter((candidate) => candidate > cursor + minPageH)
+        .sort((a, b) => b - a);
+
+      if (viable.length > 0) {
+        cut = viable[0];
+      } else {
+        const safeBoundaries = usableBlocks
+          .flatMap((b) => [b.top - gap, b.bottom + gap])
+          .filter((candidate) => candidate > cursor + minPageH && candidate < cut && !insideBlock(candidate))
+          .sort((a, b) => b - a);
+
+        if (safeBoundaries.length > 0) cut = safeBoundaries[0];
       }
-      // senão: bloco maior que página → aceita o corte original
     }
 
     cut = Math.min(cut, totalHeight);
@@ -139,35 +150,36 @@ export async function exportCurrentViewToPdf(): Promise<void> {
 
     const pageHeightsCss = computePageHeights(cssHeight, maxPageH, blocks);
 
-    const firstPageH = pageHeightsCss[0] * PX_TO_PT;
+    const pageH = maxPageH * PX_TO_PT;
+    const pageCanvasHeight = Math.round(maxPageH * SCALE);
     const pdf = new jsPDF({
       unit: 'pt',
-      format: [pageW, firstPageH],
-      orientation: pageW >= firstPageH ? 'landscape' : 'portrait',
+      format: [pageW, pageH],
+      orientation: pageW >= pageH ? 'landscape' : 'portrait',
     });
 
-    let renderedPx = 0;
+    let renderedCss = 0;
     pageHeightsCss.forEach((hCss, idx) => {
-      const slicePx = Math.round(hCss * SCALE);
-      const slicePt = hCss * PX_TO_PT;
+      const sourceY = Math.round(renderedCss * SCALE);
+      const slicePx = Math.min(canvas.height - sourceY, Math.round(hCss * SCALE));
 
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
-      sliceCanvas.height = slicePx;
+      sliceCanvas.height = pageCanvasHeight;
       const ctx = sliceCanvas.getContext('2d');
       if (!ctx) throw new Error('Não foi possível obter contexto 2D.');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-      ctx.drawImage(canvas, 0, renderedPx, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
+      ctx.drawImage(canvas, 0, sourceY, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
 
       const imgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
 
       if (idx > 0) {
-        pdf.addPage([pageW, slicePt], pageW >= slicePt ? 'landscape' : 'portrait');
+        pdf.addPage([pageW, pageH], pageW >= pageH ? 'landscape' : 'portrait');
       }
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, slicePt);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH);
 
-      renderedPx += slicePx;
+      renderedCss += hCss;
     });
 
     pdf.save(`O2-${slugifyRoute()}-${todayStamp()}.pdf`);
