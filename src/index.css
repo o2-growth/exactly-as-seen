@@ -146,14 +146,3 @@
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
-
-/* PDF export: expand internal scroll areas so html2canvas captures everything */
-html.printing,
-html.printing body {
-  overflow: visible !important;
-}
-html.printing #app-print-root,
-html.printing #app-print-root * {
-  overflow: visible !important;
-  max-height: none !important;
-}
