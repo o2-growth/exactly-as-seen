@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { FileDown, Sun, Moon, Menu } from 'lucide-react';
+import { FileDown, Sun, Moon, Menu, Loader2 } from 'lucide-react';
 import PeriodFilter from './PeriodFilter';
+import { exportCurrentViewToPdf } from '@/lib/exportPdf';
+import { toast } from '@/hooks/use-toast';
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
