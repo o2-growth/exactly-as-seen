@@ -2,6 +2,8 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const PRINT_ROOT_ID = 'app-print-root';
+const SCALE = 2;
+const PX_TO_PT = 0.75; // 1 CSS px = 0.75 pt @ 96dpi
 
 function getBackgroundColor(): string {
   const styles = getComputedStyle(document.documentElement);
@@ -21,38 +23,59 @@ function todayStamp(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function wait(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function nextFrames(n = 2) {
+  for (let i = 0; i < n; i++) {
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+  }
+}
+
 export async function exportCurrentViewToPdf(): Promise<void> {
-  const target = document.getElementById(PRINT_ROOT_ID);
+  const target = document.getElementById(PRINT_ROOT_ID) as HTMLElement | null;
   if (!target) throw new Error('Conteúdo da tela não encontrado para exportar.');
 
-  document.documentElement.classList.add('printing');
-  // Allow layout to settle after expanding overflow
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // Save and expand only the print root — não tocar em descendentes
+  const prevHeight = target.style.height;
+  const prevMaxHeight = target.style.maxHeight;
+  const prevOverflow = target.style.overflow;
+  target.style.height = 'auto';
+  target.style.maxHeight = 'none';
+  target.style.overflow = 'visible';
+
+  // Aguardar Recharts re-medir após mudança de altura
+  await nextFrames(2);
+  await wait(250);
 
   try {
     const bg = getBackgroundColor();
     const canvas = await html2canvas(target, {
-      scale: 2,
+      scale: SCALE,
       backgroundColor: bg,
       useCORS: true,
       logging: false,
-      windowWidth: target.scrollWidth,
-      windowHeight: target.scrollHeight,
     });
 
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
+    const cssWidth = canvas.width / SCALE;
+    const cssHeight = canvas.height / SCALE;
+    const pageW = cssWidth * PX_TO_PT;
+    // Cada página = uma "tela" cheia (ou todo o conteúdo, se couber)
+    const viewportH = Math.max(600, window.innerHeight);
+    const pageCssH = Math.min(cssHeight, viewportH);
+    const pageH = pageCssH * PX_TO_PT;
 
-    const imgW = pageW;
-    const ratio = canvas.width / imgW;
-    const sliceHpx = pageH * ratio; // pixels of source canvas per PDF page
+    const pdf = new jsPDF({ unit: 'pt', format: [pageW, pageH], orientation: pageW >= pageH ? 'landscape' : 'portrait' });
 
+    const sliceHpx = pageCssH * SCALE; // altura de cada slice no canvas-fonte
     let renderedPx = 0;
     let pageIndex = 0;
+
     while (renderedPx < canvas.height) {
       const remainingPx = canvas.height - renderedPx;
       const currentSlicePx = Math.min(sliceHpx, remainingPx);
+      const currentSlicePt = (currentSlicePx / SCALE) * PX_TO_PT;
 
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
@@ -73,18 +96,22 @@ export async function exportCurrentViewToPdf(): Promise<void> {
         currentSlicePx,
       );
 
-      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
-      const sliceHpt = currentSlicePx / ratio;
-      if (pageIndex > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, imgW, sliceHpt);
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
+
+      if (pageIndex > 0) {
+        // Última página pode ser menor — ajustar formato
+        pdf.addPage([pageW, currentSlicePt], pageW >= currentSlicePt ? 'landscape' : 'portrait');
+      }
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, currentSlicePt);
 
       renderedPx += currentSlicePx;
       pageIndex += 1;
     }
 
-    const filename = `O2-${slugifyRoute()}-${todayStamp()}.pdf`;
-    pdf.save(filename);
+    pdf.save(`O2-${slugifyRoute()}-${todayStamp()}.pdf`);
   } finally {
-    document.documentElement.classList.remove('printing');
+    target.style.height = prevHeight;
+    target.style.maxHeight = prevMaxHeight;
+    target.style.overflow = prevOverflow;
   }
 }

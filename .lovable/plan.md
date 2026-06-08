@@ -1,45 +1,31 @@
-# Exportar PDF — print fiel da tela atual
+# Corrigir PDF — print fiel (mesma fonte, mesmo espaçamento)
 
-## Objetivo
-Ativar o botão "Export PDF" (hoje desabilitado no `AppHeader`) para gerar um PDF que reproduz **exatamente** o que está visível na tela atual — como um print da área de conteúdo (`<main>`), funcionando em todas as rotas (`/`, `/pnl`, `/cashflow`, `/assumptions`, `/premissas`, `/simulador-tributario`, `/debt`, `/valuation`, `/history`).
+## Causa do problema
+- `.printing * { overflow: visible !important }` quebrou cards/tabelas internas e fez o `ResponsiveContainer` do Recharts re-medir errado (gráficos cortados, legenda solta).
+- `windowWidth: scrollWidth` forçou layout em largura diferente da real.
+- Reescala para A4 paisagem comprimiu/esticou fontes.
 
-## Abordagem
-Captura client-side via **html2canvas + jsPDF** (sem backend, sem edge functions, sem mudar dados):
+## Correção
 
-1. Adicionar dependências: `html2canvas`, `jspdf`.
-2. Criar `src/lib/exportPdf.ts` com função `exportCurrentViewToPdf(filename)`:
-   - Seleciona o elemento `<main>` do `AppLayout`.
-   - Renderiza com `html2canvas` (scale 2 para nitidez, `backgroundColor` lendo `--background`, `useCORS: true`).
-   - Cria PDF A4 paisagem em `jsPDF`, escala a imagem proporcionalmente à largura útil e **quebra automaticamente em múltiplas páginas** se a altura exceder uma página (loop fatiando o canvas).
-   - Gera nome: `O2-{rota}-{YYYY-MM-DD}.pdf`.
-3. Marcar o `<main>` em `AppLayout.tsx` com `id="app-print-root"` para seleção determinística.
-4. Em `AppHeader.tsx`:
-   - Remover `opacity-60 cursor-not-allowed` do botão.
-   - Adicionar `onClick` chamando a função, com estado `isExporting` (spinner + disable) e `toast` de sucesso/erro.
-   - Mostrar o botão também no mobile (ícone-only) — hoje está `hidden lg:flex`.
-5. Antes da captura, adicionar classe utilitária temporária `.printing` no `<html>` para:
-   - Expandir áreas com scroll interno (`overflow: visible !important` em tabelas/containers) para que o print não corte conteúdo "abaixo da dobra" dentro de cards roláveis.
-   - Esconder elementos puramente de UI de navegação dentro do main, se houver (ex.: tooltips abertos).
-   - Remover a classe no `finally`.
+### 1. `src/lib/exportPdf.ts` — reescrita
+- Sem `windowWidth`/`windowHeight` override.
+- Não tocar em descendentes. Apenas no próprio `<main>#app-print-root`: salvar `style.height`/`overflow`, setar `height: auto` e `overflow: visible` para revelar todo o conteúdo abaixo da dobra. Restaurar no `finally`.
+- Aguardar `2× requestAnimationFrame` + 200ms para Recharts re-medir.
+- `html2canvas(target, { scale: 2, backgroundColor, useCORS: true, logging: false })`.
+- PDF em **dimensões do conteúdo**, não A4:
+  - `cssWidth = canvas.width / 2` (px CSS), `cssHeight = canvas.height / 2`.
+  - `pxToPt = 0.75`; `pageW = cssWidth * pxToPt`.
+  - `pageH = Math.min(cssHeight, window.innerHeight) * pxToPt` → cada página = "uma tela".
+  - `new jsPDF({ unit: 'pt', format: [pageW, pageH] })`.
+- Fatiamento: para cada slice, criar canvas auxiliar com `width = canvas.width`, `height = sliceHpx` (= `pageH/pxToPt*2`), desenhar a faixa correspondente, inserir em 1:1 com `pdf.addImage(jpeg, 'JPEG', 0, 0, pageW, sliceHpx/2*pxToPt)`. Última página com altura proporcional ao resto.
+- JPEG qualidade 0.95.
+- Nome: `O2-{rota}-{YYYY-MM-DD}.pdf`.
 
-## Detalhes técnicos
-- **Fidelidade visual**: `html2canvas` respeita o tema atual (dark/light) porque lê o DOM renderizado. Cores via tokens HSL funcionam.
-- **Charts (Recharts)**: são SVG dentro do DOM — `html2canvas` captura corretamente.
-- **Páginas longas (PnL, Assumptions)**: o fatiamento por altura cobre N páginas A4 mantendo proporção.
-- **Sem alterações em**: contextos, engine de cálculo, dados, schema, edge functions, design tokens.
-- **Não inclui**: sidebar nem header no PDF (apenas o conteúdo da `<main>`), pois é o "conteúdo da tela" que importa. Confirmar se prefere incluir o header também.
+### 2. `src/index.css`
+- Remover o bloco `html.printing ...` adicionado anteriormente (não é mais usado).
 
-## Arquivos tocados
-- `package.json` (deps)
-- `src/lib/exportPdf.ts` (novo)
-- `src/components/layout/AppLayout.tsx` (id no main + classe printing)
-- `src/components/layout/AppHeader.tsx` (ativar botão + handler)
-- `src/index.css` (regras `.printing` para overflow)
+### 3. Sem mudanças em
+- `AppHeader.tsx`, `AppLayout.tsx`, contextos, engine, dados.
 
-## Fora de escopo
-- Templates customizados por tela, capa, paginação numerada, logo no rodapé.
-- Geração server-side / agendada.
-- Pitch deck Teaser/Book (fica para projeto separado já discutido).
-
-## Pergunta rápida
-Incluir o header da aplicação (com filtro de período, badge BASE, versão) no topo do PDF, ou só o conteúdo da `<main>`?
+## Resultado esperado
+Cada página do PDF é literalmente uma "tela" do app — mesma largura em pixels CSS, mesmas fontes, mesmos espaçamentos, gráficos com o tamanho que o Recharts mediu. Rolagem virtual da página vira páginas sequenciais.
