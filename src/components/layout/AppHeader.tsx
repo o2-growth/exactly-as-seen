@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useVersionHistory } from '@/contexts/VersionHistoryContext';
-import { FileDown, Sun, Moon, Menu } from 'lucide-react';
+import { FileDown, Sun, Moon, Menu, Loader2 } from 'lucide-react';
 import PeriodFilter from './PeriodFilter';
+import { exportCurrentViewToPdf } from '@/lib/exportPdf';
+import { toast } from '@/hooks/use-toast';
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -26,6 +28,25 @@ interface AppHeaderProps {
 export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
   const { currentVersion } = useVersionHistory();
   const { dark, toggle: toggleTheme } = useTheme();
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportPdf = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      await exportCurrentViewToPdf();
+      toast({ title: 'PDF gerado', description: 'O download foi iniciado.' });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Falha ao exportar PDF',
+        description: e instanceof Error ? e.message : 'Erro desconhecido.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between px-3 md:px-6 py-3 bg-card/90 backdrop-blur-md border-b border-border">
@@ -73,9 +94,14 @@ export default function AppHeader({ onMenuToggle }: AppHeaderProps) {
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
-        <button className="hidden lg:flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:text-foreground hover:border-primary/40 transition-colors opacity-60 cursor-not-allowed">
-          <FileDown className="h-3.5 w-3.5" />
-          Export PDF
+        <button
+          onClick={handleExportPdf}
+          disabled={isExporting}
+          className="flex items-center gap-1.5 px-2 md:px-3 py-2 text-xs font-medium text-muted-foreground border border-border rounded-lg hover:text-foreground hover:border-primary/40 transition-colors disabled:opacity-60 disabled:cursor-wait"
+          title="Exportar a tela atual em PDF"
+        >
+          {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileDown className="h-3.5 w-3.5" />}
+          <span className="hidden lg:inline">{isExporting ? 'Gerando...' : 'Export PDF'}</span>
         </button>
       </div>
     </header>
