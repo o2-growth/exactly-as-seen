@@ -33,11 +33,80 @@ async function nextFrames(n = 2) {
   }
 }
 
+/**
+ * Coleta retângulos (top/bottom em px CSS, relativos ao topo do print root)
+ * dos blocos que não devem ser cortados entre páginas.
+ */
+function collectUnbreakableBlocks(root: HTMLElement): Array<{ top: number; bottom: number }> {
+  const rootTop = root.getBoundingClientRect().top;
+  const selector = [
+    '.gradient-card',
+    '.kpi-card',
+    '[data-pdf-block]',
+    'table',
+    'section',
+    'article',
+    '[class*="card"]',
+  ].join(',');
+
+  const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector));
+  const blocks = nodes.map((el) => {
+    const r = el.getBoundingClientRect();
+    return { top: r.top - rootTop, bottom: r.bottom - rootTop };
+  });
+  // Ordenar por top ascendente
+  blocks.sort((a, b) => a.top - b.top);
+  return blocks;
+}
+
+/**
+ * Calcula alturas de página (px CSS) preferindo cortar entre blocos.
+ */
+function computePageHeights(
+  totalHeight: number,
+  maxPageH: number,
+  blocks: Array<{ top: number; bottom: number }>,
+): number[] {
+  const minPageH = Math.max(200, maxPageH * 0.4);
+  const gap = 8;
+  const heights: number[] = [];
+  let cursor = 0;
+
+  while (cursor < totalHeight) {
+    const remaining = totalHeight - cursor;
+    if (remaining <= maxPageH) {
+      heights.push(remaining);
+      break;
+    }
+
+    let cut = cursor + maxPageH;
+
+    // Procurar blocos que estão sendo cortados por `cut`
+    const conflicting = blocks.filter((b) => b.top < cut - 0.5 && b.bottom > cut + 0.5);
+
+    if (conflicting.length > 0) {
+      // Pegar o bloco mais "cortado" — usar o que tem o menor top entre os conflitantes
+      // (recuar para o topo do primeiro bloco cortado)
+      const topMost = conflicting.reduce((acc, b) => (b.top < acc.top ? b : acc), conflicting[0]);
+      const candidate = topMost.top - gap;
+      if (candidate > cursor + minPageH) {
+        cut = candidate;
+      }
+      // senão: bloco maior que página → aceita o corte original
+    }
+
+    cut = Math.min(cut, totalHeight);
+    heights.push(cut - cursor);
+    cursor = cut;
+  }
+
+  return heights;
+}
+
 export async function exportCurrentViewToPdf(): Promise<void> {
   const target = document.getElementById(PRINT_ROOT_ID) as HTMLElement | null;
   if (!target) throw new Error('Conteúdo da tela não encontrado para exportar.');
 
-  // Save and expand only the print root — não tocar em descendentes
   const prevHeight = target.style.height;
   const prevMaxHeight = target.style.maxHeight;
   const prevOverflow = target.style.overflow;
@@ -45,12 +114,15 @@ export async function exportCurrentViewToPdf(): Promise<void> {
   target.style.maxHeight = 'none';
   target.style.overflow = 'visible';
 
-  // Aguardar Recharts re-medir após mudança de altura
   await nextFrames(2);
   await wait(250);
 
   try {
     const bg = getBackgroundColor();
+
+    // Coletar blocos ANTES do canvas, com layout já estabilizado
+    const blocks = collectUnbreakableBlocks(target);
+
     const canvas = await html2canvas(target, {
       scale: SCALE,
       backgroundColor: bg,
@@ -61,52 +133,42 @@ export async function exportCurrentViewToPdf(): Promise<void> {
     const cssWidth = canvas.width / SCALE;
     const cssHeight = canvas.height / SCALE;
     const pageW = cssWidth * PX_TO_PT;
-    // Cada página = uma "tela" cheia (ou todo o conteúdo, se couber)
+
     const viewportH = Math.max(600, window.innerHeight);
-    const pageCssH = Math.min(cssHeight, viewportH);
-    const pageH = pageCssH * PX_TO_PT;
+    const maxPageH = Math.min(cssHeight, viewportH);
 
-    const pdf = new jsPDF({ unit: 'pt', format: [pageW, pageH], orientation: pageW >= pageH ? 'landscape' : 'portrait' });
+    const pageHeightsCss = computePageHeights(cssHeight, maxPageH, blocks);
 
-    const sliceHpx = pageCssH * SCALE; // altura de cada slice no canvas-fonte
+    const firstPageH = pageHeightsCss[0] * PX_TO_PT;
+    const pdf = new jsPDF({
+      unit: 'pt',
+      format: [pageW, firstPageH],
+      orientation: pageW >= firstPageH ? 'landscape' : 'portrait',
+    });
+
     let renderedPx = 0;
-    let pageIndex = 0;
-
-    while (renderedPx < canvas.height) {
-      const remainingPx = canvas.height - renderedPx;
-      const currentSlicePx = Math.min(sliceHpx, remainingPx);
-      const currentSlicePt = (currentSlicePx / SCALE) * PX_TO_PT;
+    pageHeightsCss.forEach((hCss, idx) => {
+      const slicePx = Math.round(hCss * SCALE);
+      const slicePt = hCss * PX_TO_PT;
 
       const sliceCanvas = document.createElement('canvas');
       sliceCanvas.width = canvas.width;
-      sliceCanvas.height = currentSlicePx;
+      sliceCanvas.height = slicePx;
       const ctx = sliceCanvas.getContext('2d');
       if (!ctx) throw new Error('Não foi possível obter contexto 2D.');
       ctx.fillStyle = bg;
       ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-      ctx.drawImage(
-        canvas,
-        0,
-        renderedPx,
-        canvas.width,
-        currentSlicePx,
-        0,
-        0,
-        canvas.width,
-        currentSlicePx,
-      );
+      ctx.drawImage(canvas, 0, renderedPx, canvas.width, slicePx, 0, 0, canvas.width, slicePx);
 
       const imgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
 
-      if (pageIndex > 0) {
-        // Última página pode ser menor — ajustar formato
-        pdf.addPage([pageW, currentSlicePt], pageW >= currentSlicePt ? 'landscape' : 'portrait');
+      if (idx > 0) {
+        pdf.addPage([pageW, slicePt], pageW >= slicePt ? 'landscape' : 'portrait');
       }
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, currentSlicePt);
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, slicePt);
 
-      renderedPx += currentSlicePx;
-      pageIndex += 1;
-    }
+      renderedPx += slicePx;
+    });
 
     pdf.save(`O2-${slugifyRoute()}-${todayStamp()}.pdf`);
   } finally {

@@ -1,31 +1,22 @@
-# Corrigir PDF — print fiel (mesma fonte, mesmo espaçamento)
+## Problema
+A paginação atual fatia o conteúdo a cada altura de viewport, cortando cards/gráficos no meio (faixa preta na imagem = corte sobre o gráfico "Margin Evolution").
 
-## Causa do problema
-- `.printing * { overflow: visible !important }` quebrou cards/tabelas internas e fez o `ResponsiveContainer` do Recharts re-medir errado (gráficos cortados, legenda solta).
-- `windowWidth: scrollWidth` forçou layout em largura diferente da real.
-- Reescala para A4 paisagem comprimiu/esticou fontes.
+## Solução — quebras inteligentes em `src/lib/exportPdf.ts`
 
-## Correção
+1. **Marcar blocos "inquebráveis"**: antes do `html2canvas`, percorrer `#app-print-root` e coletar os retângulos (top/bottom em px CSS, relativo ao topo do print root) dos elementos candidatos a "card":
+   - `.gradient-card`, `.kpi-card`, `[data-pdf-block]`, `table`, e qualquer filho direto de `<main>` que tenha `class*="card"` ou seja um `section`/`article`.
+   - Usar `getBoundingClientRect()` + `target.getBoundingClientRect().top` para normalizar.
 
-### 1. `src/lib/exportPdf.ts` — reescrita
-- Sem `windowWidth`/`windowHeight` override.
-- Não tocar em descendentes. Apenas no próprio `<main>#app-print-root`: salvar `style.height`/`overflow`, setar `height: auto` e `overflow: visible` para revelar todo o conteúdo abaixo da dobra. Restaurar no `finally`.
-- Aguardar `2× requestAnimationFrame` + 200ms para Recharts re-medir.
-- `html2canvas(target, { scale: 2, backgroundColor, useCORS: true, logging: false })`.
-- PDF em **dimensões do conteúdo**, não A4:
-  - `cssWidth = canvas.width / 2` (px CSS), `cssHeight = canvas.height / 2`.
-  - `pxToPt = 0.75`; `pageW = cssWidth * pxToPt`.
-  - `pageH = Math.min(cssHeight, window.innerHeight) * pxToPt` → cada página = "uma tela".
-  - `new jsPDF({ unit: 'pt', format: [pageW, pageH] })`.
-- Fatiamento: para cada slice, criar canvas auxiliar com `width = canvas.width`, `height = sliceHpx` (= `pageH/pxToPt*2`), desenhar a faixa correspondente, inserir em 1:1 com `pdf.addImage(jpeg, 'JPEG', 0, 0, pageW, sliceHpx/2*pxToPt)`. Última página com altura proporcional ao resto.
-- JPEG qualidade 0.95.
-- Nome: `O2-{rota}-{YYYY-MM-DD}.pdf`.
+2. **Calcular pontos de corte ótimos**:
+   - `maxPageH = window.innerHeight` (em px CSS).
+   - Algoritmo guloso: a partir de `cursor = 0`, candidato inicial `cut = cursor + maxPageH`. Se `cut` cai dentro de algum bloco (`block.top < cut < block.bottom`), recuar `cut` para `block.top` (desde que `block.top > cursor + minPageH`, com `minPageH = maxPageH * 0.4` para evitar páginas minúsculas).
+   - Se nenhum recuo é viável (bloco maior que página inteira, ex.: gráfico muito alto), aceitar o corte original — não há como evitar.
+   - Adicionar pequeno `gap` (8px) acima da quebra para respiro visual.
+   - Resultado: array de alturas de página `[h1, h2, …]` em px CSS, somando `cssHeight` total.
 
-### 2. `src/index.css`
-- Remover o bloco `html.printing ...` adicionado anteriormente (não é mais usado).
+3. **Renderização**: manter o pipeline atual (slice canvas → JPEG → `addImage`), mas usar as alturas calculadas em vez de `Math.min(viewportH, cssHeight)` fixo. Cada `addPage` usa `[pageW, hN * pxToPt]`.
 
-### 3. Sem mudanças em
-- `AppHeader.tsx`, `AppLayout.tsx`, contextos, engine, dados.
+4. **Sem mudanças** em `AppLayout.tsx`, `AppHeader.tsx`, `index.css`, contextos ou engine.
 
-## Resultado esperado
-Cada página do PDF é literalmente uma "tela" do app — mesma largura em pixels CSS, mesmas fontes, mesmos espaçamentos, gráficos com o tamanho que o Recharts mediu. Rolagem virtual da página vira páginas sequenciais.
+## Resultado
+Quebras de página passam preferencialmente entre cards/gráficos, nunca cortando um bloco no meio quando há espaço razoável acima.
