@@ -201,6 +201,31 @@ export async function exportCurrentViewToPdf(): Promise<void> {
   target.style.maxHeight = 'none';
   target.style.overflow = 'visible';
 
+  // Neutralizar overflow:auto/scroll/hidden em descendentes para que o
+  // scrollWidth real do conteúdo seja medido (caso contrário a captura
+  // corta os elementos que estavam atrás de scrollbars internos).
+  const overflowRestorers: Array<() => void> = [];
+  const allDescendants = target.querySelectorAll<HTMLElement>('*');
+  allDescendants.forEach((el) => {
+    const cs = getComputedStyle(el);
+    const ox = cs.overflowX;
+    const oy = cs.overflowY;
+    if (ox === 'auto' || ox === 'scroll' || ox === 'hidden' ||
+        oy === 'auto' || oy === 'scroll' || oy === 'hidden') {
+      const prevOX = el.style.overflowX;
+      const prevOY = el.style.overflowY;
+      const prevO = el.style.overflow;
+      el.style.overflow = 'visible';
+      el.style.overflowX = 'visible';
+      el.style.overflowY = 'visible';
+      overflowRestorers.push(() => {
+        el.style.overflow = prevO;
+        el.style.overflowX = prevOX;
+        el.style.overflowY = prevOY;
+      });
+    }
+  });
+
   await nextFrames(2);
   await wait(300);
 
@@ -209,7 +234,11 @@ export async function exportCurrentViewToPdf(): Promise<void> {
     const primary = getPrimaryColor();
     const blocks = collectUnbreakableBlocks(target);
 
-    const captureWidth = Math.max(target.scrollWidth, target.offsetWidth);
+    const captureWidth = Math.max(
+      target.scrollWidth,
+      target.offsetWidth,
+      document.documentElement.scrollWidth,
+    );
     const captureHeight = Math.max(target.scrollHeight, target.offsetHeight);
 
     const canvas = await html2canvas(target, {
@@ -222,14 +251,17 @@ export async function exportCurrentViewToPdf(): Promise<void> {
       windowWidth: captureWidth,
       windowHeight: captureHeight,
       onclone: (clonedDoc, clonedEl) => {
-        // 1) Injetar CSS para neutralizar animações/transições/opacidade e
-        //    preservar gradientes de texto.
+        // 1) Injetar CSS para neutralizar animações/transições/opacidade,
+        //    preservar gradientes de texto e forçar overflow visível.
         const style = clonedDoc.createElement('style');
         style.textContent = `
           *, *::before, *::after {
             animation: none !important;
             transition: none !important;
             opacity: 1 !important;
+          }
+          #${PRINT_ROOT_ID}, #${PRINT_ROOT_ID} * {
+            overflow: visible !important;
           }
           .bg-clip-text, [class*="bg-clip-text"], .text-transparent {
             -webkit-text-fill-color: ${primary} !important;
@@ -247,6 +279,7 @@ export async function exportCurrentViewToPdf(): Promise<void> {
           clonedEl.style.overflow = 'visible';
           clonedEl.style.height = 'auto';
           clonedEl.style.maxHeight = 'none';
+          clonedEl.style.width = `${captureWidth}px`;
         }
 
         // 3) Substituir form controls por texto estático
