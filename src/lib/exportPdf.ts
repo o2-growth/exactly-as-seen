@@ -50,6 +50,8 @@ function collectUnbreakableBlocks(root: HTMLElement): Array<{ top: number; botto
     'section',
     'article',
     '[class*="card"]',
+    '.recharts-responsive-container',
+    '.recharts-wrapper',
   ].join(',');
 
   const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector));
@@ -116,6 +118,14 @@ function computePageHeights(
  * Mantém dimensões, fontes e bordas copiando os estilos computados.
  */
 function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
+  const inlineAllStyles = (src: HTMLElement, dst: HTMLElement) => {
+    const cs = getComputedStyle(src);
+    for (let i = 0; i < cs.length; i++) {
+      const prop = cs[i];
+      dst.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
+  };
+
   const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
     const cs = getComputedStyle(src);
     const rect = src.getBoundingClientRect();
@@ -187,6 +197,24 @@ function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTML
     span.textContent = label;
     copyVisualStyles(orig, span);
     clone.parentNode.replaceChild(span, clone);
+  });
+
+  // Botões (html2canvas falha ao renderizar texto de alguns <button>,
+  // ex.: abas/TabsTrigger). Substituímos por <div> com os mesmos estilos
+  // computados e o mesmo conteúdo interno.
+  const origButtons = originalRoot.querySelectorAll<HTMLButtonElement>('button');
+  const cloneButtons = clonedRoot.querySelectorAll<HTMLButtonElement>('button');
+  origButtons.forEach((orig, i) => {
+    const clone = cloneButtons[i];
+    if (!clone || !clone.parentNode) return;
+    const div = clone.ownerDocument!.createElement('div');
+    while (clone.firstChild) div.appendChild(clone.firstChild);
+    inlineAllStyles(orig, div);
+    div.style.boxSizing = 'border-box';
+    const rect = orig.getBoundingClientRect();
+    div.style.width = `${rect.width}px`;
+    div.style.height = `${rect.height}px`;
+    clone.parentNode.replaceChild(div, clone);
   });
 }
 
