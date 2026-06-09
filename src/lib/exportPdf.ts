@@ -50,6 +50,8 @@ function collectUnbreakableBlocks(root: HTMLElement): Array<{ top: number; botto
     'section',
     'article',
     '[class*="card"]',
+    '.recharts-responsive-container',
+    '.recharts-wrapper',
   ].join(',');
 
   const nodes = Array.from(root.querySelectorAll<HTMLElement>(selector));
@@ -116,6 +118,14 @@ function computePageHeights(
  * Mantém dimensões, fontes e bordas copiando os estilos computados.
  */
 function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
+  const inlineAllStyles = (src: HTMLElement, dst: HTMLElement) => {
+    const cs = getComputedStyle(src);
+    for (let i = 0; i < cs.length; i++) {
+      const prop = cs[i];
+      dst.style.setProperty(prop, cs.getPropertyValue(prop));
+    }
+  };
+
   const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
     const cs = getComputedStyle(src);
     const rect = src.getBoundingClientRect();
