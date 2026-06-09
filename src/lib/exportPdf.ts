@@ -111,50 +111,82 @@ function computePageHeights(
 }
 
 /**
- * Sincroniza valores de form controls (inputs, selects, textareas) entre
- * a árvore original e a árvore clonada, pois html2canvas só lê atributos HTML.
+ * Substitui inputs/selects/textareas no clone por elementos de texto estáticos,
+ * porque html2canvas não renderiza confiavelmente o conteúdo de form controls.
+ * Mantém dimensões, fontes e bordas copiando os estilos computados.
  */
-function syncFormValues(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
+function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
+  const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
+    const cs = getComputedStyle(src);
+    const rect = src.getBoundingClientRect();
+    dst.style.display = 'inline-flex';
+    dst.style.alignItems = 'center';
+    dst.style.boxSizing = 'border-box';
+    dst.style.width = `${rect.width}px`;
+    dst.style.height = `${rect.height}px`;
+    dst.style.minHeight = `${rect.height}px`;
+    dst.style.padding = cs.padding;
+    dst.style.fontSize = cs.fontSize;
+    dst.style.fontFamily = cs.fontFamily;
+    dst.style.fontWeight = cs.fontWeight;
+    dst.style.color = cs.color;
+    dst.style.background = cs.backgroundColor;
+    dst.style.border = cs.border;
+    dst.style.borderRadius = cs.borderRadius;
+    dst.style.textAlign = cs.textAlign as string;
+    dst.style.lineHeight = cs.lineHeight;
+    dst.style.whiteSpace = 'nowrap';
+    dst.style.overflow = 'hidden';
+    dst.style.verticalAlign = 'middle';
+    // garantir que o texto fique alinhado ao mesmo lado do input original
+    if (cs.textAlign === 'right' || cs.textAlign === 'end') {
+      dst.style.justifyContent = 'flex-end';
+    } else if (cs.textAlign === 'center') {
+      dst.style.justifyContent = 'center';
+    } else {
+      dst.style.justifyContent = 'flex-start';
+    }
+  };
+
+  // Inputs
   const origInputs = originalRoot.querySelectorAll<HTMLInputElement>('input');
   const cloneInputs = clonedRoot.querySelectorAll<HTMLInputElement>('input');
   origInputs.forEach((orig, i) => {
     const clone = cloneInputs[i];
-    if (!clone) return;
+    if (!clone || !clone.parentNode) return;
     const type = (orig.type || 'text').toLowerCase();
-    if (type === 'checkbox' || type === 'radio') {
-      if (orig.checked) clone.setAttribute('checked', 'checked');
-      else clone.removeAttribute('checked');
-    } else {
-      clone.setAttribute('value', orig.value ?? '');
-      (clone as HTMLInputElement).value = orig.value ?? '';
-    }
+    if (type === 'checkbox' || type === 'radio') return; // deixar como está
+    const span = clone.ownerDocument!.createElement('span');
+    span.textContent = orig.value ?? '';
+    copyVisualStyles(orig, span);
+    clone.parentNode.replaceChild(span, clone);
   });
 
+  // Textareas
   const origTextareas = originalRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
   const cloneTextareas = clonedRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
   origTextareas.forEach((orig, i) => {
     const clone = cloneTextareas[i];
-    if (!clone) return;
-    clone.textContent = orig.value ?? '';
-    (clone as HTMLTextAreaElement).value = orig.value ?? '';
+    if (!clone || !clone.parentNode) return;
+    const div = clone.ownerDocument!.createElement('div');
+    div.textContent = orig.value ?? '';
+    copyVisualStyles(orig, div);
+    div.style.whiteSpace = 'pre-wrap';
+    clone.parentNode.replaceChild(div, clone);
   });
 
+  // Selects
   const origSelects = originalRoot.querySelectorAll<HTMLSelectElement>('select');
   const cloneSelects = clonedRoot.querySelectorAll<HTMLSelectElement>('select');
   origSelects.forEach((orig, i) => {
     const clone = cloneSelects[i];
-    if (!clone) return;
-    const value = orig.value;
-    Array.from(clone.options).forEach((opt) => {
-      if (opt.value === value) {
-        opt.setAttribute('selected', 'selected');
-        opt.selected = true;
-      } else {
-        opt.removeAttribute('selected');
-        opt.selected = false;
-      }
-    });
-    clone.setAttribute('value', value);
+    if (!clone || !clone.parentNode) return;
+    const selectedOpt = orig.options[orig.selectedIndex];
+    const label = selectedOpt ? selectedOpt.text : '';
+    const span = clone.ownerDocument!.createElement('span');
+    span.textContent = label;
+    copyVisualStyles(orig, span);
+    clone.parentNode.replaceChild(span, clone);
   });
 }
 
@@ -217,8 +249,8 @@ export async function exportCurrentViewToPdf(): Promise<void> {
           clonedEl.style.maxHeight = 'none';
         }
 
-        // 3) Sincronizar valores de form controls
-        syncFormValues(target, clonedEl as HTMLElement);
+        // 3) Substituir form controls por texto estático
+        replaceFormControlsWithText(target, clonedEl as HTMLElement);
       },
     });
 
