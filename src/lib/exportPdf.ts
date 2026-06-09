@@ -249,8 +249,8 @@ export async function exportCurrentViewToPdf(): Promise<void> {
           clonedEl.style.maxHeight = 'none';
         }
 
-        // 3) Sincronizar valores de form controls
-        syncFormValues(target, clonedEl as HTMLElement);
+        // 3) Substituir form controls por texto estático
+        replaceFormControlsWithText(target, clonedEl as HTMLElement);
       },
     });
 
