@@ -196,9 +196,9 @@ function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTML
   });
 
   // Botões (html2canvas falha ao renderizar texto de alguns <button>,
-  // ex.: abas/TabsTrigger). Substituímos por <div> preservando apenas os
-  // estilos visuais essenciais — evitando copiar TODAS as propriedades
-  // computadas, o que quebrava o layout de Tabs/painéis irmãos.
+  // ex.: abas/TabsTrigger). Substituímos por <div> com um <span> interno
+  // que carrega cor/tipografia explícitas — assim o texto não depende mais
+  // de herança no clone (que perde seletores data-[state=active]).
   const origButtons = originalRoot.querySelectorAll<HTMLButtonElement>('button');
   const cloneButtons = clonedRoot.querySelectorAll<HTMLButtonElement>('button');
   origButtons.forEach((orig, i) => {
@@ -206,30 +206,53 @@ function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTML
     if (!clone || !clone.parentNode) return;
     const cs = getComputedStyle(orig);
     const rect = orig.getBoundingClientRect();
-    const div = clone.ownerDocument!.createElement('div');
-    while (clone.firstChild) div.appendChild(clone.firstChild);
+    const doc = clone.ownerDocument!;
+
+    // Captura texto visível (ignora sr-only/hidden) e ícones SVG.
+    const text = (orig.innerText || orig.textContent || '').trim();
+    const svgs = Array.from(orig.querySelectorAll('svg')).map(
+      (svg) => svg.cloneNode(true) as SVGElement,
+    );
+
+    const div = doc.createElement('div');
     div.style.display = cs.display === 'none' ? 'none' : 'inline-flex';
     div.style.alignItems = 'center';
     div.style.justifyContent = cs.justifyContent || 'center';
-    div.style.gap = cs.gap;
+    div.style.gap = cs.gap && cs.gap !== 'normal' ? cs.gap : '6px';
     div.style.boxSizing = 'border-box';
     div.style.width = `${rect.width}px`;
     div.style.height = `${rect.height}px`;
     div.style.padding = cs.padding;
     div.style.margin = cs.margin;
-    div.style.fontSize = cs.fontSize;
-    div.style.fontFamily = cs.fontFamily;
-    div.style.fontWeight = cs.fontWeight;
-    div.style.color = cs.color;
     div.style.background = cs.backgroundColor;
     div.style.borderRadius = cs.borderRadius;
     div.style.border = cs.border;
     div.style.boxShadow = cs.boxShadow;
-    div.style.textAlign = cs.textAlign as string;
-    div.style.lineHeight = cs.lineHeight;
     div.style.whiteSpace = 'nowrap';
     div.style.overflow = 'hidden';
     div.style.verticalAlign = 'middle';
+
+    // SVGs primeiro (best-effort: ícones costumam vir antes do texto).
+    svgs.forEach((svg) => {
+      // Preserva cor do ícone via currentColor.
+      svg.setAttribute('style', `color: ${cs.color}; flex: none;`);
+      div.appendChild(svg);
+    });
+
+    if (text) {
+      const span = doc.createElement('span');
+      span.textContent = text;
+      span.style.color = cs.color;
+      span.style.fontSize = cs.fontSize;
+      span.style.fontFamily = cs.fontFamily;
+      span.style.fontWeight = cs.fontWeight;
+      span.style.lineHeight = cs.lineHeight;
+      span.style.letterSpacing = cs.letterSpacing;
+      span.style.textAlign = cs.textAlign as string;
+      span.style.whiteSpace = 'nowrap';
+      div.appendChild(span);
+    }
+
     clone.parentNode.replaceChild(div, clone);
   });
 }
