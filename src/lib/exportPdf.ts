@@ -198,6 +198,24 @@ function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTML
     copyVisualStyles(orig, span);
     clone.parentNode.replaceChild(span, clone);
   });
+
+  // Botões (html2canvas falha ao renderizar texto de alguns <button>,
+  // ex.: abas/TabsTrigger). Substituímos por <div> com os mesmos estilos
+  // computados e o mesmo conteúdo interno.
+  const origButtons = originalRoot.querySelectorAll<HTMLButtonElement>('button');
+  const cloneButtons = clonedRoot.querySelectorAll<HTMLButtonElement>('button');
+  origButtons.forEach((orig, i) => {
+    const clone = cloneButtons[i];
+    if (!clone || !clone.parentNode) return;
+    const div = clone.ownerDocument!.createElement('div');
+    while (clone.firstChild) div.appendChild(clone.firstChild);
+    inlineAllStyles(orig, div);
+    div.style.boxSizing = 'border-box';
+    const rect = orig.getBoundingClientRect();
+    div.style.width = `${rect.width}px`;
+    div.style.height = `${rect.height}px`;
+    clone.parentNode.replaceChild(div, clone);
+  });
 }
 
 export async function exportCurrentViewToPdf(): Promise<void> {
