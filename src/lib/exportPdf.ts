@@ -118,13 +118,9 @@ function computePageHeights(
  * Mantém dimensões, fontes e bordas copiando os estilos computados.
  */
 function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
-  const inlineAllStyles = (src: HTMLElement, dst: HTMLElement) => {
-    const cs = getComputedStyle(src);
-    for (let i = 0; i < cs.length; i++) {
-      const prop = cs[i];
-      dst.style.setProperty(prop, cs.getPropertyValue(prop));
-    }
-  };
+  // (inlineAllStyles foi removido — copiar todos os estilos computados
+  // de buttons quebrava o layout dos painéis de Tabs adjacentes.)
+
 
   const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
     const cs = getComputedStyle(src);
