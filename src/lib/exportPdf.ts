@@ -12,6 +12,13 @@ function getBackgroundColor(): string {
   return '#ffffff';
 }
 
+function getPrimaryColor(): string {
+  const styles = getComputedStyle(document.documentElement);
+  const p = styles.getPropertyValue('--primary').trim();
+  if (p) return `hsl(${p})`;
+  return '#16a34a';
+}
+
 function slugifyRoute(): string {
   const path = window.location.pathname.replace(/^\/+|\/+$/g, '') || 'overview';
   return path.replace(/\//g, '-');
@@ -33,10 +40,6 @@ async function nextFrames(n = 2) {
   }
 }
 
-/**
- * Coleta retângulos (top/bottom em px CSS, relativos ao topo do print root)
- * dos blocos que não devem ser cortados entre páginas.
- */
 function collectUnbreakableBlocks(root: HTMLElement): Array<{ top: number; bottom: number }> {
   const rootTop = root.getBoundingClientRect().top;
   const selector = [
@@ -54,14 +57,10 @@ function collectUnbreakableBlocks(root: HTMLElement): Array<{ top: number; botto
     const r = el.getBoundingClientRect();
     return { top: r.top - rootTop, bottom: r.bottom - rootTop };
   });
-  // Ordenar por top ascendente
   blocks.sort((a, b) => a.top - b.top);
   return blocks;
 }
 
-/**
- * Calcula alturas de página (px CSS) preferindo cortar entre blocos.
- */
 function computePageHeights(
   totalHeight: number,
   maxPageH: number,
@@ -83,12 +82,9 @@ function computePageHeights(
     }
 
     let cut = cursor + maxPageH;
-
-    // Procurar blocos que estão sendo cortados por `cut`
     const conflicting = usableBlocks.filter((b) => b.top < cut - 0.5 && b.bottom > cut + 0.5);
 
     if (conflicting.length > 0) {
-      // Recuar para o topo viável mais próximo do corte, evitando páginas minúsculas.
       const viable = conflicting
         .map((b) => b.top - gap)
         .filter((candidate) => candidate > cursor + minPageH)
@@ -114,6 +110,54 @@ function computePageHeights(
   return heights;
 }
 
+/**
+ * Sincroniza valores de form controls (inputs, selects, textareas) entre
+ * a árvore original e a árvore clonada, pois html2canvas só lê atributos HTML.
+ */
+function syncFormValues(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
+  const origInputs = originalRoot.querySelectorAll<HTMLInputElement>('input');
+  const cloneInputs = clonedRoot.querySelectorAll<HTMLInputElement>('input');
+  origInputs.forEach((orig, i) => {
+    const clone = cloneInputs[i];
+    if (!clone) return;
+    const type = (orig.type || 'text').toLowerCase();
+    if (type === 'checkbox' || type === 'radio') {
+      if (orig.checked) clone.setAttribute('checked', 'checked');
+      else clone.removeAttribute('checked');
+    } else {
+      clone.setAttribute('value', orig.value ?? '');
+      (clone as HTMLInputElement).value = orig.value ?? '';
+    }
+  });
+
+  const origTextareas = originalRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
+  const cloneTextareas = clonedRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
+  origTextareas.forEach((orig, i) => {
+    const clone = cloneTextareas[i];
+    if (!clone) return;
+    clone.textContent = orig.value ?? '';
+    (clone as HTMLTextAreaElement).value = orig.value ?? '';
+  });
+
+  const origSelects = originalRoot.querySelectorAll<HTMLSelectElement>('select');
+  const cloneSelects = clonedRoot.querySelectorAll<HTMLSelectElement>('select');
+  origSelects.forEach((orig, i) => {
+    const clone = cloneSelects[i];
+    if (!clone) return;
+    const value = orig.value;
+    Array.from(clone.options).forEach((opt) => {
+      if (opt.value === value) {
+        opt.setAttribute('selected', 'selected');
+        opt.selected = true;
+      } else {
+        opt.removeAttribute('selected');
+        opt.selected = false;
+      }
+    });
+    clone.setAttribute('value', value);
+  });
+}
+
 export async function exportCurrentViewToPdf(): Promise<void> {
   const target = document.getElementById(PRINT_ROOT_ID) as HTMLElement | null;
   if (!target) throw new Error('Conteúdo da tela não encontrado para exportar.');
@@ -126,19 +170,56 @@ export async function exportCurrentViewToPdf(): Promise<void> {
   target.style.overflow = 'visible';
 
   await nextFrames(2);
-  await wait(250);
+  await wait(300);
 
   try {
     const bg = getBackgroundColor();
-
-    // Coletar blocos ANTES do canvas, com layout já estabilizado
+    const primary = getPrimaryColor();
     const blocks = collectUnbreakableBlocks(target);
+
+    const captureWidth = Math.max(target.scrollWidth, target.offsetWidth);
+    const captureHeight = Math.max(target.scrollHeight, target.offsetHeight);
 
     const canvas = await html2canvas(target, {
       scale: SCALE,
       backgroundColor: bg,
       useCORS: true,
       logging: false,
+      width: captureWidth,
+      height: captureHeight,
+      windowWidth: captureWidth,
+      windowHeight: captureHeight,
+      onclone: (clonedDoc, clonedEl) => {
+        // 1) Injetar CSS para neutralizar animações/transições/opacidade e
+        //    preservar gradientes de texto.
+        const style = clonedDoc.createElement('style');
+        style.textContent = `
+          *, *::before, *::after {
+            animation: none !important;
+            transition: none !important;
+            opacity: 1 !important;
+          }
+          .bg-clip-text, [class*="bg-clip-text"], .text-transparent {
+            -webkit-text-fill-color: ${primary} !important;
+            color: ${primary} !important;
+            background: none !important;
+          }
+        `;
+        clonedDoc.head.appendChild(style);
+
+        // 2) Garantir que o root clonado não tem transform/opacity residuais
+        if (clonedEl instanceof HTMLElement) {
+          clonedEl.classList.remove('animate-fade-in');
+          clonedEl.style.transform = 'none';
+          clonedEl.style.opacity = '1';
+          clonedEl.style.overflow = 'visible';
+          clonedEl.style.height = 'auto';
+          clonedEl.style.maxHeight = 'none';
+        }
+
+        // 3) Sincronizar valores de form controls
+        syncFormValues(target, clonedEl as HTMLElement);
+      },
     });
 
     const cssWidth = canvas.width / SCALE;
