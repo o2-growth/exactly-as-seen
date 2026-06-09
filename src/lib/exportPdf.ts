@@ -333,5 +333,6 @@ export async function exportCurrentViewToPdf(): Promise<void> {
     target.style.height = prevHeight;
     target.style.maxHeight = prevMaxHeight;
     target.style.overflow = prevOverflow;
+    overflowRestorers.forEach((restore) => restore());
   }
 }
