@@ -118,13 +118,9 @@ function computePageHeights(
  * Mantém dimensões, fontes e bordas copiando os estilos computados.
  */
 function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
-  const inlineAllStyles = (src: HTMLElement, dst: HTMLElement) => {
-    const cs = getComputedStyle(src);
-    for (let i = 0; i < cs.length; i++) {
-      const prop = cs[i];
-      dst.style.setProperty(prop, cs.getPropertyValue(prop));
-    }
-  };
+  // (inlineAllStyles foi removido — copiar todos os estilos computados
+  // de buttons quebrava o layout dos painéis de Tabs adjacentes.)
+
 
   const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
     const cs = getComputedStyle(src);
@@ -200,20 +196,40 @@ function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTML
   });
 
   // Botões (html2canvas falha ao renderizar texto de alguns <button>,
-  // ex.: abas/TabsTrigger). Substituímos por <div> com os mesmos estilos
-  // computados e o mesmo conteúdo interno.
+  // ex.: abas/TabsTrigger). Substituímos por <div> preservando apenas os
+  // estilos visuais essenciais — evitando copiar TODAS as propriedades
+  // computadas, o que quebrava o layout de Tabs/painéis irmãos.
   const origButtons = originalRoot.querySelectorAll<HTMLButtonElement>('button');
   const cloneButtons = clonedRoot.querySelectorAll<HTMLButtonElement>('button');
   origButtons.forEach((orig, i) => {
     const clone = cloneButtons[i];
     if (!clone || !clone.parentNode) return;
+    const cs = getComputedStyle(orig);
+    const rect = orig.getBoundingClientRect();
     const div = clone.ownerDocument!.createElement('div');
     while (clone.firstChild) div.appendChild(clone.firstChild);
-    inlineAllStyles(orig, div);
+    div.style.display = cs.display === 'none' ? 'none' : 'inline-flex';
+    div.style.alignItems = 'center';
+    div.style.justifyContent = cs.justifyContent || 'center';
+    div.style.gap = cs.gap;
     div.style.boxSizing = 'border-box';
-    const rect = orig.getBoundingClientRect();
     div.style.width = `${rect.width}px`;
     div.style.height = `${rect.height}px`;
+    div.style.padding = cs.padding;
+    div.style.margin = cs.margin;
+    div.style.fontSize = cs.fontSize;
+    div.style.fontFamily = cs.fontFamily;
+    div.style.fontWeight = cs.fontWeight;
+    div.style.color = cs.color;
+    div.style.background = cs.backgroundColor;
+    div.style.borderRadius = cs.borderRadius;
+    div.style.border = cs.border;
+    div.style.boxShadow = cs.boxShadow;
+    div.style.textAlign = cs.textAlign as string;
+    div.style.lineHeight = cs.lineHeight;
+    div.style.whiteSpace = 'nowrap';
+    div.style.overflow = 'hidden';
+    div.style.verticalAlign = 'middle';
     clone.parentNode.replaceChild(div, clone);
   });
 }
