@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas';
+import { domToCanvas } from 'modern-screenshot';
 import jsPDF from 'jspdf';
 
 const PRINT_ROOT_ID = 'app-print-root';
@@ -10,13 +10,6 @@ function getBackgroundColor(): string {
   const bg = styles.getPropertyValue('--background').trim();
   if (bg) return `hsl(${bg})`;
   return '#ffffff';
-}
-
-function getPrimaryColor(): string {
-  const styles = getComputedStyle(document.documentElement);
-  const p = styles.getPropertyValue('--primary').trim();
-  if (p) return `hsl(${p})`;
-  return '#16a34a';
 }
 
 function slugifyRoute(): string {
@@ -112,151 +105,6 @@ function computePageHeights(
   return heights;
 }
 
-/**
- * Substitui inputs/selects/textareas no clone por elementos de texto estáticos,
- * porque html2canvas não renderiza confiavelmente o conteúdo de form controls.
- * Mantém dimensões, fontes e bordas copiando os estilos computados.
- */
-function replaceFormControlsWithText(originalRoot: HTMLElement, clonedRoot: HTMLElement) {
-  // (inlineAllStyles foi removido — copiar todos os estilos computados
-  // de buttons quebrava o layout dos painéis de Tabs adjacentes.)
-
-
-  const copyVisualStyles = (src: HTMLElement, dst: HTMLElement) => {
-    const cs = getComputedStyle(src);
-    const rect = src.getBoundingClientRect();
-    dst.style.display = 'inline-flex';
-    dst.style.alignItems = 'center';
-    dst.style.boxSizing = 'border-box';
-    dst.style.width = `${rect.width}px`;
-    dst.style.height = `${rect.height}px`;
-    dst.style.minHeight = `${rect.height}px`;
-    dst.style.padding = cs.padding;
-    dst.style.fontSize = cs.fontSize;
-    dst.style.fontFamily = cs.fontFamily;
-    dst.style.fontWeight = cs.fontWeight;
-    dst.style.color = cs.color;
-    dst.style.background = cs.backgroundColor;
-    dst.style.border = cs.border;
-    dst.style.borderRadius = cs.borderRadius;
-    dst.style.textAlign = cs.textAlign as string;
-    dst.style.lineHeight = cs.lineHeight;
-    dst.style.whiteSpace = 'nowrap';
-    dst.style.overflow = 'hidden';
-    dst.style.verticalAlign = 'middle';
-    // garantir que o texto fique alinhado ao mesmo lado do input original
-    if (cs.textAlign === 'right' || cs.textAlign === 'end') {
-      dst.style.justifyContent = 'flex-end';
-    } else if (cs.textAlign === 'center') {
-      dst.style.justifyContent = 'center';
-    } else {
-      dst.style.justifyContent = 'flex-start';
-    }
-  };
-
-  // Inputs
-  const origInputs = originalRoot.querySelectorAll<HTMLInputElement>('input');
-  const cloneInputs = clonedRoot.querySelectorAll<HTMLInputElement>('input');
-  origInputs.forEach((orig, i) => {
-    const clone = cloneInputs[i];
-    if (!clone || !clone.parentNode) return;
-    const type = (orig.type || 'text').toLowerCase();
-    if (type === 'checkbox' || type === 'radio') return; // deixar como está
-    const span = clone.ownerDocument!.createElement('span');
-    span.textContent = orig.value ?? '';
-    copyVisualStyles(orig, span);
-    clone.parentNode.replaceChild(span, clone);
-  });
-
-  // Textareas
-  const origTextareas = originalRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
-  const cloneTextareas = clonedRoot.querySelectorAll<HTMLTextAreaElement>('textarea');
-  origTextareas.forEach((orig, i) => {
-    const clone = cloneTextareas[i];
-    if (!clone || !clone.parentNode) return;
-    const div = clone.ownerDocument!.createElement('div');
-    div.textContent = orig.value ?? '';
-    copyVisualStyles(orig, div);
-    div.style.whiteSpace = 'pre-wrap';
-    clone.parentNode.replaceChild(div, clone);
-  });
-
-  // Selects
-  const origSelects = originalRoot.querySelectorAll<HTMLSelectElement>('select');
-  const cloneSelects = clonedRoot.querySelectorAll<HTMLSelectElement>('select');
-  origSelects.forEach((orig, i) => {
-    const clone = cloneSelects[i];
-    if (!clone || !clone.parentNode) return;
-    const selectedOpt = orig.options[orig.selectedIndex];
-    const label = selectedOpt ? selectedOpt.text : '';
-    const span = clone.ownerDocument!.createElement('span');
-    span.textContent = label;
-    copyVisualStyles(orig, span);
-    clone.parentNode.replaceChild(span, clone);
-  });
-
-  // Botões (html2canvas falha ao renderizar texto de alguns <button>,
-  // ex.: abas/TabsTrigger). Substituímos por <div> com um <span> interno
-  // que carrega cor/tipografia explícitas — assim o texto não depende mais
-  // de herança no clone (que perde seletores data-[state=active]).
-  const origButtons = originalRoot.querySelectorAll<HTMLButtonElement>('button');
-  const cloneButtons = clonedRoot.querySelectorAll<HTMLButtonElement>('button');
-  origButtons.forEach((orig, i) => {
-    const clone = cloneButtons[i];
-    if (!clone || !clone.parentNode) return;
-    const cs = getComputedStyle(orig);
-    const rect = orig.getBoundingClientRect();
-    const doc = clone.ownerDocument!;
-
-    // Captura texto visível (ignora sr-only/hidden) e ícones SVG.
-    const text = (orig.innerText || orig.textContent || '').trim();
-    const svgs = Array.from(orig.querySelectorAll('svg')).map(
-      (svg) => svg.cloneNode(true) as SVGElement,
-    );
-
-    const div = doc.createElement('div');
-    div.style.display = cs.display === 'none' ? 'none' : 'inline-flex';
-    div.style.alignItems = 'center';
-    div.style.justifyContent = cs.justifyContent || 'center';
-    div.style.gap = cs.gap && cs.gap !== 'normal' ? cs.gap : '6px';
-    div.style.boxSizing = 'border-box';
-    div.style.width = `${rect.width}px`;
-    div.style.height = `${rect.height}px`;
-    div.style.padding = cs.padding;
-    div.style.margin = cs.margin;
-    div.style.background = cs.backgroundColor;
-    div.style.borderRadius = cs.borderRadius;
-    div.style.border = cs.border;
-    div.style.boxShadow = cs.boxShadow;
-    div.style.whiteSpace = 'nowrap';
-    div.style.overflow = 'hidden';
-    div.style.verticalAlign = 'middle';
-
-    // SVGs primeiro (best-effort: ícones costumam vir antes do texto).
-    svgs.forEach((svg) => {
-      // Preserva cor do ícone via currentColor.
-      svg.setAttribute('style', `color: ${cs.color}; flex: none;`);
-      div.appendChild(svg);
-    });
-
-    if (text) {
-      const span = doc.createElement('span');
-      span.textContent = text;
-      span.style.color = cs.color;
-      span.style.fontSize = cs.fontSize;
-      span.style.fontFamily = cs.fontFamily;
-      span.style.fontWeight = cs.fontWeight;
-      span.style.lineHeight = cs.lineHeight;
-      span.style.letterSpacing = cs.letterSpacing;
-      span.style.textAlign = cs.textAlign as string;
-      span.style.whiteSpace = 'nowrap';
-      div.appendChild(span);
-    }
-
-    clone.parentNode.replaceChild(div, clone);
-  });
-}
-
 export async function exportCurrentViewToPdf(): Promise<void> {
   const target = document.getElementById(PRINT_ROOT_ID) as HTMLElement | null;
   if (!target) throw new Error('Conteúdo da tela não encontrado para exportar.');
@@ -269,8 +117,7 @@ export async function exportCurrentViewToPdf(): Promise<void> {
   target.style.overflow = 'visible';
 
   // Neutralizar overflow:auto/scroll/hidden em descendentes para que o
-  // scrollWidth real do conteúdo seja medido (caso contrário a captura
-  // corta os elementos que estavam atrás de scrollbars internos).
+  // conteúdo escondido por scrollbars internos também seja capturado.
   const overflowRestorers: Array<() => void> = [];
   const allDescendants = target.querySelectorAll<HTMLElement>('*');
   allDescendants.forEach((el) => {
@@ -298,7 +145,6 @@ export async function exportCurrentViewToPdf(): Promise<void> {
 
   try {
     const bg = getBackgroundColor();
-    const primary = getPrimaryColor();
     const blocks = collectUnbreakableBlocks(target);
 
     const captureWidth = Math.max(
@@ -308,50 +154,12 @@ export async function exportCurrentViewToPdf(): Promise<void> {
     );
     const captureHeight = Math.max(target.scrollHeight, target.offsetHeight);
 
-    const canvas = await html2canvas(target, {
+    // Captura nativa via SVG foreignObject — fica idêntico à tela.
+    const canvas = await domToCanvas(target, {
       scale: SCALE,
       backgroundColor: bg,
-      useCORS: true,
-      logging: false,
       width: captureWidth,
       height: captureHeight,
-      windowWidth: captureWidth,
-      windowHeight: captureHeight,
-      onclone: (clonedDoc, clonedEl) => {
-        // 1) Injetar CSS para neutralizar animações/transições/opacidade,
-        //    preservar gradientes de texto e forçar overflow visível.
-        const style = clonedDoc.createElement('style');
-        style.textContent = `
-          *, *::before, *::after {
-            animation: none !important;
-            transition: none !important;
-            opacity: 1 !important;
-          }
-          #${PRINT_ROOT_ID}, #${PRINT_ROOT_ID} * {
-            overflow: visible !important;
-          }
-          .bg-clip-text, [class*="bg-clip-text"], .text-transparent {
-            -webkit-text-fill-color: ${primary} !important;
-            color: ${primary} !important;
-            background: none !important;
-          }
-        `;
-        clonedDoc.head.appendChild(style);
-
-        // 2) Garantir que o root clonado não tem transform/opacity residuais
-        if (clonedEl instanceof HTMLElement) {
-          clonedEl.classList.remove('animate-fade-in');
-          clonedEl.style.transform = 'none';
-          clonedEl.style.opacity = '1';
-          clonedEl.style.overflow = 'visible';
-          clonedEl.style.height = 'auto';
-          clonedEl.style.maxHeight = 'none';
-          clonedEl.style.width = `${captureWidth}px`;
-        }
-
-        // 3) Substituir form controls por texto estático
-        replaceFormControlsWithText(target, clonedEl as HTMLElement);
-      },
     });
 
     const cssWidth = canvas.width / SCALE;
