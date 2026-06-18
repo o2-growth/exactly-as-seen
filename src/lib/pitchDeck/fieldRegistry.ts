@@ -1,11 +1,14 @@
 import type { FullModelOutput } from '@/engine/calculationsEngine';
 
-/** Helpers para formatar números em milhares (R$ 000's) e milhões (MM). */
+/** Helpers para formatar números.
+ *  IMPORTANTE: o engine `FullModelOutput` já retorna valores em R$ MIL (000's),
+ *  então não dividimos novamente. */
 export const fmtThousands = (v: number) =>
-  (Math.round(v / 1000)).toLocaleString('pt-BR');
+  Math.round(v).toLocaleString('pt-BR');
 
+/** Converte valor em R$ MIL para "X.XMM" (milhões). */
 export const fmtMillions = (v: number) =>
-  `${(v / 1_000_000).toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}MM`;
+  `${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1, minimumFractionDigits: 1 })}MM`;
 
 export const fmtPct = (v: number, digits = 1) =>
   `${v.toFixed(digits)}%`;
