@@ -1,133 +1,102 @@
+## Diagnóstico do que está hoje vs. o PDF original
 
-## Visão geral
+Comparei os 41 slides atuais com o PDF que você enviou. Existem **3 problemas reais**:
 
-Criar uma página interna `/pitch-deck` que reproduz fielmente o template enviado (41 slides) com **dados ao vivo vindos da página Premissas e do motor de cálculos** — mesma identidade visual da plataforma (navy + verde, Space Grotesk/Inter). Toda mudança em premissa reflete imediatamente nos slides.
+**1. Conteúdo do PDF foi resumido demais.** Vários slides perderam bullets, tabelas e números que estavam no original:
+- Slide 7 (custo CLT) — copy fiel, mas os valores estão **hardcoded** (R$ 25k, R$ 18k…) em vez de virem do módulo de Headcount.
+- Slide 12 (TAM) — o PDF tem tabela **TAM/SAM/SOM (20M / 6M / 100k)** com fonte Sebrae; nosso slide só mostra "6M · R$2Tri · 30%".
+- Slide 15 (SaaS+AI) — o PDF lista **10 funcionalidades detalhadas**; nosso slide mostra só 5 bullets curtos.
+- Slide 16 (CaaS) — o PDF tem **dois blocos**: B2B (10 pontos) e B2C/CFO (10 pontos); nosso slide tem 5 bullets genéricos.
+- Slide 17 (Marketplace) — o PDF tem tabela **"Dores da empresa / Plataforma O2 / Dores do CFO"**; nosso slide só tem 2 cards.
+- Slide 18 (BaaS) — o PDF lista **14 itens**; nosso slide mostra 4.
+- Slide 19 (Modelo) — o PDF mostra o **fluxo metodológico Setup (R$15k ou 12x R$1.497) + 3 planos SaaS (R$2.390 / R$2.497 / R$3.997) + MRR R$5.000**; nosso slide só puxa tickets do contexto.
 
-Para os "dois mundos" (dados sempre atualizados + possibilidade de ajuste manual), o deck terá **3 níveis de override**, todos opcionais e não-destrutivos:
+**2. Vários dados que existem no engine estão "fakes" ou hardcoded:**
+- Slide 25 — distribuição trimestral inventada (`0.7 + i*0.2`). Vamos somar os meses reais do `MonthlyPnL`.
+- Slide 23 — LTV/CAC = 8.9 fixo. O engine tem o cálculo real.
+- Slide 3 — KPIs como "R$3mi investidos em produto" e "+R$2bi de faturamento dos clientes" estão escritos como texto. O segundo dá pra puxar do `useHistoricalClients`.
+- Slide 39 — ARR usando `grossRevenue` total. ARR correto = `(MRR de dezembro do ano) × 12`, somando só receitas recorrentes (SaaS + CaaS recorrente).
 
-1. **Auto** (padrão): valor vem direto do cálculo/premissa.
-2. **Override de texto/copy** por slide: editar título, bullet, subtítulo, ou substituir um número.
-3. **Reordenar / ocultar slides** sem apagar nada.
+**3. Recorte travado em 2028.** Você pediu série completa **2022→2030** nos slides financeiros — hoje os charts param em 2025 (slide 24), 2028 (slide 27, 29), e a tabela de valuation usa só 2025.
 
-Tudo persistido em snapshot no banco (igual já fazemos com Premissas). Botão **"Resetar para dados ao vivo"** desfaz overrides quando quiser voltar à fonte da verdade.
+---
 
-## Estrutura da página
+## O que vou fazer
 
-Rota: `/pitch-deck` (entra no sidebar abaixo de Valuation).
+### A. Conteúdo: reescrever os 41 slides 100% fiel ao PDF
 
-Layout:
-```text
-+--------------------------------------------------+
-| Toolbar: [Editar] [Apresentar F5] [Export PPTX]  |
-|          [Export PDF] [Resetar overrides]        |
-+------+-------------------------------------------+
-| Mini |                                           |
-| navs |   Canvas 1920x1080 (escala responsiva)    |
-| 1..41|   ScaledSlide component                   |
-|      |                                           |
-+------+-------------------------------------------+
-```
+Cada slide passa a ter exatamente os bullets, tabelas e textos do original. Mantenho o design system O2 (navy + verde, Space Grotesk/Inter) — escolha "Híbrido".
 
-- Sidebar de thumbnails (clique navega).
-- Canvas central com slide escalado.
-- Modo Apresentação fullscreen com setas/Espaço/Esc.
-- Modo Edição: clique num campo destacado abre input inline → grava override.
+| Slide | O que muda |
+|---|---|
+| 6 | Tabela 5×3 com copy completo do PDF (Empreendedor + Gestor) |
+| 7 | Itens viram **rows do Headcount real** (CFO, Diretor TI, Dev, Analistas), valores do módulo |
+| 8 | Diagrama integrado DATAFLOW→DIAPA→LUXA fiel ao PDF |
+| 12 | Tabela **TAM / SAM / SOM (20M / 6M / 100k)** com fonte Sebrae |
+| 13 | 3 cards de produto com os ícones/screenshots do PDF |
+| 14-18 | Listas longas (10/14 itens) idênticas ao PDF |
+| 17 | Tabela 3 colunas "Dores empresa · O2 · Dores CFO" |
+| 19 | Card Setup + Card SaaS (3 planos) + Card MRR/Success Fee |
+| 20-21 | Fotos reais do time extraídas do PDF |
 
-## Mapeamento dos 41 slides → dados do sistema
+### B. Dados: cabear TUDO no `calculationsEngine` (2022→2030)
 
-Indico apenas os slides com dados dinâmicos. Os demais (capa, problema, metodologia, time, roadmap) ficam estáticos com copy editável.
+| Slide | Fonte real |
+|---|---|
+| 3 | `growth` = engine, `mult` = engine, `cmPct` = engine, `LTV/CAC` = engine, `clientes geridos` = `useHistoricalClients` |
+| 19 | `assumptions.tickets` + `assumptions.plans` |
+| 23 | LTV/CAC e CM% reais do engine |
+| 24 | Faturamento **2022–2030** (9 barras) |
+| 25 | Receita Bruta **mensal de 2025** (12 barras) somando `MonthlyPnL` real |
+| 26 | Marketing **2024–2030** |
+| 27 | Tabela **2025→2030**: Receita Bruta, Lucro Bruto, EBITDA, Lucro Líquido |
+| 28 | YoY 2024→2025 **e** 2025→2026 (2 colunas), do engine |
+| 29 | Tabela **2024→2030**: Receita Líquida, EBITDA, Margem EBITDA |
+| 30 | KPIs reais: caixa gerado YTD via `useOxyCashFlow` + dívida bancária via `useFinancialDebts` |
+| 39 | ARR = MRR dezembro de 2025 × 12 (recorrente apenas); valuation = ARR × 10× |
 
-| # | Slide | Fonte dos dados |
-|---|---|---|
-| 3 | Overview / KPIs | Crescimento YoY, MC%, LTV/CAC: `calculationsEngine` |
-| 19 | Modelo de Negócio (tickets) | `assumptionsContext` (ticket por produto) |
-| 22 | NPS / satisfação | Override manual (não temos no sistema) |
-| 23 | KPIs Marketing & Comercial | Client analytics (CAC, LTV, conversão) |
-| 24 | Evolução do Faturamento (R$000s) | Calc engine: receita bruta por trimestre |
-| 25 | Evolução KPIs Financeiros | Calc engine: Receita Bruta trimestral |
-| 26 | Investimento em Marketing | DRE: linha Marketing por período |
-| 27 | Projeções FY25–FY28 | DRE: Receita Bruta, Lucro Bruto, EBITDA, Resultado Líquido anuais |
-| 28 | Crescimento YoY | Calc engine: variação YoY dos indicadores |
-| 29 | Resultados com todos produtos | DRE consolidada por ano + % Receita Líquida |
-| 30 | Geração de caixa | Cash flow page |
-| 37 | Múltiplos SaaS Capital | Estático (referência externa) |
-| 39 | O2 = 10× ARR | ARR atual × 10 (calc engine) |
+### C. Imagens-chave do PDF importadas como assets
 
-Para cada campo dinâmico mostrado no slide, renderizo `<DataField fieldId="…" />` que:
-1. Lê valor do calc engine.
-2. Se houver override no snapshot, mostra override + badge "editado".
-3. Em modo edição, vira input.
+Extraio do PDF: logo O2, fotos dos sócios (slides 20-21), screenshots da Oxy (slides 14-15), ícones de produto (slide 13). Cada uma vai pro CDN via `lovable-assets` e entra no slide como `<img>`.
 
-## Persistência
+### D. Overrides continuam funcionando
 
-Nova tabela `pitch_deck_overrides`:
-```sql
-CREATE TABLE public.pitch_deck_overrides (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  overrides jsonb NOT NULL DEFAULT '{}'::jsonb,
-  slide_order jsonb,
-  hidden_slides jsonb DEFAULT '[]'::jsonb,
-  updated_at timestamptz DEFAULT now()
-);
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.pitch_deck_overrides TO authenticated;
-GRANT ALL ON public.pitch_deck_overrides TO service_role;
-ALTER TABLE public.pitch_deck_overrides ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "users manage own overrides" ON public.pitch_deck_overrides
-  FOR ALL TO authenticated
-  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
-```
+Toda string e número segue dentro de `<DataField>` — você continua editando manualmente quando precisar.
 
-Estrutura do JSON:
-```json
-{
-  "slide_27.ebitda_2028": "25.735",
-  "slide_3.kpi_crescimento": "210%"
-}
-```
+---
 
-## Export
-
-- **PDF**: reaproveita `modern-screenshot` já no projeto, renderizando cada slide em sequência (mesma pipeline do `exportPdf.ts`).
-- **PPTX**: usa a skill `pptx` (pptxgenjs) num gerador server-side simples — cada slide vira um slide PPTX editável no PowerPoint/Google Slides. Mantém títulos, bullets e tabelas como objetos editáveis (não imagem), para o usuário poder ajustar fora se quiser.
-
-## Arquitetura técnica
+## Arquitetura técnica (resumo)
 
 ```text
-src/pages/PitchDeck.tsx              ← rota principal (editor + presenter)
 src/components/pitch-deck/
-  ScaledSlide.tsx                    ← container 1920x1080
-  SlideLayout.tsx                    ← wrapper padrão
-  DataField.tsx                      ← campo dinâmico c/ override
-  ThumbnailStrip.tsx
-  PresenterMode.tsx
-  slides/
-    Slide01_Capa.tsx
-    Slide02_Intro.tsx
-    ...
-    Slide41_Obrigado.tsx
-src/contexts/PitchDeckContext.tsx    ← carrega overrides, expõe get/set
+  slides.tsx                     ← reescrita completa dos 41 slides
+  charts/
+    BarChart.tsx                 ← série dinâmica 2022-2030
+    YearTable.tsx                ← tabela ano-a-ano (anos configuráveis)
+    MonthlyBarChart.tsx          ← novo (slide 25 mensal real)
 src/lib/pitchDeck/
-  fieldRegistry.ts                   ← mapeia fieldId → seletor no calc engine
-  exportPptx.ts                      ← gerador PPTX (Edge Function)
-supabase/functions/pitch-export-pptx/index.ts
+  metrics.ts                     ← novo: getARR(), getLtvCac(), getQuarterlyRevenue(year), getMonthlyRevenue(year)
+src/assets/pitch-deck/           ← imagens extraídas do PDF (via lovable-assets)
+  *.asset.json
 ```
 
-## Etapas de implementação
+Novos helpers em `metrics.ts`:
+- `getARR(model, year)` — soma MRR de dezembro de produtos recorrentes × 12
+- `getLtvCac(model)` — usa CAC e ticket médio × duração esperada de retenção
+- `getMonthlyRevenue(model, year)` — array com 12 valores reais
+- `getYearsRange(start, end)` — gera labels p/ gráficos dinâmicos
 
-1. Migration `pitch_deck_overrides` + grants/RLS.
-2. `PitchDeckContext` (overrides + ordem + hidden) com auto-save.
-3. `ScaledSlide` + `SlideLayout` + `DataField`.
-4. Rota `/pitch-deck` + entrada no sidebar.
-5. 41 componentes de slide refletindo o template (uso as imagens extraídas como referência visual).
-6. Modo edição inline + toolbar.
-7. Modo Apresentação fullscreen.
-8. Export PDF (reaproveita pipeline existente).
-9. Edge Function de export PPTX.
-10. QA visual: render todos os slides com dados ao vivo, comparar lado-a-lado com o template enviado.
+Sem mudanças no engine ou no banco. Sem nova migration. Apenas:
+- 1 arquivo novo (`metrics.ts`)
+- 3 componentes de chart novos
+- 1 reescrita de `slides.tsx`
+- N assets de imagem
+
+---
 
 ## Fora deste plano
 
-- Não integramos com Pitch.com / Gamma / Google Slides (decidido: não vale o custo de manutenção).
-- Não criamos colaboração multi-usuário no deck (overrides são por usuário).
-- Slides 36–38 (citações SaaS Capital) ficam como copy estática editável — não há dado no sistema para automatizar.
+- Não mudo o `calculationsEngine` (todos os números já existem lá).
+- Não recrio a tabela `pitch_deck_overrides` (continua igual).
+- Não troco o estilo visual (manteremos o design system O2 — sua escolha foi "Híbrido").
+- NPS continua override manual (não existe dado de NPS no sistema). Se quiser, posso depois criar uma tabela `nps_responses` — mas isso fica fora deste escopo.
