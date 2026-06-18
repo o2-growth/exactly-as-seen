@@ -19,6 +19,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PremissasPage from "./pages/PremissasPage";
 import SimuladorTributario from "./pages/SimuladorTributario";
+import PitchDeck from "./pages/PitchDeck";
 // FinanceCycle is now integrated into CashFlow page
 
 const queryClient = new QueryClient({
@@ -46,6 +47,7 @@ const App = () => (
               <Route path="/debt" element={<ProtectedRoute><AppLayout><DebtFinance /></AppLayout></ProtectedRoute>} />
               <Route path="/valuation" element={<ProtectedRoute><AppLayout><Valuation /></AppLayout></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><AppLayout><VersionHistory /></AppLayout></ProtectedRoute>} />
+              <Route path="/pitch-deck" element={<ProtectedRoute><AppLayout><PitchDeck /></AppLayout></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

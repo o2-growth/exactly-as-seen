@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X, Receipt, Calculator, Eye, EyeOff, LogOut, User } from 'lucide-react';
+import { Home, BarChart3, Droplets, SlidersHorizontal, Landmark, TrendingUp, Clock, X, Receipt, Calculator, Eye, EyeOff, LogOut, User, Presentation } from 'lucide-react';
 import o2Logo from '@/assets/O2_Inc_Logo.png';
 import { getBackendClientSafe } from '@/lib/supabase-safe';
 
@@ -22,6 +22,7 @@ const navItems = [
   { to: '/cashflow', icon: Droplets, label: 'Cash Flow', hideable: false },
   { to: '/debt', icon: Landmark, label: 'Debt & Finance', hideable: false },
   { to: '/valuation', icon: TrendingUp, label: 'Valuation & Cap Table', hideable: false },
+  { to: '/pitch-deck', icon: Presentation, label: 'Pitch Deck', hideable: false },
   { to: '/history', icon: Clock, label: 'Version History', hideable: false },
 ];
 

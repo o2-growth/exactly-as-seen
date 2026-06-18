@@ -262,6 +262,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pitch_deck_overrides: {
+        Row: {
+          created_at: string
+          hidden_slides: Json
+          id: string
+          overrides: Json
+          slide_order: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          hidden_slides?: Json
+          id?: string
+          overrides?: Json
+          slide_order?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          hidden_slides?: Json
+          id?: string
+          overrides?: Json
+          slide_order?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tax_debts: {
         Row: {
           adhesion_date: string | null
