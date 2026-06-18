@@ -146,3 +146,12 @@
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
+
+/* ── Pitch Deck slide typography ──────────────────────────────────────── */
+.slide-content {
+  --slide-chrome: 20px;
+}
+.slide-chrome,
+.slide-badge,
+.slide-page,
+.slide-footer { font-size: var(--slide-chrome); line-height: 1.15; }
